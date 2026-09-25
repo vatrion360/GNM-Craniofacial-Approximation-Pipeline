@@ -74,6 +74,11 @@ def parse_args(argv=None) -> PipelineConfig:
                         help="PLY heatmap of the local correction (default: <output>_heatmap.ply)")
     parser.add_argument("--output-stats", default=None,
                         help="TXT statistics report (default: <output>_statistici.txt)")
+    parser.add_argument("--output-json", default=None, help="JSON reproducibility report")
+    parser.add_argument("--output-statistical", default=None, help="Unwarped statistical OBJ")
+    parser.add_argument("--seed", type=int, default=42, help="Deterministic sampling seed")
+    parser.add_argument("--overwrite", action="store_true", help="Explicitly replace previous outputs")
+    parser.add_argument("--strict", action="store_true", help="Require v3, model hash and documented tissue sources")
     parser.add_argument("--npz", default=default_npz_path(),
                         help="Path to gnm_head.npz")
     parser.add_argument("--regularization", default="auto",
@@ -83,7 +88,7 @@ def parse_args(argv=None) -> PipelineConfig:
                              "the TPS centres (e.g. --exclude Pogonion Rhinion)")
     parser.add_argument("--exclude-outliers", action="store_true",
                         help="Automatically exclude markers with residual > "
-                             "max(15 mm, 3*MAD) after the first fit and re-fit "
+                             "max(15 mm, median+3*MAD) after the first fit and re-fit "
                              "once; by default they are only flagged, not excluded")
     parser.add_argument("--max-correction-mm", type=float, default=15.0,
                         help="Hard cap of the local correction per vertex on the "
@@ -96,7 +101,9 @@ def parse_args(argv=None) -> PipelineConfig:
                              "without anatomical anchors (eyes/mouth interior/"
                              "lips); 1.0 = no protection")
     parser.add_argument("--skip-tps", action="store_true",
-                        help="Stop after the statistical fit (no local correction)")
+                        help="Stop after statistical fitting (the default)")
+    parser.add_argument("--local-correction", action="store_true",
+                        help="Enable bounded 3-D polyharmonic local correction (experimental)")
     parser.add_argument("--skull", default=None,
                         help="Skull (STL/OBJ) from the same Blender scene as the "
                              "CSV (world, mm) - enables the dense scalp constraints")
@@ -137,12 +144,17 @@ def parse_args(argv=None) -> PipelineConfig:
         output=args.output,
         output_error_mesh=args.output_error_mesh,
         output_stats=args.output_stats,
+        output_json=args.output_json,
+        output_statistical=args.output_statistical,
+        seed=args.seed,
+        overwrite=args.overwrite,
+        strict=args.strict,
         npz=args.npz,
         skull=args.skull,
         regularization=args.regularization,
         exclude=args.exclude,
         exclude_outliers=args.exclude_outliers,
-        skip_tps=args.skip_tps,
+        skip_tps=args.skip_tps or not args.local_correction,
         max_correction_mm=args.max_correction_mm,
         face_cap_mm=args.face_cap_mm,
         protect_damping=args.protect_damping,

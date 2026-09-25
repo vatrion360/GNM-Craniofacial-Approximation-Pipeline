@@ -1,0 +1,47 @@
+name: Blender integration
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  blender:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install .
+      - uses: actions/checkout@v4
+        with:
+          repository: google/GNM
+          ref: 915aa356c6a2247083e69a06e40dfe909d42435a
+          path: vendor/GNM
+          persist-credentials: false
+      - name: Verify model and build add-on
+        run: |
+          python tools/prepare_model.py --source vendor/GNM/gnm/shape/data/versions/v3_0/gnm_head.npz --destination models/gnm_head.npz
+          python tools/build_addon.py
+      - name: Download fixed Blender test version and verify official checksum
+        run: |
+          curl --fail --location --retry 3 --output blender-4.5.0-linux-x64.tar.xz https://download.blender.org/release/Blender4.5/blender-4.5.0-linux-x64.tar.xz
+          curl --fail --location --retry 3 --output blender-4.5.0.sha256 https://download.blender.org/release/Blender4.5/blender-4.5.0.sha256
+          sha256sum --check --ignore-missing blender-4.5.0.sha256
+          tar -xf blender-4.5.0-linux-x64.tar.xz
+      - name: Exercise ZIP, model, marker exchange and external fitting
+        shell: bash
+        run: |
+          export GNM_MODEL_PATH="$PWD/models/gnm_head.npz"
+          export GNM_EXTERNAL_PYTHON="$(command -v python)"
+          ./blender-4.5.0-linux-x64/blender --background --factory-startup --python-exit-code 1 --python tools/blender_smoke.py 2>&1 | tee blender-smoke.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blender-4.5.0-linux-smoke
+          path: blender-smoke.log

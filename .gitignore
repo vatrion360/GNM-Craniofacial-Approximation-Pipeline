@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+build/
+dist/
+wheelhouse/
+models/
+priors/
+outputs/
+*.blend*
+*.npz
+*.stl
+*.obj
+*.ply

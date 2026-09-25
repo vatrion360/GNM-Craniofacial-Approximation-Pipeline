@@ -1,0 +1,111 @@
+"""Run in Blender 4.2+: blender --background --factory-startup --python-exit-code 1 --python tools/blender_smoke.py.
+
+Tests the actual ZIP namespace, registration, tissue updates, v3 export and
+cleanup. Set GNM_MODEL_PATH to also exercise model loading and marker export.
+Set GNM_EXTERNAL_PYTHON to test the external fitting/import/cancellation path.
+This is an engineering smoke check, not a visual/anatomical validation.
+"""
+import importlib
+import json
+import os
+from pathlib import Path
+import sys
+import tempfile
+import time
+import zipfile
+
+import bpy
+
+root = Path(__file__).resolve().parents[1]
+archive = root / 'dist' / 'gnm_cranio-5.0.0rc1.zip'
+with tempfile.TemporaryDirectory() as directory:
+    with zipfile.ZipFile(archive) as z:
+        z.extractall(directory)
+    sys.path.insert(0, directory)
+    addon = importlib.import_module('gnm_cranio')
+    for _ in range(2):
+        addon.register()
+        assert hasattr(bpy.context.scene, 'gnm_markers')
+        addon.unregister()
+        assert not hasattr(bpy.types.Scene, 'gnm_markers')
+    addon.register()
+    try:
+        scene = bpy.context.scene
+        scene.unit_settings.system = 'METRIC'
+        scene.unit_settings.scale_length = .001
+        assert bpy.ops.gnm.init_markers() == {'FINISHED'}
+        assert len(scene.gnm_markers) == 27
+        item = scene.gnm_markers[0]
+        for attr, position in [('bone_empty', (0, 0, 0)), ('target_empty', (0, 0, 6))]:
+            obj = bpy.data.objects.new(attr, None)
+            scene.collection.objects.link(obj)
+            obj.location = position
+            setattr(item, attr, obj)
+        bpy.context.view_layer.update()
+        item.tissue_depth_mm = 8
+        bpy.context.view_layer.update()
+        assert abs(item.target_empty.matrix_world.translation.z - 8) < 1e-5
+        if os.environ.get('GNM_MODEL_PATH'):
+            scene.gnm_live.npz_path = os.environ['GNM_MODEL_PATH']
+            model = addon._load_gnm_model(scene.gnm_live.npz_path)
+            assert model.vertex_count == 17821
+            item.gnm_vertex_override = 12310
+            path = Path(directory) / 'test.csv'
+            addon._export_markers(scene, str(path))
+            backend = addon._core_module('backend').GNMBackend(scene.gnm_live.npz_path)
+            targets, _, meta = addon._core_module('io_csv').read_marker_csv(path, backend.index_to_label,
+                                                                          backend.landmark_vertex_map)
+            assert targets[0].vertex == 12310
+            assert meta['bone_positions_mm']['Nasion'] == [0, 0, 0]
+            if os.environ.get('GNM_EXTERNAL_PYTHON'):
+                # Synthetic mean targets test software plumbing, not anatomy.
+                for marker in scene.gnm_markers:
+                    marker.gnm_vertex_override = -1
+                    target = model.mu[addon._resolve_vertex(marker)]
+                    bone = target.copy()
+                    bone[2] -= marker.tissue_depth_mm
+                    for attr, position in [('bone_empty', bone), ('target_empty', target)]:
+                        obj = getattr(marker, attr)
+                        if obj is None:
+                            obj = bpy.data.objects.new(marker.label + attr, None)
+                            scene.collection.objects.link(obj)
+                            setattr(marker, attr, obj)
+                        obj.location = position.tolist()
+                    marker.tissue_source = 'synthetic model mean; software test only'
+                bpy.context.view_layer.update()
+                settings = scene.gnm_settings
+                settings.python_executable = os.environ['GNM_EXTERNAL_PYTHON']
+                settings.case_directory = str(Path(directory) / 'caz sintetic șță')
+                assert bpy.ops.gnm.run_offline() == {'FINISHED'}
+                assert bpy.app.timers.is_registered(addon._offline_poll)
+                folder = Path(addon._OFFLINE['folder'])
+                deadline = time.monotonic() + 180
+                while addon._OFFLINE['process'] is not None and time.monotonic() < deadline:
+                    addon._offline_poll()
+                    time.sleep(.05)
+                if not settings.offline_status.startswith('Completed;'):
+                    print((folder / 'run.log').read_text(encoding='utf-8'))
+                    raise AssertionError(settings.offline_status)
+                report = json.loads((folder / 'face_report.json').read_text(encoding='utf-8'))
+                assert report['metrics']['final_fit']['rmse_mm'] < .01
+                imported = [obj for obj in scene.objects if obj.get('gnm_report') == str(folder / 'face_report.json')]
+                assert len(imported) == 1 and len(imported[0].data.vertices) == model.vertex_count
+                # Direct polling in this headless script does not unregister a
+                # timer returning None, unlike Blender's event loop.
+                if bpy.app.timers.is_registered(addon._offline_poll):
+                    bpy.app.timers.unregister(addon._offline_poll)
+                assert bpy.ops.gnm.run_offline() == {'FINISHED'}
+                process = addon._OFFLINE['process']
+                assert bpy.ops.gnm.cancel_offline() == {'FINISHED'}
+                assert process.poll() is not None
+                assert not bpy.app.timers.is_registered(addon._offline_poll)
+                print('BLENDER_EXTERNAL_FIT_IMPORT_CANCEL_PASS')
+            else:
+                print('EXTERNAL FIT NOT TESTED: set GNM_EXTERNAL_PYTHON')
+        else:
+            print('MODEL LOAD/EXPORT NOT TESTED: set GNM_MODEL_PATH')
+    finally:
+        addon.unregister()
+    assert not bpy.app.timers.is_registered(addon._offline_poll)
+    assert not bpy.app.timers.is_registered(addon._live_timer_tick)
+print('BLENDER_SMOKE_PASS')

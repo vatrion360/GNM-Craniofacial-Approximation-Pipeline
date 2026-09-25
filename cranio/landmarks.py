@@ -11,8 +11,10 @@ Legatura dintre etichete si indecsii de vertex ai unui model concret
 (ex. GNM Head v3.0) NU sta aici - este responsabilitatea backend-ului
 (vezi cranio.backend.gnm_backend).
 
-Adancimile de tesut urmeaza literatura: Rhine & Campbell 1980;
-De Greef et al. 2006; Stephan & Simpson 2008 (corectate in addon V12).
+The numeric defaults are inherited heuristics without row-level traceability.
+They are NOT certified transcriptions of the cited tissue-depth literature.
+Weights are relative influence controls, not probabilities or inverse variances.
+See docs/SCIENCE.md and docs/SPECIALIST_WORKFLOW.md before casework.
 """
 
 # Eticheta -> (adancime_tesut_mm, latura)

@@ -123,6 +123,9 @@ def load_skull_samples(skull_path, n_samples=200000, seed=42):
         mesh = mesh.to_geometry()
     if not isinstance(mesh, trimesh.Trimesh) or len(mesh.vertices) == 0:
         raise ValueError(f"Nu am putut citi un mesh valid din {skull_path}")
+    if (not len(mesh.faces) or not np.isfinite(mesh.vertices).all()
+            or not np.isfinite(mesh.area) or mesh.area <= 0):
+        raise ValueError("Skull requires finite vertices and nonzero surface area")
     points, face_idx = trimesh.sample.sample_surface(mesh, n_samples, seed=seed)
     normals = mesh.face_normals[face_idx]
     return mesh, np.asarray(points), np.asarray(normals)
