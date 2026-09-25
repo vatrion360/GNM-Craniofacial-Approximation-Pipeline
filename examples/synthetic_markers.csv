@@ -1,0 +1,30 @@
+# gnm-marker-csv v3
+# {"coordinate_space": "world", "model_sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de", "purpose": "software smoke test, NOT accuracy validation", "synthetic": true, "units": "mm", "version": 3}
+label,vertex,placed,x,y,z,weight,bone_x,bone_y,bone_z,tissue_depth_mm,tissue_source
+Nasion,12319,1,0.05016312375664711,305.63739013671875,123.53564453125,1,,,,,synthetic mean-model target; not FSTT data
+Rhinion,12310,1,0.07422878593206406,280.8289794921875,139.1437530517578,1,,,,,synthetic mean-model target; not FSTT data
+Glabella,12337,1,0.008949332870543003,321.34539794921875,125.07393646240234,1,,,,,synthetic mean-model target; not FSTT data
+Pogonion,12284,1,0.0009568622335791588,226.43392944335938,133.8513946533203,1,,,,,synthetic mean-model target; not FSTT data
+Gnathion,12258,1,0.03161752223968506,192.25697326660156,124.79936981201172,1,,,,,synthetic mean-model target; not FSTT data
+Gonion_Dr,8737,1,-64.65754699707031,228.146728515625,52.205650329589844,1,,,,,synthetic mean-model target; not FSTT data
+Gonion_St,2609,1,64.67449188232422,228.16473388671875,52.249755859375,1,,,,,synthetic mean-model target; not FSTT data
+Orbita_Dr_Ext,7426,1,-43.8456916809082,299.9802551269531,105.77447509765625,1,,,,,synthetic mean-model target; not FSTT data
+Orbita_St_Ext,1298,1,43.81647872924805,299.9209899902344,105.7034683227539,1,,,,,synthetic mean-model target; not FSTT data
+Orbita_Dr_Int,11027,1,-18.359926223754883,299.2307434082031,111.01299285888672,1,,,,,synthetic mean-model target; not FSTT data
+Orbita_St_Int,4899,1,18.397390365600586,299.2018737792969,111.03923797607422,1,,,,,synthetic mean-model target; not FSTT data
+Supraorbitale_Dr,7566,1,-20.920801162719727,320.32928466796875,123.31847381591797,1,,,,,synthetic mean-model target; not FSTT data
+Supraorbitale_St,1438,1,20.927886962890625,320.2541809082031,123.35240936279297,1,,,,,synthetic mean-model target; not FSTT data
+Infraorbitale_Dr,9903,1,-25.695634841918945,261.829345703125,120.34611511230469,1,,,,,synthetic mean-model target; not FSTT data
+Infraorbitale_St,3775,1,25.68729019165039,261.9132995605469,120.27229309082031,1,,,,,synthetic mean-model target; not FSTT data
+Zygion_Dr,10002,1,-67.7127456665039,279.149169921875,83.14811706542969,1,,,,,synthetic mean-model target; not FSTT data
+Zygion_St,3874,1,67.69168853759766,279.210693359375,83.31047821044922,1,,,,,synthetic mean-model target; not FSTT data
+Alare_Dr,10105,1,-16.778772354125977,255.14248657226562,123.32735443115234,1,,,,,synthetic mean-model target; not FSTT data
+Alare_St,3977,1,16.821990966796875,255.16015625,123.35443115234375,1,,,,,synthetic mean-model target; not FSTT data
+Eurion_Dr,7765,1,-77.79637908935547,322.0069274902344,15.637118339538574,1,,,,,synthetic mean-model target; not FSTT data
+Eurion_St,1637,1,77.76321411132812,321.95599365234375,15.761144638061523,1,,,,,synthetic mean-model target; not FSTT data
+Vertex_VarfCap,12398,1,-0.03529943525791168,407.11016845703125,20.884227752685547,1,,,,,synthetic mean-model target; not FSTT data
+Nasospinale_BazaNas,12298,1,0.032606881111860275,253.86700439453125,132.30226135253906,1,,,,,synthetic mean-model target; not FSTT data
+Prosthion_BuzaSup,12276,1,0.018084634095430374,239.6085662841797,134.80577087402344,1,,,,,synthetic mean-model target; not FSTT data
+Acanthion,12297,1,0.03304513916373253,252.44790649414062,131.8172149658203,1,,,,,synthetic mean-model target; not FSTT data
+Piriform_Dr,10215,1,-12.44128131866455,253.4688720703125,126.56890106201172,1,,,,,synthetic mean-model target; not FSTT data
+Piriform_St,4087,1,12.48716926574707,253.49366760253906,126.60614013671875,1,,,,,synthetic mean-model target; not FSTT data

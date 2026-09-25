@@ -23,4 +23,5 @@ Module:
     pipeline    - fluxul complet end-to-end (folosit de CLI si de Blender).
 """
 
-__version__ = "4.0.0"
+
+__version__ = "5.0.0rc1"

@@ -1,123 +1,143 @@
-# -*- coding: utf-8 -*-
-"""Citire/scriere fisiere de markeri craniofaciali.
-
-Formate suportate:
-
-    * legacy v11/v12 - CSV simplu cu coloanele
-      ``gnm_landmark_index,x,y,z`` (index codificat cu semn; sentinelul
-      ``0,0,0`` = marker neplasat). Fara metadate.
-    * v2 - acelasi CSV, prefixat de doua linii-comentariu::
-
-        # gnm-marker-csv v2
-        # {"units": "mm", "addon_version": "12.0.0", ...}
-
-      Metadatele (JSON, o singura linie) includ unitatile, versiunea
-      addon-ului, fisierul craniu sursa si adancimile de tesut folosite -
-      pentru reproductibilitate (TODO.md, Faza 10). Cititorul legacy
-      ramane neschimbat: fisierele vechi se citesc identic.
-"""
-
+"""Explicit v3 marker interchange in world millimetres; legacy v1/v2 readable."""
 import csv
 import json
-from typing import List, NamedTuple, Tuple
+from typing import NamedTuple
 
 import numpy as np
-
 from .landmarks import CONFIDENCE_WEIGHTS, DEFAULT_CONFIDENCE
+from .validation import finite_array
 
 V2_MAGIC = "# gnm-marker-csv v2"
+V3_MAGIC = "# gnm-marker-csv v3"
+V3_FIELDS = ["label", "vertex", "placed", "x", "y", "z", "weight",
+             "bone_x", "bone_y", "bone_z", "tissue_depth_mm", "tissue_source"]
 
 
 class MarkerTarget(NamedTuple):
-    """Un marker plasat: eticheta, vertexul modelului, tinta, ponderea.
-
-    NamedTuple ca sa ramana compatibil cu decompozitia positionala
-    ``(label, vertex, xyz, weight)`` din codul existent.
-    """
     label: str
     vertex: int
     xyz: np.ndarray
     weight: float
 
 
-def _decode_rows(rows, index_to_label, label_to_vertex):
-    """Transforma randuri CSV in (targets, skipped) - logica comuna."""
-    targets: List[MarkerTarget] = []
-    skipped: List[Tuple[str, str]] = []
-    for row in rows:
-        enc = int(row["gnm_landmark_index"])
-        x, y, z = float(row["x"]), float(row["y"]), float(row["z"])
-        label = index_to_label.get(enc)
-        if label is None:
-            skipped.append((str(enc),
-                            "unknown index (newer addon version?)"))
-            continue
-        if abs(x) < 1e-9 and abs(y) < 1e-9 and abs(z) < 1e-9:
-            skipped.append((label, "not placed in the addon (0,0,0)"))
-            continue
-        targets.append(MarkerTarget(
-            label=label,
-            vertex=label_to_vertex[label],
-            xyz=np.array([x, y, z], dtype=np.float64),
-            weight=CONFIDENCE_WEIGHTS.get(label, DEFAULT_CONFIDENCE),
-        ))
-    return targets, skipped
-
-
 def read_marker_csv(csv_path, index_to_label, label_to_vertex):
-    """Citeste un fisier de markeri (legacy sau v2), cu auto-detectie.
-
-    Returneaza (targets, skipped, metadata) unde:
-      targets = lista de MarkerTarget;
-      skipped = lista de (eticheta, motiv) pentru markerii exclusi;
-      metadata = dict ({"version": 1} pentru fisiere legacy).
-    """
-    with open(csv_path, newline="") as f:
-        raw_lines = f.read().splitlines()
-
-    metadata = {"version": 1}
-    body = raw_lines
-    if raw_lines and raw_lines[0].strip() == V2_MAGIC:
-        metadata = {"version": 2}
-        if len(raw_lines) > 1 and raw_lines[1].lstrip().startswith("#"):
-            try:
-                metadata.update(json.loads(raw_lines[1].lstrip()[1:].strip()))
-            except json.JSONDecodeError:
-                metadata["metadata_error"] = "the JSON metadata line is corrupted"
-        body = [ln for ln in raw_lines if not ln.lstrip().startswith("#")]
-
-    targets, skipped = _decode_rows(
-        csv.DictReader(body), index_to_label, label_to_vertex)
+    with open(csv_path, encoding="utf-8-sig", newline="") as stream:
+        lines = stream.read().splitlines()
+    if not lines:
+        raise ValueError("Marker CSV is empty")
+    version = {V2_MAGIC: 2, V3_MAGIC: 3}.get(lines[0].strip(), 1)
+    metadata = {"version": version}
+    if version > 1:
+        if len(lines) < 2 or not lines[1].lstrip().startswith("#"):
+            raise ValueError("Versioned CSV requires a JSON metadata line")
+        try:
+            meta = json.loads(lines[1].lstrip()[1:].strip())
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid marker metadata: {exc}") from exc
+        if not isinstance(meta, dict):
+            raise ValueError("Marker metadata must be a JSON object")
+        metadata.update(meta)
+        metadata["version"] = version
+    if version == 3 and (metadata.get("units") != "mm" or
+                         metadata.get("coordinate_space") != "world"):
+        raise ValueError("v3 requires units='mm' and coordinate_space='world'")
+    if metadata.get("units", "mm") != "mm":
+        raise ValueError("Marker units must be mm; explicitly convert before fitting")
+    reader = csv.DictReader(ln for ln in lines if not ln.lstrip().startswith("#"))
+    required = {"label", "vertex", "placed", "x", "y", "z", "weight"} if version == 3 else {
+        "gnm_landmark_index", "x", "y", "z"}
+    if not required.issubset(reader.fieldnames or []):
+        raise ValueError(f"CSV is missing required columns: {sorted(required)}")
+    targets, skipped, seen_labels, seen_vertices = [], [], set(), set()
+    bones, records = {}, {}
+    for line_number, row in enumerate(reader, 1):
+        try:
+            if None in row:
+                raise ValueError("extra columns")
+            if version == 3:
+                label = row["label"].strip()
+                if not label:
+                    raise ValueError("empty label")
+                if label in seen_labels:
+                    raise ValueError(f"duplicate label {label}")
+                seen_labels.add(label)
+                if row["placed"] not in ("0", "1"):
+                    raise ValueError("placed must be 0 or 1")
+                if row["placed"] == "0":
+                    skipped.append((label, "not placed"))
+                    continue
+                vertex = int(row["vertex"])
+                weight = float(row["weight"])
+            else:
+                enc = int(row["gnm_landmark_index"])
+                label = index_to_label.get(enc)
+                if label is None:
+                    raise ValueError(f"unknown legacy index {enc}; export explicit v3 labels")
+                if label in seen_labels:
+                    raise ValueError(f"duplicate label {label}")
+                seen_labels.add(label)
+                vertex = label_to_vertex[label]
+                weight = CONFIDENCE_WEIGHTS.get(label, DEFAULT_CONFIDENCE)
+            xyz = finite_array([float(row[a]) for a in ("x", "y", "z")], label, (3,))
+            if version < 3 and np.all(np.abs(xyz) < 1e-9):
+                skipped.append((label, "legacy unplaced origin sentinel"))
+                continue
+            if vertex < 0 or vertex in seen_vertices:
+                raise ValueError(f"negative or duplicate vertex {vertex}")
+            if not np.isfinite(weight) or not 0 < weight <= 1:
+                raise ValueError("weight must be finite and in (0, 1]")
+            seen_vertices.add(vertex)
+            if version == 3:
+                record = {}
+                values = [row.get("bone_" + axis, "") for axis in "xyz"]
+                if any(v not in ("", None) for v in values):
+                    bone = finite_array([float(v) for v in values], f"{label} bone", (3,))
+                    bones[label] = bone.tolist()
+                    record["bone_xyz_mm"] = bone.tolist()
+                depth = row.get("tissue_depth_mm", "")
+                if depth not in ("", None):
+                    depth = float(depth)
+                    if not np.isfinite(depth) or depth < 0:
+                        raise ValueError("tissue_depth_mm must be finite and nonnegative")
+                    record["tissue_depth_mm"] = depth
+                    if label in bones and not np.isclose(np.linalg.norm(xyz - bones[label]), depth,
+                                                         atol=0.05, rtol=0):
+                        raise ValueError("bone-to-target distance differs from tissue_depth_mm")
+                record["tissue_source"] = row.get("tissue_source", "") or "unspecified"
+                records[label] = record
+            targets.append(MarkerTarget(label, vertex, xyz, weight))
+        except (TypeError, KeyError, ValueError) as exc:
+            raise ValueError(f"CSV data row {line_number}: {exc}") from exc
+    metadata["bone_positions_mm"] = bones
+    metadata["marker_records"] = records
+    if version < 3:
+        metadata["legacy_assumptions"] = "world millimetres; origin means unplaced; no bone positions"
     return targets, skipped, metadata
 
 
-def write_marker_csv_v2(csv_path, rows, metadata=None):
-    """Scrie un fisier de markeri v2 (metadate JSON + CSV legacy-compatibil).
+def write_marker_csv_v3(csv_path, rows, metadata=None):
+    meta = dict(metadata or {})
+    meta.update(version=3, units="mm", coordinate_space="world")
+    with open(csv_path, "w", newline="", encoding="utf-8") as stream:
+        stream.write(V3_MAGIC + "\n# " + json.dumps(meta, sort_keys=True, ensure_ascii=False,
+                                                   allow_nan=False) + "\n")
+        writer = csv.DictWriter(stream, fieldnames=V3_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+    return meta
 
-    rows = lista de (index_codificat, x, y, z); sunt sortate ca la exportul
-    legacy. Corpul CSV ramane citibil de orice cititor legacy care ignora
-    liniile comentariu.
-    """
-    meta = {"version": 2}
-    if metadata:
-        meta.update(metadata)
-    with open(csv_path, "w", newline="") as f:
-        f.write(V2_MAGIC + "\n")
-        f.write("# " + json.dumps(meta, ensure_ascii=False, sort_keys=True)
-                + "\n")
-        writer = csv.writer(f)
+
+def write_marker_csv_v2(csv_path, rows, metadata=None):
+    meta = {"version": 2, "units": "mm", **(metadata or {})}
+    with open(csv_path, "w", newline="", encoding="utf-8") as stream:
+        stream.write(V2_MAGIC + "\n# " + json.dumps(meta, ensure_ascii=False,
+                                                  allow_nan=False) + "\n")
+        writer = csv.writer(stream)
         writer.writerow(["gnm_landmark_index", "x", "y", "z"])
         writer.writerows(sorted(rows))
     return meta
 
 
 def load_csv_targets(csv_path, index_to_label, label_to_vertex):
-    """Compatibilitate cu vechiul API: returneaza (targets, skipped).
-
-    targets este o lista de tuple-uri (eticheta, vertex, xyz, greutate),
-    exact ca in gnm_reconstruct v3.1.
-    """
-    targets, skipped, _meta = read_marker_csv(
-        csv_path, index_to_label, label_to_vertex)
-    tuples = [(t.label, t.vertex, t.xyz, t.weight) for t in targets]
-    return tuples, skipped
+    targets, skipped, _ = read_marker_csv(csv_path, index_to_label, label_to_vertex)
+    return targets, skipped

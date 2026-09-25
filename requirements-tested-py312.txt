@@ -1,0 +1,4 @@
+# Runtime used for the local Python 3.12 validation; obtain wheels per target OS.
+numpy==2.3.5
+scipy==1.17.0
+trimesh==5.1.0

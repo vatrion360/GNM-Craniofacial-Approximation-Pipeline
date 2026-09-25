@@ -24,6 +24,7 @@ Optimizorul nu stie nimic despre Blender sau despre addon.
 from dataclasses import dataclass
 
 import numpy as np
+from .validation import finite_array, validate_points, rmse
 
 
 @dataclass
@@ -56,10 +57,16 @@ class LossConfig:
 def weighted_umeyama(src, dst, weights):
     """Estimeaza (scala, R, t) cu src -> dst, ponderat, fara reflexie.
 
-    Ridica ValueError daca solutia ar fi o reflexie (semn de date proaste:
-    markeri inversati stanga/dreapta, eroare de plasare grava etc.).
+    Enforces a proper rotation. Degenerate/invalid input raises ValueError;
+    reflected correspondences yield a proper best fit with residual error.
     """
-    w = np.asarray(weights, dtype=np.float64)
+    src = validate_points(src, "source landmarks")
+    dst = validate_points(dst, "target landmarks")
+    if src.shape != dst.shape:
+        raise ValueError("Source and target landmark shapes differ")
+    w = finite_array(weights, "weights", (len(src),))
+    if np.any(w <= 0):
+        raise ValueError("Alignment weights must be positive")
     w = w / w.sum()
     ms = (w[:, None] * src).sum(axis=0)
     md = (w[:, None] * dst).sum(axis=0)
@@ -67,14 +74,15 @@ def weighted_umeyama(src, dst, weights):
     yc = dst - md
     cov = (yc * w[:, None]).T @ xc
     u, d, vt = np.linalg.svd(cov)
-    if np.linalg.det(u @ vt) < 0:
-        raise ValueError(
-            "Alignment requires a REFLECTION (det=-1). Possible causes: "
-            "Left/Right swapped markers, or severe placement errors."
-        )
-    rot = u @ vt
+    # Proper rotation, including planar triples whose SVD null vector may
+    # change sign. A negative determinant alone is not proof of swapped sides.
+    signs = np.ones(3)
+    signs[-1] = 1.0 if np.linalg.det(u @ vt) >= 0 else -1.0
+    rot = (u * signs) @ vt
     var = (w[:, None] * xc ** 2).sum()
-    scale = d.sum() / var
+    scale = float((d * signs).sum() / var)
+    if not np.isfinite(scale) or scale <= 1e-12:
+        raise ValueError("Similarity fit has a degenerate scale")
     trans = md - scale * rot @ ms
     return scale, rot, trans
 
@@ -157,7 +165,7 @@ def _symmetry_rows(basis, mirror_indices, eig_floor=1e-12):
     """Randuri LSQ pentru priorul de simetrie bilaterala.
 
     Asimetria mesh-ului generat este liniara in coeficienti:
-        V - V[mirror] = (mu - mu[mirror]) + sum_i c_i * (B_i - B_i[mirror])
+        V - reflect_x(V[mirror]); basis rows use B_i - reflect_x(B_i[mirror]).
     (template-ul mu are doar o micro-asimetrie constanta, < 0.05 mm, deci
     nu intra in penalizare). Penalizarea ||sum_i c_i D_i||^2 este
     forma patratica c^T G c; returnam R cu R^T R = G_normalizat (medie
@@ -166,7 +174,9 @@ def _symmetry_rows(basis, mirror_indices, eig_floor=1e-12):
     Returneaza None daca baza e perfect simetrica (nu e cazul la GNM -
     variatia populationala include si asimetrii).
     """
-    d = basis - basis[:, mirror_indices, :]          # (I, N, 3)
+    mirrored = basis[:, mirror_indices, :].copy()
+    mirrored[:, :, 0] *= -1.0  # sagittal reflection is geometric, not just a permutation
+    d = basis - mirrored
     flat = d.reshape(d.shape[0], -1)                 # (I, N*3)
     trace = float((flat ** 2).sum())
     if trace <= 0.0:
@@ -207,7 +217,7 @@ def _per_component_lambda(c, lam, sigma0, weight):
 
     Penalizarea weight*lam*(|c_i| - sigma0)^2 pentru |c_i| > sigma0 este
     echivalenta (la c curent) cu un ridge de pondere
-        lam_i = weight*lam*((|c_i| - sigma0) / |c_i|)^2
+        lam_i = weight*lam*(|c_i| - sigma0) / |c_i|
     adaugata peste lambda de baza. Spre deosebire de clipul dur, presiunea
     creste continuu si nu produce un platou de solutii la +-clip.
     """
@@ -217,7 +227,7 @@ def _per_component_lambda(c, lam, sigma0, weight):
         over = abs_c - sigma0
         act = over > 0
         lam_vec[act] += weight * lam * (
-            over[act] / np.maximum(abs_c[act], 1e-12)) ** 2
+            over[act] / np.maximum(abs_c[act], 1e-12))
     return lam_vec
 
 
@@ -272,6 +282,33 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
     """
     if loss_cfg is None:
         loss_cfg = LossConfig()
+    targets_xyz = validate_points(targets_xyz, "fit targets")
+    if (np.ndim(mu) != 2 or np.shape(mu)[1] != 3 or np.ndim(basis) != 3
+            or np.shape(basis)[1:] != np.shape(mu)):
+        raise ValueError("Invalid mean/basis shapes")
+    lm_idx = np.asarray(lm_idx)
+    if (lm_idx.shape != (len(targets_xyz),) or lm_idx.dtype.kind not in "iu"
+            or np.any(lm_idx < 0) or np.any(lm_idx >= len(mu))):
+        raise ValueError("Landmark indices are invalid or outside the model")
+    weights = finite_array(weights, "fit weights", (len(targets_xyz),))
+    if np.any(weights <= 0):
+        raise ValueError("Fit weights must be positive")
+    lam0 = default_lambda if lam == "auto" else float(lam)
+    if not np.isfinite(lam0) or lam0 <= 0:
+        raise ValueError("Regularization must be finite and positive")
+    for name in ("symmetry_weight", "distance_weight", "prior_soft_sigma", "prior_soft_weight", "clip_sigma"):
+        value = getattr(loss_cfg, name)
+        if not np.isfinite(value) or value < 0:
+            raise ValueError(f"Invalid loss setting: {name}")
+    if loss_cfg.clip_sigma == 0 or max_iter < 1 or tol <= 0:
+        raise ValueError("clip_sigma, max_iter and tol must be positive")
+    if pose_rows is not None and not 3 <= pose_rows <= len(targets_xyz):
+        raise ValueError("pose_rows must select at least 3 valid landmarks")
+    if prior_mean is not None:
+        prior_mean = finite_array(prior_mean, "prior mean", (basis.shape[0],))
+        prior_scale = finite_array(prior_scale, "prior scale", (basis.shape[0],))
+        if np.any(prior_scale <= 0) or not np.isfinite(prior_weight) or prior_weight <= 0:
+            raise ValueError("Prior scale and weight must be positive")
     identity_dim = basis.shape[0]
     mu_lm = mu[lm_idx]
     basis_lm = basis[:, lm_idx, :]                      # (I, L, 3)
@@ -387,11 +424,14 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
     lam_used = lam0
     if lam == "auto":
         model_lm = mu_lm + np.einsum("i,ilk->lk", c, basis_lm)
-        scale, rot, trans, _ = robust_alignment(model_lm, targets_xyz, w_eff)
+        kp = len(model_lm) if pose_rows is None else pose_rows
+        scale, rot, trans, _ = robust_alignment(model_lm[:kp], targets_xyz[:kp], w_eff[:kp])
         targets_model = (targets_xyz - trans) @ (scale * rot) / (scale ** 2)
         grid = [0.3, 1.0, 3.0, 10.0, 30.0, 100.0, 300.0, 1000.0]
+        # Conditional CV is for tuning, not a validation score. Exclude dense
+        # pseudo-landmarks from folds when the caller supplies pose_rows.
         lam_used, loo_table = loo_select_lambda(
-            basis_lm, mu_lm, targets_model, w_eff, grid, identity_dim)
+            basis_lm[:, :kp], mu_lm[:kp], targets_model[:kp], w_eff[:kp], grid, identity_dim)
 
     # Fit final alternativ cu lambda ales (IRLS: ponderi robuste actualizate).
     c = np.zeros(identity_dim)
@@ -407,12 +447,14 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
         c = c_new
         model_lm = mu_lm + np.einsum("i,ilk->lk", c, basis_lm)
         pred = scale * (model_lm @ rot.T) + trans
-        rms = float(np.linalg.norm(pred - targets_xyz, axis=1).mean())
+        rms = rmse(np.linalg.norm(pred - targets_xyz, axis=1))
         history.append((it, float(scale), rms, float(np.abs(c).max())))
         if delta < tol:
             break
 
     model_lm = mu_lm + np.einsum("i,ilk->lk", c, basis_lm)
+    kp = len(model_lm) if pose_rows is None else pose_rows
+    scale, rot, trans, _ = robust_alignment(model_lm[:kp], targets_xyz[:kp], w_eff[:kp])
     pred = scale * (model_lm @ rot.T) + trans
     residuals_fit = np.linalg.norm(pred - targets_xyz, axis=1)
     return (c, scale, rot, trans, lam_used,
@@ -431,6 +473,7 @@ def bounded_tps_correction(vertices_world, centers, residuals_vec, cap_vertex,
     scalati cu increderea in pipeline (marker imprecis = constrangere
     partiala, nu exacta).
 
+    Uses a 3-D polyharmonic kernel (-r in SciPy), not the 2-D r^2 log(r).
     Limitarea este neteda si aplicata O SINGURA DATA, campului interpolat:
     |d| -> cap_vertex * tanh(|d| / cap_vertex), cu cap per-vertex (mai mic pe
     fata, mai mare pe scalp). Spline-ul TPS poate depasi local valorile
@@ -443,10 +486,22 @@ def bounded_tps_correction(vertices_world, centers, residuals_vec, cap_vertex,
     (urmeaza aproape doar fitul global neted).
     """
     from scipy.interpolate import RBFInterpolator
-
-    rbf = RBFInterpolator(centers, residuals_vec,
-                          kernel="thin_plate_spline", smoothing=0.0)
-    field = rbf(vertices_world)
+    vertices_world = finite_array(vertices_world, "mesh vertices")
+    centers = validate_points(centers, "local correction centres", minimum=4, rank=3)
+    residuals_vec = finite_array(residuals_vec, "local displacements", centers.shape)
+    cap_vertex = finite_array(cap_vertex, "correction caps", (len(vertices_world),))
+    if np.any(cap_vertex <= 0) or not np.isfinite(protect_damping) or not 0 <= protect_damping <= 1:
+        raise ValueError("Correction caps must be positive and damping must be in [0, 1]")
+    if len(np.unique(centers, axis=0)) != len(centers):
+        raise ValueError("Duplicate local correction centres; review marker correspondences")
+    # 3-D biharmonic/polyharmonic kernel (-r in SciPy), with affine tail.
+    # r^2 log(r) is the classical 2-D TPS kernel, not the 3-D bending kernel.
+    origin = centers.mean(axis=0)
+    rbf = RBFInterpolator(centers - origin, residuals_vec,
+                          kernel="linear", degree=1, smoothing=0.0)
+    field = np.vstack([rbf(vertices_world[i:i + 2048] - origin)
+                       for i in range(0, len(vertices_world), 2048)])
+    finite_array(field, "interpolated correction")
 
     field_mags = np.linalg.norm(field, axis=1)
     field_safe = np.maximum(field_mags, 1e-12)
@@ -478,8 +533,8 @@ def stability_warnings(lam_used, loo_table, c, clip_sigma=3.0):
             warns.append(
                 f"LOO-CV chose lambda={lam_used:g}, the LOWER edge of the "
                 f"grid ({min(grid_lams):g}..{max(grid_lams):g}) - the data "
-                "seems noise-dominated; consider extending the grid or "
-                "enabling additional loss terms.")
+                "selected the weakest shrinkage tested; this is not evidence "
+                "of accuracy. Review conditional CV and marker placement.")
         elif lam_used >= max(grid_lams):
             warns.append(
                 f"LOO-CV chose lambda={lam_used:g}, the UPPER edge of the "

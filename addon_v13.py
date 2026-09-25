@@ -1,105 +1,14 @@
-"""
-GNM Markeri Craniofaciali (V13.5)
-V13.5: anti-saturatie in jobul ICP+deformare ("fata exagerata" la 0
-markeri - efect secundar al eliminarii franei Huber din V13.3):
-  * trim 10%: la fiecare iteratie a jobului se elimina cele mai DEPARTATE
-    corespondente dense - coada distributiei e dominata de potriviri
-    gresite (tabla interna, margini de apertura, muchii) care trageau
-    beta in saturatie (clip 30 -> 23 pe v13-test, cu acoperire MAI BUNA:
-    os expus prin piele 4.8% -> 2.0%).
-  * testul de normala ramane activ tot timpul in job, dar relaxat
-    (min_dot=-0.2): respinge doar potrivirile pe fata opusa a osului.
-V13.4: corectia hartii landmark -> vertex pentru RHINION:
-  * Vechiul vertex 12296 (tabelul V12) este iBUG 30 = PRONASALE (varful
-    nasului, 43.8 mm sub Nasion pe template), NU rhinion-ul craniometric.
-    Noul vertex este 12310 (iBUG 29): puntea nazala osoasa, 25.1 mm sub
-    Nasion, median, oglinda exacta (cranio.backend LABEL_TO_VERTEX).
-  * CSV-urile vechi (cu -12297) raman decodabile (tabelul legacy v11);
-    exporturile noi scriu -12311.
-  * landmark_vertex_map.json revizuit: intrare noua "rhinion", glabella si
-    gonion_* inlocuite cu vertexii verificati anatomic (V12), zygion
-    promovat la confidence medium-high, eliminata intrarea eronata
-    "gnathion_from_chin_region" (extremum lateral, nefolosita).
-  * Efect secundar fericit: markerul Rhinion plasat corect anatomic
-    (~23-25 mm sub Nasion) nu mai e raportat SUSPECT de consistency check
-    si nu mai e down-ponderat Huber ca outlier in fit.
-V13.3: calitatea fitting-ului ICP/dense (acoperirea craniului + nasul):
-  * Fix geometric: constrangerea densa "punte_nazala" este centrata pe
-    puntea OSOASA (Nasion->pronasale la 45%, raza 14 mm, varful exclus),
-    nu pe vertexul-pronasale din tabelul V12 - vechiul patch constrangea
-    apertura nazala (fara os) si turtia nasul (cranio/geometry.py).
-  * Randurile dense nu mai trec prin Huber IRLS (huber_rows in
-    fit_identity): punctele departate, care au cea mai mare nevoie de
-    tragere, nu mai sunt penalizate (paritate cu offline).
-  * Schedule de respingere 2.0 -> 1.0 in jobul ICP+deformare + buget
-    50/50 fata/scalp la sub-esantionarea randurilor dense.
-  * Controale UI noi: Putere Dense (multiplicator), Pondere Densa Nas
-    (soft prior, implicit 0.7), Randuri Dense Max, Clip Sigma (avansat).
-  * Diagnostice nazale in panou: keep-rate + distanta medie la os vs
-    tinta de 3 mm si RMS separat pe landmark-urile nazale.
-V13.0: workflow LIVE cu doua viewport-uri 3D paralele (aceeasi fereastra
-Blender) si reconstructie GNM in timp real:
-  * Split vertical al zonei de lucru: STANGA = craniul scanat + markeri,
-    DREAPTA = mesh-ul GNM Head regenerat din coeficientii de identitate
-    (beta, 253 componente), izolate vizual cu local-view per area, dar in
-    ACEEASI scena/lume (coordonate world comune -> comparatie directa).
-  * Fitting partial in timp real (orice subset de markeri, minim 3), cu
-    exact aceeasi matematica ca pipeline-ul offline (cranio.optimize.
-    fit_identity: alternare Umeyama ponderat <-> ridge LSQ augmentat,
-    Huber IRLS, clip dur +-3 sigma). Lambda este adaptiv: creste cand
-    sunt putini markeri activi (regularizare mai puternica la constrangeri
-    putine). Nota: solverul din cranio este forma PRIMALA augmentata
-    (lstsq SVD), matematic echivalenta cu forma duala mentionata in
-    literatura addon-ului; o pastram pentru consistenta cu offline-ul.
-  * Calculul de fit ruleaza intr-un thread separat (doar numpy, fara bpy);
-    rezultatul e aplicat pe main thread din bpy.app.timers (~10 Hz) cu
-    mesh.vertices.foreach_set - obiectul GNM nu este recreat.
-  * Correspondenta landmark -> vertex GNM: override manual (picking pe
-    mesh-ul GNM din dreapta) > tabelul V12 verificat anatomic >
-    landmark_vertex_map.json (folosit pentru confidence/culori).
-  * Overlay de ghost-uri colorate pe confidence la pozitiile landmark-
-    urilor GNM (verde = V12/JSON medium-high, portocaliu = JSON low,
-    mov = picking manual, rosu = fara correspondenta).
-Restul functionalitatii V12 este neschimbata. Changelog V12.0:
-V12.0: corectie anatomica a indecsilor GNM (verificata pe gnm_head.npz v3.0)
-si a adancimilor de tesut, dupa literatura (Rhine & Campbell 1980; De Greef
-et al. 2006; Stephan & Simpson 2008):
-  * Gonion: 11165/5037 -> 8737/2609 (vechii erau punctele dlib 0/16 de SUS
-    de pe linia mandibulei, langa ureche - NU unghiul gonial).
-  * Zygion: 10603/4475 -> 10002/3874 (vechii erau pe pavilionul urechii,
-    vertex-group "ears"; noii sunt in regiunea zigomatica, bizigomatic
-    135.4 mm pe template).
-  * Eurion: 8565/2437 -> 7765/1637 (vechii erau tot pe ureche; noii sunt pe
-    eminenta parietala, bieuryon 155.6 mm pe template).
-  * Alare: 9901/3773 -> 10105/3977 (vechii prea laterali, +-29.9 mm; noii
-    sunt punctele dlib 31/35, +-16.8 mm).
-  * Nasospinale_BazaNas: 33 -> 12298 (vechiul era pe GAT, sub barbie; noul
-    este vertexul median de subnasale - homologul de piele al nasospinale).
-  * Prosthion_BuzaSup: 51 -> 12276 (idem; vertexul median labrale superius).
-  * Nasospinale/Prosthion devin is_exact=True (homologi reali de piele).
-  * Adancimi actualizate: Rhinion 9.0->3.0, Gnathion 12.0->10.5,
-    Orbita_Ext 10.0->8.0, Orbita_Int 5.0->6.0, Supraorbitale 10.5->7.0,
-    Infraorbitale 5.5->7.0, Eurion 6.0->5.0.
-Toate perechile bilaterale noi sunt oglinzi exacte (mirror_indices GNM).
-Vechiul changelog V11:
-Eliminat Maxillary Notch si protectia restrictiva de lateralitate (Stanga/Dreapta).
-V11.1: reconstructie automata prin oglindire (mirroring) pentru cranii partiale.
-V11.2: progres vizual + navigare rapida la markerii neplasati, si un "ghost" de
-previzualizare simetrica atunci cand plasezi un marker a carui pereche (Dr/St)
-e deja plasata.
-V11.3: preview vizual (wireframe) al planului medio-sagital, raport de
-asimetrie bilaterala (Text Editor), si un mod de previzualizare pentru
-reconstructia prin oglindire (doar oglindeste, fara sudura, pana confirmi).
-V11.4: raport de sesiune complet (Text Editor) cu sursa fisierului, adancimi
-de tesut modificate, calitatea planului, asimetrie si reconstructie folosita,
-plus capturi foto standardizate (fata/3-4/profil) cu camera si lumina fixate
-relativ la axele estimate ale craniului (nu la coordonate globale arbitrare).
-V11.5: importul uneste automat fisierele care aduc mai multe obiecte separate
-(frecvent la fragmente neconectate/.obj cu grupuri multiple) inainte de
-centrare/scalare, in loc sa proceseze doar primul si sa lase restul neatins.
-Adaugat operator de recentrare pe planul medio-sagital (din markerii deja
-plasati), pentru cranii partiale/asimetrice unde centrarea dupa bounding box
-de la import nu corespunde centrului anatomic real.
+"""GNM Craniofacial Markers 14.0 / software package 5.0.0rc1.
+
+Install the complete ZIP built with tools/build_addon.py. The bundled numerical
+core is imported under the add-on namespace. Optional previews run serially in
+Blender's main thread and may pause the UI; final fitting uses a separate Python
+process polled by a timer. No background Python thread calls Blender APIs.
+
+Built-in depths, weights and skin-vertex correspondences are inherited research
+heuristics, not a validated anatomical standard. Review tissue sources, target
+directions and landmark definitions before casework. Export v3 preserves bone
+positions, skin targets, manual vertex overrides and model provenance.
 """
 
 import csv
@@ -114,7 +23,7 @@ import time
 import bpy
 import bmesh
 import numpy as np  # livrat cu Blender (fitul live e numpy-pur, fara scipy)
-from mathutils import Matrix, kdtree
+from mathutils import Matrix, Vector, kdtree
 from bpy.props import (
     StringProperty, FloatProperty, IntProperty, PointerProperty,
     CollectionProperty, EnumProperty, BoolProperty,
@@ -125,8 +34,8 @@ from bpy_extras import view3d_utils
 bl_info = {
     "name": "GNM Scientific Markers",
     "author": "VATRION",
-    "version": (13, 0, 0),
-    "blender": (3, 6, 0),
+    "version": (14, 0, 0),
+    "blender": (4, 2, 0),
     "location": "View3D > Sidebar > GNM Markers",
     "category": "3D View",
 }
@@ -134,7 +43,7 @@ bl_info = {
 # -----------------------------------------------------------------------
 # BAZA DE DATE MARKERI
 # -----------------------------------------------------------------------
-# Tabel corectat anatomic in V12 - vezi justificarea detaliata in docstring.
+# Inherited V12 skin-vertex candidates; anatomical review required (docs/SCIENCE.md).
 # Format: (vertex_id_GNM_v3, eticheta, adancime_tesut_mm, latura, is_exact)
 LANDMARKS = [
     # V13.4: Rhinion 12296 -> 12310 (12296 este iBUG 30 = pronasale/varful
@@ -292,6 +201,9 @@ def _estimate_facial_axes(scene):
 # PROPRIETATI
 # -----------------------------------------------------------------------
 class GNMSettings(PropertyGroup):
+    python_executable: StringProperty(name="Python executable", subtype="FILE_PATH")
+    case_directory: StringProperty(name="Case output folder", subtype="DIR_PATH")
+    offline_status: StringProperty(default="Ready")
     marker_size_mm: FloatProperty(name="Marker Radius (mm)", default=1.5, min=0.1)
     peg_thickness_mm: FloatProperty(name="Peg Thickness (mm)", default=0.5, min=0.1)
 
@@ -332,10 +244,26 @@ class GNMSettings(PropertyGroup):
     ultim_export_csv: StringProperty(name="Last CSV Export", default="")
     ultim_export_timestamp: StringProperty(name="Last Export Date", default="")
 
+def _update_tissue_depth(self, context):
+    if self.bone_empty is None or self.target_empty is None:
+        return
+    bone = self.bone_empty.matrix_world.translation
+    direction = self.target_empty.matrix_world.translation - bone
+    if direction.length < 1e-9:
+        direction = Vector(self.bone_empty.get("gnm_normal", (0, 0, 1)))
+    direction.normalize()
+    self.target_empty.matrix_world.translation = bone + direction * self.tissue_depth_mm
+    if self.peg_object is not None:
+        self.peg_object.location = bone + direction * self.tissue_depth_mm / 2
+        self.peg_object.scale.z = self.tissue_depth_mm
+        self.peg_object.rotation_quaternion = direction.to_track_quat("Z", "Y")
+
+
 class GNMMarkerItem(PropertyGroup):
     gnm_index: IntProperty()
     label: StringProperty()
-    tissue_depth_mm: FloatProperty(default=5.0, min=0.0)
+    tissue_depth_mm: FloatProperty(default=5.0, min=0.0, update=_update_tissue_depth)
+    tissue_source: StringProperty(name="Tissue source / method", default="legacy-unvalidated")
     side: IntProperty(default=0)
     bone_empty: PointerProperty(type=bpy.types.Object)
     target_empty: PointerProperty(type=bpy.types.Object)
@@ -357,6 +285,13 @@ class GNM_OT_import_setup(Operator):
     bl_label = "1. Import & Calibrate Skull (.stl/.obj)"
     bl_options = {"REGISTER", "UNDO"}
     filepath: StringProperty(subtype="FILE_PATH")
+    source_units: EnumProperty(name="Source coordinates", items=[
+        ('mm', "Millimetres", "1 source coordinate = 1 mm"),
+        ('cm', "Centimetres", "1 source coordinate = 10 mm"),
+        ('m', "Metres", "1 source coordinate = 1000 mm")], default='mm')
+
+    def draw(self, context):
+        self.layout.prop(self, "source_units")
 
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
@@ -410,9 +345,8 @@ class GNM_OT_import_setup(Operator):
         bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
         obj.location = (0, 0, 0)
 
-        max_dim = max(obj.dimensions)
-        if max_dim < 5.0: 
-            obj.scale = (1000.0, 1000.0, 1000.0)
+        factor = {"mm": 1.0, "cm": 10.0, "m": 1000.0}[self.source_units]
+        obj.scale *= factor
             
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
@@ -422,10 +356,11 @@ class GNM_OT_import_setup(Operator):
         # corectie ruleaza independent pe fiecare insula - e posibil, desi rar,
         # ca o insula sa iasa cu normalele inversate fata de restul. Daca vezi
         # o zona cu shading ciudat/negru pe o singura piesa, verific-o manual.
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.mesh.normals_make_consistent(inside=False)
-        bpy.ops.object.mode_set(mode='OBJECT')
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+        bm.to_mesh(obj.data)
+        bm.free()
 
         msg = "Skull imported, scaled and normals fixed!"
         if joined_multiple:
@@ -458,6 +393,9 @@ class GNM_OT_place_marker(Operator):
 
     def invoke(self, context, event):
         if not context.scene.gnm_markers: return {"CANCELLED"}
+        if not _is_mm_scene(context.scene):
+            self.report({"ERROR"}, "Set scene scale to 0.001 (1 Blender unit = 1 mm) before placing markers")
+            return {"CANCELLED"}
         self._show_symmetry_ghost(context)
         context.window_manager.modal_handler_add(self)
         return {"RUNNING_MODAL"}
@@ -544,6 +482,7 @@ class GNM_OT_place_marker(Operator):
         bone.empty_display_type = 'SPHERE'
         bone.empty_display_size = m_size
         bone.location = location
+        bone["gnm_normal"] = tuple(normal.normalized())
         context.collection.objects.link(bone)
         item.bone_empty = bone
 
@@ -1172,25 +1111,18 @@ class GNM_OT_mirror_reconstruct(Operator):
 class GNM_OT_export_csv(Operator):
     bl_idname = "gnm.export_csv"
     bl_label = "4. Export Final CSV"
-    filepath: StringProperty(subtype="FILE_PATH", default="markeri_gnm_v11.csv")
+    filepath: StringProperty(subtype="FILE_PATH", default="markers_v3.csv")
 
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
         return {"RUNNING_MODAL"}
 
     def execute(self, context):
-        rows = []
-        for item in context.scene.gnm_markers:
-            if item.target_empty:
-                loc = item.target_empty.matrix_world.translation
-                rows.append((item.gnm_index, loc.x, loc.y, loc.z))
-            else:
-                rows.append((item.gnm_index, 0.0, 0.0, 0.0))
-
-        with open(self.filepath, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["gnm_landmark_index", "x", "y", "z"])
-            writer.writerows(sorted(rows))
+        try:
+            _export_markers(context.scene, self.filepath)
+        except (ValueError, OSError, ImportError) as exc:
+            self.report({"ERROR"}, str(exc))
+            return {"CANCELLED"}
 
         context.scene.gnm_settings.ultim_export_csv = os.path.basename(self.filepath)
         context.scene.gnm_settings.ultim_export_timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -1283,6 +1215,17 @@ class GNM_PT_panel(Panel):
 
         layout.separator()
         layout.operator("gnm.export_csv", icon="EXPORT")
+        if scene.gnm_markers:
+            item = scene.gnm_markers[scene.gnm_marker_active_index]
+            layout.prop(item, "tissue_source")
+        box = layout.box()
+        box.label(text="Offline fit (external Python)")
+        box.prop(settings, "python_executable")
+        box.prop(settings, "case_directory")
+        box.operator("gnm.run_offline", icon="PLAY")
+        box.operator("gnm.cancel_offline", icon="CANCEL")
+        box.label(text=settings.offline_status)
+        box.label(text="Fit residuals are not reconstruction accuracy")
 
         # V13: sectiunea de reconstructie live (definita mai jos in fisier).
         _draw_live_section(layout, context)
@@ -1297,7 +1240,7 @@ class GNM_PT_panel(Panel):
 #    cu +X = stanga anatomica, +Y = sus, +Z = anterior. cranio.backend il
 #    converteste in milimetri; aici il incarcam direct in float32 (vezi
 #    _load_gnm_model) cu aceeasi conversie (x1000), pentru a injumatati
-#    memoria (basis ~540 MB in loc de ~1.1 GB) si varful de incarcare.
+#    memoria (basis ~54 MB in loc de ~108 MB) si varful de incarcare.
 #    Craniul din scena Blender e in mm (V12 forteaza scale_length=0.001).
 #    Fitul este complet frame-agnostic: Umeyama recupereaza rotatie+scala+
 #    translatie intre spatiul modelului si world-ul craniului, deci NU
@@ -1321,46 +1264,18 @@ class GNM_PT_panel(Panel):
 #    idempotent ambele local-view-uri (util daca utilizatorul iese din
 #    local view cu Numpad-/).
 #
-# 4. CONCURENTA. Thread-ul worker atinge DOAR numpy (nu bpy); main thread
-#    aplica rezultatele din bpy.app.timers (foreach_set pe pozitiile
-#    vertecsilor obiectului existent - obiectul nu e recreat). Triggerul
-#    e depsgraph_update_post cu fingerprint pe pozitiile markerilor
-#    (fara polling constant; undo si mutarea cu G sunt prinse automat).
-#    Job-urile sunt "latest-wins": daca markerii se misca mai repede decat
-#    rezolva fitul, se pastreaza doar cel mai recent snapshot.
+# 4. EXECUTION. Preview snapshots and numerical fits run serially on the
+#    main-thread timer. Heavy previews can pause Blender; final fitting uses
+#    the external process below. The numerical preview is not identical to
+#    the offline pipeline when different options or regularisation are used.
 #
-# 5. PRECEDENTA VERTEX (decizie de proiect): override manual (picking in
-#    viewport-ul drept) > LABEL_TO_VERTEX V12 (verificat anatomic) >
-#    landmark_vertex_map.json. JSON-ul ramane sursa de nume/confidence si
-#    coloreaza avertismentele (confidence "low" -> ghost portocaliu).
-#    Conflict cunoscut: gonion_* din JSON sunt punctele iBUG 0/16 de langa
-#    ureche (valorile vechi v11 corectate in V12) - castiga V12.
+# 5. CORRESPONDENCE. Manual vertex selection takes precedence over the
+#    inherited V12 map, then landmark_vertex_map.json. These skin-vertex
+#    candidates and confidence colours require independent anatomical review.
 #
-# 6. PERFORMANTA. Un fit (12 rezolvari lstsq ~(3L+253)x253 + generare
-#    mesh) dureaza ~30-120 ms in worker; timerul la 10 Hz aplica rezultatul
-#    in ~2-5 ms pe main thread, deci UI-ul ramane responsive.
-#
-# 7. CALIBRAREA LAMBDA (V13.1). Masurat pe exporturi reale (ken5/ken-6.csv):
-#    lambda_base=30 producea ||beta|| ~ 2 (cap practic nedeformat -
-#    "rigid"), in timp ce LOO-CV din pipeline-ul offline alegea 0.3
-#    (marginea grilei) -> ||beta|| ~ 25, morfologie robusta. Schedule-ul
-#    live recalibrat: base=1.0, proportional cu 1/n, podea 0.3 (= marginea
-#    grilei LOO). Optional, modul "LOO auto" reruleaza LOO-CV o data la
-#    schimbarea numarului de markeri (paritate cu offline-ul). Reziduul de
-#    ~1 cm care ramane chiar la lambda optim este ASTEPTAT: corectia finala
-#    se face cu TPS numai in pipeline-ul offline (scipy nu exista in
-#    Blender) - preview-ul live este intentionat "la ~1 cm" de tinte.
-#
-# 8. PRIOR DEMOGRAFIC (optional, V13.1). Media si deviatia standard per
-#    componenta din IdentitySampler (CVAE conditional sex x etnie;
-#    precomputate OFFLINE cu TensorFlow - vezi make_demographic_prior.py)
-#    inlocuiesc shrink-ul isotropic spre beta=0 cu shrink spre media
-#    demografica, cu precizie 1/sigma per componenta (estimare MAP pentru
-#    priorul Gaussian N(mu, diag(sigma^2)), implementata in
-#    cranio.optimize.fit_identity prin parametrii optionali prior_mean/
-#    prior_scale/prior_weight; fara ei, comportamentul fitului este
-#    bit-identic cu pipeline-ul offline). sigma este clipat la [0.25, 4.0]
-#    la generare, la incarcare si la fit.
+# 6. PRIORS. Preview lambda schedules and optional demographic priors are
+#    inherited heuristics. Conditional fixed-pose LOO tunes regularisation;
+#    it does not measure independent predictive accuracy. See docs/SCIENCE.md.
 # -----------------------------------------------------------------------
 
 GNM_LIVE_COLLECTION = "GNM_Live"
@@ -1430,7 +1345,7 @@ class _LiveState:
         self.label_to_vertex = None  # dict din cranio.backend (sau fallback)
         self.json_map = None       # dict parsat din landmark_vertex_map.json
         self.enabled = False       # modul live pornit/oprit
-        self.worker = None         # threading.Thread
+        self.worker = None         # legacy state slot; no Python thread is started
         self.stop_event = threading.Event()
         self.pending = None        # snapshot de fit (latest-wins)
         self.pending_lock = threading.Lock()
@@ -1467,141 +1382,40 @@ def _repo_root_from_npz(npz_path):
         os.path.dirname(npz_path), "..", "..", "..", "..", ".."))
 
 
+def _core_module(name):
+    import importlib
+    # ZIP vendors the numerical package under this add-on namespace. Never
+    # evict unrelated modules or infer executable code paths from model paths.
+    return importlib.import_module((__package__ + ".cranio." if __package__ else "cranio.") + name)
+
+
 def _ensure_cranio(npz_path):
-    """Asigura importul pachetului ``cranio`` DIN REPO SI PROASPAT.
-
-    Returneaza (ok, mesaj). cranio e numpy-pur pe drumul de fit (scipy si
-    trimesh sunt importate lenes, la nivel de functie, si nu sunt atinse aici),
-    deci ruleaza direct pe numpy-ul livrat cu Blender.
-
-    Capcana tipica: intr-o sesiune Blender lunga, sys.modules poate retine un
-    cranio.optimize MAI VECHI (importat inainte de un patch, ex. inainte de
-    adaugarea prior_mean in fit_identity, sau dintr-un site-packages vechi);
-    reload-ul addon-ului (F8) NU reimprospateaza sys.modules. De aceea
-    verificam explicit semnatura lui fit_identity si locatia modulului si, la
-    nevoie, eliminam modulele cranio din sys.modules si le reimportam din
-    repo-ul dedus din calea npz-ului.
-    """
-    import inspect
-
-    root = _repo_root_from_npz(npz_path) if npz_path else None
-
-    def _is_current():
-        try:
-            import cranio
-            from cranio.optimize import fit_identity as _fi
-            if "prior_mean" not in inspect.signature(_fi).parameters:
-                return False
-            # V13.6 fix: un cranio vechi poate avea prior_mean dar nu si
-            # gerasimov_pronasale; fara el diagnosticul Gerasimov nu apare
-            # live (importul lenes de mai jos era inghitit tacut).
-            from cranio.geometry import gerasimov_pronasale as _gp  # noqa: F401
-            if root and os.path.isdir(os.path.join(root, "cranio")):
-                mod_root = os.path.dirname(os.path.dirname(
-                    os.path.abspath(cranio.__file__)))
-                if os.path.normcase(mod_root) != os.path.normcase(root):
-                    return False
-            return True
-        except Exception:
-            return False
-
-    if not _is_current():
-        for name in [m for m in list(sys.modules)
-                     if m == "cranio" or m.startswith("cranio.")]:
-            del sys.modules[name]
-        if root and root not in sys.path:
-            sys.path.insert(0, root)
-        try:
-            import cranio  # noqa: F401
-        except ImportError as exc:
-            return False, (
-                f"The 'cranio' package cannot be imported ({exc}). Set the "
-                f"path to the repo's gnm_head.npz (it also contains cranio/).")
-    from cranio.optimize import fit_identity, LossConfig
-    if "prior_mean" not in inspect.signature(fit_identity).parameters:
-        return False, (
-            "cranio.optimize.fit_identity does not support prior_mean - "
-            "cranio version too old; please sync the repo.")
     try:
-        from cranio.landmarks import CONFIDENCE_WEIGHTS, DEFAULT_CONFIDENCE
-    except ImportError:
-        CONFIDENCE_WEIGHTS, DEFAULT_CONFIDENCE = {}, 0.7
-    _CRANIO.update({
-        "fit_identity": fit_identity,
-        "LossConfig": LossConfig,
-        "CONFIDENCE_WEIGHTS": CONFIDENCE_WEIGHTS,
-        "DEFAULT_CONFIDENCE": DEFAULT_CONFIDENCE,
-    })
-    try:
-        from cranio.backend import GNMBackend
-        _CRANIO["LABEL_TO_VERTEX"] = GNMBackend(npz_path or None).landmark_vertex_map
-    except Exception:
-        pass
-    # V13.2: utilitarele de geometrie pentru constrangerile dense din craniu
-    # (toate numpy-pure; cranio.geometry importa trimesh/scipy doar lenes,
-    # in functiile pe care NU le folosim aici).
-    from cranio.geometry import (
-        build_scalp_mask, build_face_dense_regions, compute_vertex_normals)
-    from cranio.optimize import weighted_umeyama
-    _CRANIO.update({
-        "build_scalp_mask": build_scalp_mask,
-        "build_face_dense_regions": build_face_dense_regions,
-        "compute_vertex_normals": compute_vertex_normals,
-        "weighted_umeyama": weighted_umeyama,
-    })
-    # V13.6: diagnosticul Gerasimov/Ullrich-Stephan (numpy pur, apt de worker).
-    try:
-        from cranio.geometry import gerasimov_pronasale
-        _CRANIO["gerasimov_pronasale"] = gerasimov_pronasale
-    except ImportError:
-        pass
-    return True, ""
+        optimize = _core_module("optimize")
+        geometry = _core_module("geometry")
+        landmarks = _core_module("landmarks")
+        backend = _core_module("backend")
+        _CRANIO.update({
+            "fit_identity": optimize.fit_identity, "LossConfig": optimize.LossConfig,
+            "weighted_umeyama": optimize.weighted_umeyama,
+            "CONFIDENCE_WEIGHTS": landmarks.CONFIDENCE_WEIGHTS,
+            "DEFAULT_CONFIDENCE": landmarks.DEFAULT_CONFIDENCE,
+            "LABEL_TO_VERTEX": backend.GNMBackend().landmark_vertex_map,
+        })
+        for key in ("build_scalp_mask", "build_face_dense_regions", "compute_vertex_normals", "gerasimov_pronasale"):
+            _CRANIO[key] = getattr(geometry, key)
+        return True, ""
+    except ImportError as exc:
+        return False, f"Install the complete gnm_cranio ZIP: {exc}"
 
 
 def _load_gnm_model(npz_path):
-    """Incarca gnm_head.npz direct in float32, in milimetri.
-
-    Echivalent functional cu cranio.backend.GNMBackend.load (aceleasi chei,
-    aceeasi conversie m->mm), dar evita copia intermediara float64 (~1.1 GB):
-    basis float32 = ~540 MB. Precizia float32 (eroare relativa ~1e-7, adica
-    sub-micron la scara mm) este neglijabila pentru un ridge fit.
-    """
-    npz = np.load(npz_path, allow_pickle=True)
-    mu = np.ascontiguousarray(npz["template_vertex_positions"],
-                              dtype=np.float32) * 1000.0
-    basis = np.ascontiguousarray(npz["vertex_identity_basis"],
-                                 dtype=np.float32) * 1000.0
-    triangles = np.ascontiguousarray(npz["triangles"], dtype=np.int32)
-    # V13.2: vertex_groups sunt necesare pentru masca de scalp si regiunile
-    # faciale cu tesut subtire (constrangerile dense din craniu) - +3.3 MB.
-    vertex_groups = np.ascontiguousarray(npz["vertex_groups"], dtype=np.float32)
-    vertex_group_names = [str(n) for n in npz["vertex_group_names"]]
-
-    class _Model:
-        """Structura minimala cu aceeasi interfata ca FaceModelData."""
-
-        identity_dim = 253
-        vertex_count = 17821
-
-        def __init__(self, mu, basis, triangles, vertex_groups,
-                     vertex_group_names):
-            self.mu, self.basis, self.triangles = mu, basis, triangles
-            self.vertex_groups = vertex_groups
-            self.vertex_group_names = vertex_group_names
-
-        def generate(self, coefficients):
-            # V = mu + sum_i c_i * B_i (model liniar; identic cu
-            # gnm(identity=c) la expresie/rotatii zero).
-            return self.mu + np.einsum("i,ivk->vk", coefficients, self.basis)
-
-    return _Model(mu, basis, triangles, vertex_groups, vertex_group_names)
-
-
-# -----------------------------------------------------------------------
-# V13: rezolutia landmark -> vertex GNM (manual > V12 > JSON)
-# -----------------------------------------------------------------------
+    digest = _core_module("validation").sha256_file(npz_path)
+    if digest != _core_module("backend.gnm_backend").OFFICIAL_V3_SHA256:
+        raise ValueError("This add-on's built-in landmark map requires the reviewed GNM Head v3 asset; run gnm-doctor")
+    return _core_module("backend").GNMBackend(npz_path).load(dtype=np.float32)
 def _label_to_vertex_map():
-    """Tabelul eticheta -> vertex V12 (verificat anatomic).
+    """Inherited V12 label-to-skin-vertex candidates; review anatomically.
 
     Prefera LABEL_TO_VERTEX din cranio.backend (sursa unica de adevar);
     fallback: primul element al liniilor LANDMARKS din addon (acelasi tabel
@@ -1892,12 +1706,10 @@ def _ray_cast_skull(scene, depsgraph, origin, direction, max_hops=8):
 #   * Corespondentele dense se recalculeaza la nivel de SNAPSHOT (outer
 #     ICP la ~rata timerului), nu la fiecare iteratie interna ca offline -
 #     convergenta vine progresiv, in 3-10 update-uri vizibile.
-#   * mathutils.kdtree.KDTree este interogat READ-ONLY din worker thread:
-#     mathutils este o biblioteca de matematica separata (nu atinge stare
-#     bpy), iar arborele nu este modificat dupa construire (main thread).
+#   * mathutils KDTree queries and previews run on Blender's main thread.
 #   * Deformarea generala trece prin beta (spatiul GNM + clip +-3 sigma +
-#     prior optional), NU printr-un warp liber - capul ramane garantat
-#     plauzibil; morfologia craniului "voteaza" identitati robuste.
+#     prior optional). Remaining in this parameterisation does not guarantee
+#     anatomical validity or skull containment.
 #
 # V13.3 (calitate fitting: acoperire + nas):
 #   * Randurile dense NU mai sunt down-ponderate Huber (huber_rows=
@@ -2178,7 +1990,7 @@ def _push_worker_result(res):
 
 
 def _icp_deform_job(snap):
-    """Job one-shot (worker): ICP multi-start + cateva fituri dense.
+    """Serialized preview job: ICP multi-start and several dense fits.
 
     Nu atinge bpy. Impinge rezultate intermediare pe canalul normal (vezi
     deformarea progresiv in viewport), apoi un rezultat final 'icp_done'.
@@ -2278,7 +2090,7 @@ def _icp_deform_job(snap):
             "status": "ok", "n": n_markers,
             "scale": float(s), "rot": R, "trans": t, "v_model": v_model,
             "c": c,
-            "rms": float(np.nanmean(res_m)) if n_markers else 0.0,
+            "rms": float(np.sqrt(np.nanmean(res_m ** 2))) if n_markers else 0.0,
             "max_res": float(np.nanmax(res_m)) if n_markers else 0.0,
             "max_label": (snap["labels"][int(np.nanargmax(res_m))]
                           if n_markers else "-"),
@@ -2401,7 +2213,7 @@ class GNM_OT_icp_deform(Operator):
 
 
 # -----------------------------------------------------------------------
-# V13: snapshot, worker thread, aplicare rezultate
+# Preview snapshots, serial numerical work and result application
 # -----------------------------------------------------------------------
 def _fingerprint(scene):
     """Amprenta ieftina a pozitiilor markerilor (detecteaza add/move/delete,
@@ -2459,7 +2271,7 @@ def _build_snapshot(scene):
 
 def _request_refit(scene):
     """Marcheaza un nou snapshot pentru worker (no-op daca live e oprit)."""
-    if not _LIVE.enabled or _LIVE.model is None:
+    if not _LIVE.enabled or _LIVE.model is None or scene.name != getattr(_LIVE, "scene_name", scene.name):
         return
     try:
         snap = _build_snapshot(scene)
@@ -2492,7 +2304,7 @@ def _live_lambda(n, snap):
     LOO-CV cache-uit per numar de markeri (modul 'ca offline').
 
     LOO-CV costa ~0.7-1 s, deci il rerulam NUMAI cand se schimba numarul
-    de markeri (n >= 4), in worker thread; intre timp folosim valoarea
+    de markeri (n >= 4), in serialized preview; intre timp folosim valoarea
     cache-uita cu o podea de siguranta joasa (0.3*24/n) - LOO devine
     zgomotos la putine puncte."""
     cfg = _LIVE.cfg
@@ -2541,11 +2353,16 @@ def _gerasimov_worker(snap, scale, rot, trans, v_model):
     if missing:
         return {"ok": False, "reason": "missing: " + ", ".join(missing)}
     skull_pts = (_LIVE.skull or {}).get("points")
+    # Rotate BONE positions into the pose-aligned anatomical axes, retaining mm.
+    bone = {label: (np.asarray(xyz) - trans) @ rot for label, xyz in bone.items()}
+    if skull_pts is not None:
+        skull_pts = (skull_pts - trans) @ rot
     g = ger_fn(np.asarray(bone["Nasion"]), np.asarray(bone["Rhinion"]),
                np.asarray(bone["Acanthion"]), np.asarray(bone["Piriform_Dr"]),
                np.asarray(bone["Piriform_St"]), profile_pts=skull_pts)
     if not g["ok"]:
         return {"ok": False, "reason": g["reason"]}
+    g["pronasale_xyz"] = g["pronasale_xyz"] @ rot.T + trans
     pr_fit = scale * (v_model[_PRONASALE_VID].astype(np.float64) @ rot.T) + trans
     return {"ok": True, "xyz": g["pronasale_xyz"],
             "err_vs_fit": float(np.linalg.norm(g["pronasale_xyz"] - pr_fit)),
@@ -2555,7 +2372,7 @@ def _gerasimov_worker(snap, scale, rot, trans, v_model):
 
 
 def _compute_fit(snap):
-    """Fitul propriu-zis. Ruleaza in WORKER thread: DOAR numpy, niciodata bpy.
+    """Numerical preview fit, called serially by the Blender main-thread timer.
 
     Refoloseste cranio.optimize.fit_identity (aceeasi matematica ca
     pipeline-ul offline): alternare Umeyama ponderat <-> ridge LSQ
@@ -2628,7 +2445,7 @@ def _compute_fit(snap):
         "scale": float(scale), "rot": rot, "trans": trans,
         "v_model": v_model,
         "c": c,
-        "rms": float(np.nanmean(res_m)) if n else 0.0,
+        "rms": float(np.sqrt(np.nanmean(res_m ** 2))) if n else 0.0,
         "max_res": float(np.nanmax(res_m)) if n else 0.0,
         "max_label": (snap["labels"][int(np.nanargmax(res_m))] if n else "-"),
         "lam": float(lam_used), "lam_src": lam_src,
@@ -2639,30 +2456,6 @@ def _compute_fit(snap):
         "rms_nasal": _nasal_rms(snap["labels"], res_m) if n else None,
         "gerasimov": _gerasimov_worker(snap, scale, rot, trans, v_model),
     }
-
-
-def _worker_main():
-    """Bucla worker-ului: asteapta snapshot-uri (latest-wins) si fitaza.
-
-    Snapshot-urile cu snap["job"] == "icp_deform" declanseaza jobul one-shot
-    ICP+deformare (V13.2), care isi impinge singur rezultatele intermediare."""
-    while not _LIVE.stop_event.is_set():
-        with _LIVE.pending_lock:
-            snap = _LIVE.pending
-            _LIVE.pending = None
-        if snap is None:
-            _LIVE.stop_event.wait(0.05)
-            continue
-        t0 = time.perf_counter()
-        try:
-            if snap.get("job") == "icp_deform":
-                res = _icp_deform_job(snap)
-            else:
-                res = _compute_fit(snap)
-        except Exception as exc:  # ex. ValueError la reflexie (markeri Dr/St)
-            res = {"status": "error", "error": str(exc)}
-        res["ms"] = (time.perf_counter() - t0) * 1000.0
-        _push_worker_result(res)
 
 
 def _apply_result(scene, res):
@@ -2756,7 +2549,7 @@ def _live_timer_tick():
     rezultatele gata. Returneaza intervalul urmator (sau None = stop)."""
     if not _LIVE.enabled:
         return None
-    scene = bpy.context.scene
+    scene = bpy.data.scenes.get(getattr(_LIVE, "scene_name", ""))
     if scene is None or not hasattr(scene, "gnm_live"):
         return 0.5
     st = scene.gnm_live
@@ -2771,6 +2564,17 @@ def _live_timer_tick():
         "dense_max_rows": int(st.dense_max_rows),
         "clip_sigma": float(st.clip_sigma),
     })
+    with _LIVE.pending_lock:
+        snap = _LIVE.pending
+        _LIVE.pending = None
+    if snap is not None:
+        started = time.perf_counter()
+        try:
+            result = _icp_deform_job(snap) if snap.get("job") == "icp_deform" else _compute_fit(snap)
+        except Exception as exc:
+            result = {"status": "error", "error": str(exc)}
+        result["ms"] = (time.perf_counter() - started) * 1000.0
+        _push_worker_result(result)
     res = None
     with _LIVE.result_lock:
         res = _LIVE.result
@@ -2803,6 +2607,8 @@ def _gnm_live_on_depsgraph(scene, depsgraph):
 def _gnm_live_on_load_post(_dummy):
     """La deschiderea unui .blend nou, fingerprint-urile vechi nu mai au
     sens; modelul numpy si firul de lucru raman valabile."""
+    _stop_live()
+    _stop_offline()
     _LIVE.fingerprints.clear()
 
 
@@ -2818,13 +2624,12 @@ def _remove_live_handler():
 
 
 def _start_live(scene):
-    """Porneste workerul, timerul si handlerul (idempotent)."""
+    """Start the serial preview timer and handler (idempotent)."""
+    _LIVE.scene_name = scene.name
     _LIVE.stop_event = threading.Event()
     with _LIVE.result_lock:
         _LIVE.result = None  # golim rezultatele vechi (igiena la repornire)
-    _LIVE.worker = threading.Thread(
-        target=_worker_main, name="GNM_LiveFit", daemon=True)
-    _LIVE.worker.start()
+    _LIVE.worker = None
     _LIVE.enabled = True
     if not bpy.app.timers.is_registered(_live_timer_tick):
         bpy.app.timers.register(
@@ -2841,6 +2646,9 @@ def _stop_live():
     if w is not None and w.is_alive():
         w.join(timeout=1.0)
     _LIVE.worker = None
+    for scene in bpy.data.scenes:
+        if hasattr(scene, "gnm_live"):
+            scene.gnm_live.live_active = False
     _remove_live_handler()
     if bpy.app.timers.is_registered(_live_timer_tick):
         bpy.app.timers.unregister(_live_timer_tick)
@@ -3049,6 +2857,8 @@ def _autodetect_paths(scene):
     (layoutul repo-ului de dezvoltare); utilizatorul le poate suprascrie."""
     st = scene.gnm_live
     root = os.path.dirname(os.path.abspath(__file__))
+    if not st.npz_path and os.environ.get("GNM_MODEL_PATH"):
+        st.npz_path = os.environ["GNM_MODEL_PATH"]
     if not st.npz_path:
         cand = os.path.join(root, "gnm", "shape", "data", "versions",
                             "v3_0", "gnm_head.npz")
@@ -3141,6 +2951,7 @@ class GNM_OT_load_live_model(Operator):
         scene = context.scene
         st = scene.gnm_live
         _autodetect_paths(scene)
+        st.npz_path = bpy.path.abspath(st.npz_path)
         if not st.npz_path or not os.path.isfile(st.npz_path):
             self.report({"ERROR"},
                         "The path to gnm_head.npz is not set correctly.")
@@ -3191,9 +3002,9 @@ class GNM_OT_load_live_model(Operator):
 
 
 class GNM_OT_toggle_live(Operator):
-    """Porneste/opreste fittingul live (worker thread + timer + handler)."""
+    """Toggle serialized main-thread preview; use external fitting for long jobs."""
     bl_idname = "gnm.toggle_live"
-    bl_label = "Start / Stop Live"
+    bl_label = "Start / Stop Preview (may pause UI)"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -3437,11 +3248,11 @@ class GNMLiveSettings(PropertyGroup):
     update_hz: FloatProperty(
         name="Update Rate (Hz)", default=10.0, min=1.0, max=30.0,
         description="How many result applications per second (the fit itself "
-                    "runs in the worker thread, latest-wins)")
+                    "runs serially in the main-thread timer and may pause the UI)")
     lambda_base: FloatProperty(
         name="Deformation (lambda base)", default=1.0,
         min=0.05, max=1000.0, soft_min=0.3, soft_max=30.0,
-        description="Ridge regularization calibrated on the 24-marker "
+        description="Heuristic ridge regularization for a 24-marker "
                     "reference set (V13.5); effective lambda = base * 24 / "
                     "n_markers. Calibrated on real data: 1.0 gives robust "
                     "morphology (like offline); raise for a more "
@@ -3578,7 +3389,7 @@ def _draw_live_section(layout, context):
     row.prop(st, "show_ghosts", text="",
              icon="HIDE_OFF" if st.show_ghosts else "HIDE_ON")
 
-    # Controlul principal al rigiditatii (calibrat V13.1; vezi antetul).
+    # Preview regularisation heuristic; see docs/SCIENCE.md.
     box.prop(st, "lambda_base", slider=True)
     box.prop(st, "loo_auto")
 
@@ -3635,8 +3446,176 @@ def _draw_live_section(layout, context):
     sub.prop(st, "clip_sigma")
     sub.prop(st, "prior_dir")
     box.label(text="Color legend (ghosts + marker pegs): green=V12/JSON")
-    box.label(text="safe, orange=JSON low, purple=manual picking,")
+    box.label(text="map, orange=JSON low, purple=manual picking,")
     box.label(text="red=no correspondence, cyan=Gerasimov pronasale (diag).")
+
+
+def _is_mm_scene(scene):
+    return scene.unit_settings.system == 'METRIC' and abs(scene.unit_settings.scale_length - 0.001) < 1e-8
+
+
+def _export_markers(scene, path):
+    if not _is_mm_scene(scene):
+        raise ValueError("Expected metric scene scale 0.001: 1 Blender coordinate = 1 mm")
+    ok, message = _ensure_cranio(scene.gnm_live.npz_path)
+    if not ok:
+        raise ValueError(message)
+    model_path = bpy.path.abspath(scene.gnm_live.npz_path)
+    if not os.path.isfile(model_path):
+        raise ValueError("Select the local gnm_head.npz before exporting")
+    model_digest = _core_module('validation').sha256_file(model_path)
+    if model_digest != _core_module('backend.gnm_backend').OFFICIAL_V3_SHA256:
+        raise ValueError("The built-in marker map requires the reviewed GNM v3 asset")
+    rows = []
+    for item in scene.gnm_markers:
+        vid = _resolve_vertex(item)
+        row = dict(label=item.label, vertex=vid if vid is not None else '',
+                   placed=int(item.is_placed), x='', y='', z='', weight=_weight_of(item.label),
+                   tissue_source=item.tissue_source)
+        if item.is_placed:
+            if vid is None:
+                raise ValueError(f"No model correspondence: {item.label}")
+            bone = item.bone_empty.matrix_world.translation
+            target = item.target_empty.matrix_world.translation
+            if abs((target - bone).length - item.tissue_depth_mm) > 0.05:
+                raise ValueError(f"{item.label}: target distance differs from tissue depth; review or re-place marker")
+            row.update(x=target.x, y=target.y, z=target.z,
+                       bone_x=bone.x, bone_y=bone.y, bone_z=bone.z,
+                       tissue_depth_mm=item.tissue_depth_mm)
+        rows.append(row)
+    meta = {"addon_version": '.'.join(map(str, bl_info['version'])),
+            "blender_version": bpy.app.version_string,
+            "model_sha256": model_digest,
+            "skull_source": scene.gnm_settings.sursa_fisier,
+            "scene_scale_length": scene.unit_settings.scale_length,
+            "target_construction": "bone plus operator-reviewed depth/direction; local normal is initial heuristic"}
+    _core_module('io_csv').write_marker_csv_v3(path, rows, meta)
+    # Validate exactly what the CLI will consume, including manual overrides.
+    backend = _core_module('backend').GNMBackend(model_path)
+    _core_module('io_csv').read_marker_csv(path, backend.index_to_label, backend.landmark_vertex_map)
+
+
+_OFFLINE = {"process": None, "log": None, "scene": None, "folder": None}
+
+
+def _stop_offline():
+    process = _OFFLINE.get('process')
+    if process is not None and process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except Exception:
+            process.kill()
+            process.wait(timeout=2)
+    if _OFFLINE.get('log') is not None:
+        _OFFLINE['log'].close()
+    _OFFLINE.update(process=None, log=None)
+    if bpy.app.timers.is_registered(_offline_poll):
+        bpy.app.timers.unregister(_offline_poll)
+
+
+def _offline_poll():
+    from pathlib import Path
+    process = _OFFLINE.get('process')
+    if process is None:
+        return None
+    code = process.poll()
+    if code is None:
+        return 0.5
+    _OFFLINE['log'].close()
+    _OFFLINE.update(process=None, log=None)
+    scene = bpy.data.scenes.get(_OFFLINE['scene'])
+    if scene is None:
+        return None
+    folder = Path(_OFFLINE['folder'])
+    if code != 0:
+        scene.gnm_settings.offline_status = f"Failed ({code}); see {folder / 'run.log'}"
+        return None
+    try:
+        report = json.loads((folder / 'face_report.json').read_text(encoding='utf-8'))
+        if report.get('status') != 'completed':
+            raise ValueError('Incomplete run report')
+        if report['outputs']['output']['sha256'] != _core_module('validation').sha256_file(folder / 'face.obj'):
+            raise ValueError('Output checksum mismatch')
+        # Our OBJ writer uses world-mm v/f records; do not invoke an importer
+        # whose axis/unit defaults may silently rotate or rescale the result.
+        vertices, faces = [], []
+        with (folder / 'face.obj').open(encoding='utf-8') as stream:
+            for line in stream:
+                parts = line.split()
+                if parts and parts[0] == 'v':
+                    vertices.append(tuple(map(float, parts[1:4])))
+                elif parts and parts[0] == 'f':
+                    faces.append(tuple(int(x) - 1 for x in parts[1:4]))
+        mesh = bpy.data.meshes.new('GNM Offline Result')
+        mesh.from_pydata(vertices, [], faces)
+        mesh.update()
+        obj = bpy.data.objects.new('GNM_Offline_' + folder.name, mesh)
+        obj['gnm_report'] = str(folder / 'face_report.json')
+        scene.collection.objects.link(obj)
+        scene.gnm_settings.offline_status = f"Completed; RMSE {report['metrics']['final_fit']['rmse_mm']:.2f} mm"
+    except Exception as exc:
+        scene.gnm_settings.offline_status = f"Result import failed: {exc}"
+    return None
+
+
+class GNM_OT_run_offline(Operator):
+    bl_idname = 'gnm.run_offline'
+    bl_label = 'Run Offline Fit and Import'
+
+    @classmethod
+    def poll(cls, context):
+        return _OFFLINE.get('process') is None and len(context.scene.gnm_markers) >= 4
+
+    def execute(self, context):
+        import subprocess
+        import uuid
+        from pathlib import Path
+        scene = context.scene
+        settings = scene.gnm_settings
+        try:
+            if not settings.python_executable or not settings.case_directory:
+                raise ValueError('Select the external Python executable and case output folder')
+            executable = Path(bpy.path.abspath(settings.python_executable))
+            if not executable.is_file():
+                raise ValueError('External Python executable does not exist')
+            root = Path(__file__).resolve().parent
+            folder = Path(bpy.path.abspath(settings.case_directory)) / (
+                datetime.datetime.now().strftime('%Y%m%dT%H%M%S') + '_' + uuid.uuid4().hex[:8])
+            folder.mkdir(parents=True, exist_ok=False)
+            _export_markers(scene, str(folder / 'markers.csv'))
+            command = [str(executable), str(root / 'gnm_reconstruct.py'),
+                       '--input', str(folder / 'markers.csv'),
+                       '--npz', bpy.path.abspath(scene.gnm_live.npz_path),
+                       '--output', str(folder / 'face.obj')]
+            log = (folder / 'run.log').open('w', encoding='utf-8')
+            try:
+                process = subprocess.Popen(command, cwd=str(root), stdout=log, stderr=subprocess.STDOUT,
+                                           shell=False, stdin=subprocess.DEVNULL)
+            except Exception:
+                log.close()
+                raise
+            _OFFLINE.update(process=process, log=log, folder=str(folder), scene=scene.name)
+            settings.offline_status = 'Running; ' + str(folder)
+            bpy.app.timers.register(_offline_poll, first_interval=0.5)
+            return {'FINISHED'}
+        except (ValueError, OSError, ImportError) as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+
+
+class GNM_OT_cancel_offline(Operator):
+    bl_idname = 'gnm.cancel_offline'
+    bl_label = 'Cancel Offline Fit'
+
+    @classmethod
+    def poll(cls, context):
+        return _OFFLINE.get('process') is not None
+
+    def execute(self, context):
+        _stop_offline()
+        context.scene.gnm_settings.offline_status = 'Cancelled; partial files retained in case folder'
+        return {'FINISHED'}
 
 
 _classes = (
@@ -3644,7 +3623,7 @@ _classes = (
     GNM_OT_place_marker, GNM_OT_next_unplaced, GNM_OT_toggle_plane_preview,
     GNM_OT_recenter_on_plane, GNM_OT_asymmetry_report, GNM_OT_session_report,
     GNM_OT_capturi_standardizate, GNM_OT_mirror_reconstruct, GNM_OT_export_csv,
-    GNM_UL_markers, GNM_PT_panel,
+    GNM_UL_markers, GNM_PT_panel, GNM_OT_run_offline, GNM_OT_cancel_offline,
     # V13:
     GNMLiveSettings, GNM_OT_setup_dual_viewports, GNM_OT_toggle_skull_overlay,
     GNM_OT_load_live_model, GNM_OT_toggle_live, GNM_OT_delete_marker,
@@ -3668,7 +3647,8 @@ def register():
     bpy.app.handlers.load_post.append(_gnm_live_on_load_post)
 
 def unregister():
-    # V13: oprim mai intai toate serviciile live (thread, timer, handler).
+    # Stop the external process, preview timer and handlers first.
+    _stop_offline()
     try:
         _stop_live()
     except Exception:

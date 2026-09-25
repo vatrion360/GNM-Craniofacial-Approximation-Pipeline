@@ -1,0 +1,17 @@
+{
+  "model_sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de",
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "coefficient_sd": 0.25,
+  "maximum_coordinate_deviation_mm": [
+    1.5309147329389816e-05,
+    1.5317282134219568e-05,
+    1.5348669137438264e-05
+  ],
+  "tolerance_mm": 0.001,
+  "passed": true,
+  "scope": "Neutral expression/pose numerical parity, NOT skull-to-face accuracy"
+}

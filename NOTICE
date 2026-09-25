@@ -1,0 +1,16 @@
+GNM Craniofacial Approximation Pipeline
+Original project: VATRION / https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline
+Project license: Apache License 2.0 (see LICENSE).
+
+This project uses separately acquired GNM Head assets from Google:
+https://github.com/google/GNM
+Reviewed upstream revision: 915aa356c6a2247083e69a06e40dfe909d42435a
+Asset: gnm/shape/data/versions/v3_0/gnm_head.npz
+SHA-256: e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de
+The assets are not redistributed in this source repository or add-on ZIP.
+Retain Google's LICENSE and applicable notices when preparing an offline bundle.
+
+The example marker file contains synthetic points derived from the GNM mean
+for testing. It does not describe a real person or a craniofacial case.
+
+Historical attribution: the original README credited Claude and Kimi K3 for assistance.

@@ -9,6 +9,7 @@ addon-ul Blender. Nu depinde de argparse si nu stie nimic de bpy.
 """
 
 import os
+from pathlib import Path
 
 import numpy as np
 
@@ -27,6 +28,8 @@ from .landmarks import (CONSISTENCY_PAIRS, PLACEMENT_HINTS,
 from .optimize import (LossConfig, bounded_tps_correction, fit_identity,
                        robust_alignment, stability_warnings)
 from .report import write_stats
+from .report import write_run_json
+from .validation import rmse, sha256_file, validate_points
 
 # Landmark-urile necesare diagnosticului de proiectie nazala (V13.6).
 _GERASIMOV_LABELS = ("Nasion", "Rhinion", "Acanthion",
@@ -36,7 +39,7 @@ _PRONASALE_VID = 12296  # iBUG 30 = varful nasului (nu e in LABEL_TO_VERTEX)
 _GERASIMOV_DIST_RANGE_MM = (10.0, 60.0)
 
 
-def _nasal_diagnostic_report(targets, skull_points, v_final):
+def _nasal_diagnostic_report(bone_positions, skull_points, v_final):
     """Blocul de diagnostic Gerasimov/Ullrich-Stephan (V13.6) pentru raport.
 
     Pur informativ - calculat din POZITIILE markerilor (pe craniu), NU din
@@ -44,7 +47,7 @@ def _nasal_diagnostic_report(targets, skull_points, v_final):
     linii = None daca niciunul din cele 5 landmarkuri nu e plasat; rezultat
     = dict-ul gerasimov_pronasale (sau None daca indisponibil).
     """
-    pos = {t[0]: np.asarray(t[2], dtype=np.float64) for t in targets}
+    pos = {label: np.asarray(point, dtype=np.float64) for label, point in bone_positions.items()}
     if not any(lbl in pos for lbl in _GERASIMOV_LABELS):
         return None, None
     head = ("Gerasimov nasal projection (Ullrich-Stephan interpretation) - "
@@ -69,7 +72,7 @@ def _nasal_diagnostic_report(targets, skull_points, v_final):
     lines = [head,
              f"  tangent angle = {res['angle_deg']:.1f} deg, "
              f"upper tangent: {src}",
-             f"  estimated pronasale = ({p[0]:.1f}, {p[1]:.1f}, {p[2]:.1f}) mm,"
+             f"  estimated pronasale (pose-aligned frame) = ({p[0]:.1f}, {p[1]:.1f}, {p[2]:.1f}) mm,"
              f" distance to Rhinion = {res['dist_rhinion_mm']:.1f} mm"]
     if v_final is not None:
         d = p - v_final[_PRONASALE_VID]
@@ -80,8 +83,19 @@ def _nasal_diagnostic_report(targets, skull_points, v_final):
 
 
 def run_pipeline(cfg: PipelineConfig) -> int:
+    """Public API: user input failures return 2, including missing dependencies."""
+    try:
+        return _run_pipeline(cfg)
+    except (ValueError, OSError, ImportError, np.linalg.LinAlgError) as exc:
+        print(f"[FATAL ERROR] {exc}")
+        return 2
+
+
+def _run_pipeline(cfg: PipelineConfig) -> int:
     """Ruleaza pipeline-ul complet. Returneaza 0 (succes) sau 2 (fatal)."""
     cfg.fill_default_outputs()
+    cfg.validate()
+    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull) if path}
     warnings_list = []
 
     backend = GNMBackend(cfg.npz)
@@ -98,6 +112,21 @@ def run_pipeline(cfg: PipelineConfig) -> int:
     print(f"[0] Loading CSV: {cfg.input}")
     targets, skipped, _csv_meta = read_marker_csv(
         cfg.input, backend.index_to_label, label_to_vertex)
+    model_hash = input_hashes[cfg.npz]
+    recorded_hash = _csv_meta.get("model_sha256")
+    if recorded_hash and recorded_hash != model_hash:
+        raise ValueError("Marker model SHA-256 does not match the selected model")
+    if _csv_meta["version"] < 3:
+        warnings_list.append("Legacy CSV assumes world mm and loses bone positions, overrides and tissue provenance; export v3.")
+    if not recorded_hash:
+        warnings_list.append("Marker CSV has no model SHA-256; manually verify topology/correspondences.")
+    records = _csv_meta.get("marker_records", {})
+    unreviewed = [t.label for t in targets if records.get(t.label, {}).get("tissue_source", "unspecified")
+                  in ("unspecified", "legacy-unvalidated", "")]
+    if unreviewed:
+        warnings_list.append("Unreviewed tissue sources: " + ", ".join(unreviewed))
+    if cfg.strict and (_csv_meta["version"] < 3 or not recorded_hash or unreviewed):
+        raise ValueError("Strict preflight requires v3, matching model hash and reviewed tissue sources for all placed markers")
     if cfg.exclude:
         excl = set(cfg.exclude)
         skipped.extend((t[0], "manually excluded (--exclude)")
@@ -127,7 +156,12 @@ def run_pipeline(cfg: PipelineConfig) -> int:
                                          model.vertex_group_names)
     labels = [t[0] for t in targets]
     lm_idx = np.array([t[1] for t in targets], dtype=np.int64)
+    if np.any(lm_idx < 0) or np.any(lm_idx >= model.vertex_count):
+        raise ValueError("Marker vertex outside model topology")
+    # Explicit v3 mappings are authoritative for consistency/distance terms too.
+    label_to_vertex = {t.label: t.vertex for t in targets}
     targets_xyz = np.array([t[2] for t in targets], dtype=np.float64)
+    validate_points(targets_xyz, "marker targets", minimum=4)
     weights = np.array([t[3] for t in targets], dtype=np.float64)
 
     # Verificare de consistenta a plasarii (distante inter-landmark vs
@@ -160,7 +194,7 @@ def run_pipeline(cfg: PipelineConfig) -> int:
         print(f"[0] Loading skull: {cfg.skull}")
         from scipy.spatial import cKDTree
         skull_mesh, sk_points, sk_normals = load_skull_samples(
-            cfg.skull, cfg.dense_samples)
+            cfg.skull, cfg.dense_samples, seed=cfg.seed)
         tree = cKDTree(sk_points)
         scalp_idx = build_scalp_mask(mu, vertex_groups, vertex_group_names)
         face_regions = ([] if cfg.no_face_dense else
@@ -220,7 +254,7 @@ def run_pipeline(cfg: PipelineConfig) -> int:
     except ValueError as e:
         print(f"[FATAL ERROR] {e}")
         return 2
-    print(f"    scale = {s1:.4f}, RMS = {res_align.mean():.2f} mm "
+    print(f"    scale = {s1:.4f}, RMS = {rmse(res_align):.2f} mm "
           f"(max {res_align.max():.2f} mm)")
 
     swapped = check_side_swap(targets, r1, t1, s1)
@@ -232,7 +266,7 @@ def run_pipeline(cfg: PipelineConfig) -> int:
     # --- Etapa 2: fit statistic -------------------------------------------
     lam_arg = "auto" if str(cfg.regularization).lower() == "auto" else float(cfg.regularization)
     distance_pairs = ([(label_to_vertex[a], label_to_vertex[b])
-                       for a, b in CONSISTENCY_PAIRS]
+                       for a, b in CONSISTENCY_PAIRS if a in label_to_vertex and b in label_to_vertex]
                       if cfg.distance_weight > 0.0 else None)
     active_terms = []
     if dense and dense["in_fit"]:
@@ -250,7 +284,7 @@ def run_pipeline(cfg: PipelineConfig) -> int:
         mirror_indices=model.mirror_indices, distance_pairs=distance_pairs,
         loss_cfg=loss_cfg)
     print(f"    lambda = {lam_used:g}, |c|max = {np.abs(c).max():.2f} sigma, "
-          f"RMS = {res_fit.mean():.2f} mm (max {res_fit.max():.2f} mm)")
+          f"RMS = {rmse(res_fit):.2f} mm (max {res_fit.max():.2f} mm)")
     stab = stability_warnings(lam_used, fit_info[0], c, loss_cfg.clip_sigma)
     for w in stab:
         print(f"    [!] {w}")
@@ -263,7 +297,7 @@ def run_pipeline(cfg: PipelineConfig) -> int:
     if cfg.exclude_outliers:
         med = float(np.median(res_fit))
         mad = 1.4826 * float(np.median(np.abs(res_fit - med)))
-        thresh_ex = max(15.0, 3.0 * mad)
+        thresh_ex = max(15.0, med + 3.0 * mad)
         drop = res_fit > thresh_ex
         if drop.any():
             excluded_auto = [(labels[i], float(res_fit[i]))
@@ -297,7 +331,7 @@ def run_pipeline(cfg: PipelineConfig) -> int:
                 dense=dense, mirror_indices=model.mirror_indices,
                 distance_pairs=distance_pairs, loss_cfg=loss_cfg)
             print(f"    refit: lambda = {lam_used:g}, |c|max = "
-                  f"{np.abs(c).max():.2f} sigma, RMS = {res_fit.mean():.2f} mm "
+                  f"{np.abs(c).max():.2f} sigma, RMS = {rmse(res_fit):.2f} mm "
                   f"(max {res_fit.max():.2f} mm)")
             stab = stability_warnings(lam_used, fit_info[0], c,
                                       loss_cfg.clip_sigma)
@@ -372,7 +406,7 @@ def run_pipeline(cfg: PipelineConfig) -> int:
                 far = d_to_lm > 3.0
                 sidx, dt_w = sidx[far], dt_w[far]
                 kept_regions = kept_regions[far]
-            rng = np.random.default_rng(42)
+            rng = np.random.default_rng(cfg.seed)
             # Centre scalp si faciale, sub-esantionate separat.
             scalp_id = dense["scalp_region_id"]
             for is_scalp, cap_n in ((True, cfg.tps_scalp_centres),
@@ -438,6 +472,15 @@ def run_pipeline(cfg: PipelineConfig) -> int:
                   f"(target {target_off:4.1f})")
 
     # --- Etapa 4: export ---------------------------------------------------
+    if any(sha256_file(path) != digest for path, digest in input_hashes.items()):
+        raise ValueError("An input changed during fitting; no outputs have been published")
+    for path in (cfg.output, cfg.output_error_mesh, cfg.output_stats, cfg.output_json, cfg.output_statistical):
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+    # Invalidate an older completion record before replacing any of its outputs.
+    if cfg.overwrite and Path(cfg.output_json).exists():
+        Path(cfg.output_json).unlink()
+    print(f"[4] Export statistical OBJ: {cfg.output_statistical}")
+    export_obj(cfg.output_statistical, v_world, triangles)
     print(f"[4] Export OBJ: {cfg.output}")
     export_obj(cfg.output, v_final, triangles)
     print(f"    Export heatmap PLY: {cfg.output_error_mesh}")
@@ -445,8 +488,17 @@ def run_pipeline(cfg: PipelineConfig) -> int:
                        np.linalg.norm(field, axis=1))
 
     # --- Diagnostic proiectie nazala V13.6 (informativ, post-fit) ----------
+    # This construction requires BONE markers and sagittal axes. Never feed
+    # skin targets or arbitrary world axes to it. Keep lengths in world mm.
+    bone_aligned = {label: (np.asarray(xyz) - trans) @ rot
+                    for label, xyz in _csv_meta.get("bone_positions_mm", {}).items()
+                    if label in labels}
+    final_aligned = (v_final - trans) @ rot
     nasal_report, gerasimov_res = _nasal_diagnostic_report(
-        targets, sk_points, v_final)
+        bone_aligned, None if sk_points is None else (sk_points - trans) @ rot,
+        final_aligned)
+    if not bone_aligned:
+        nasal_report = ["Nasal diagnostic unavailable: no explicit bone positions in the marker CSV."]
     if gerasimov_res is not None:
         d_ger = gerasimov_res["dist_rhinion_mm"]
         lo, hi = _GERASIMOV_DIST_RANGE_MM
@@ -458,7 +510,7 @@ def run_pipeline(cfg: PipelineConfig) -> int:
                 f"landmarks (Acanthion/Piriform/Nasion/Rhinion).")
         print(f"[3] Gerasimov diagnostic: estimate->Rhinion dist "
               f"{d_ger:.1f} mm, deviation vs final fit "
-              f"{np.linalg.norm(gerasimov_res['pronasale_xyz'] - v_final[_PRONASALE_VID]):.1f} mm")
+              f"{np.linalg.norm(gerasimov_res['pronasale_xyz'] - final_aligned[_PRONASALE_VID]):.1f} mm")
 
     extra = None
     extra_parts = []
@@ -490,5 +542,9 @@ def run_pipeline(cfg: PipelineConfig) -> int:
                 consistency=cons_rows, excluded_auto=excluded_auto,
                 nasal_report=nasal_report)
     print(f"    Statistics: {cfg.output_stats}")
+    write_run_json(cfg, _csv_meta, model_hash, targets, skipped, excluded_auto,
+                   scale, rot, trans, c, lam_used, fit_info, res_align,
+                   res_fit, res_final, field, warnings_list)
+    print(f"    Reproducibility report: {cfg.output_json}")
     print("Done.")
     return 0

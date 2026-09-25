@@ -6,7 +6,7 @@ si rotatii zero, mesh-ul GNM este exact liniar in coeficientii de
 identitate, deci sunt suficiente template-ul si baza din fisier.
 
 Contine si tabelele de legatura eticheta-anatomica <-> vertex GNM
-(verificate anatomic pe template-ul v3.0), inclusiv codificarile legacy
+(candidati mosteniti; necesita revizuire anatomica), inclusiv codificarile legacy
 ale addon-urilor Blender v11/v12 pentru decodarea CSV-urilor vechi.
 """
 
@@ -16,6 +16,8 @@ from typing import Dict
 import numpy as np
 
 from .base import FaceModelBackend, FaceModelData
+
+OFFICIAL_V3_SHA256 = "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de"
 
 # ---------------------------------------------------------------------------
 # TABELE DE CORESPONDENTA LANDMARKURI (GNM Head v3.0, skin)
@@ -57,8 +59,10 @@ LANDMARKS_V12 = [
     (12297, "Acanthion"), (10215, "Piriform_Dr"), (4087, "Piriform_St"),
 ]
 
-# Tabelul CORECTAT ANATOMIC: eticheta -> vertex GNM v3.0 (skin).
-# Verificat pe template-ul GNM (gnm_head.npz):
+# Inherited label-to-skin-vertex candidates for GNM v3.0.
+# Historical selection notes below do not establish anatomical validity.
+# iBUG skin landmarks cannot by themselves validate bone-to-skin mappings.
+# See docs/SCIENCE.md; original template-based rationale follows:
 #   * 11165/5037 (v11 Gonion) sunt punctele dlib 0/16 de sus de pe linia
 #     mandibulei (langa ureche), NU unghiul gonial -> inlocuiti cu 8737/2609
 #     (regiunea dlib 5/13, bigonial ~129 mm pe template).
@@ -82,7 +86,7 @@ LANDMARKS_V12 = [
 #     pereche oglinda exacta la +-12.4 mm de planul median, la nivelul
 #     subnasale -- proiectia marginii inferioare a aperturei piriforme
 #     (semi-latime ~12.5 mm a aperturei osoase adulte). Selectie:
-#     tools/suggest_nasal_vertices.py + verificare vizuala.
+#     historical template inspection (selection script was not committed).
 # Toate perechile bilaterale sunt oglinzi topologice exacte (mirror_indices);
 # pozitional, template-ul are o micro-asimetrie (< 0.05 mm).
 LABEL_TO_VERTEX = {
@@ -131,6 +135,12 @@ def default_npz_path() -> str:
     """Calea implicita catre gnm_head.npz (relativa la radacina repo-ului)."""
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))))
+    if os.environ.get("GNM_MODEL_PATH"):
+        return os.path.expanduser(os.environ["GNM_MODEL_PATH"])
+    for candidate in (os.path.join(repo_root, "models", "gnm_head.npz"),
+                      os.path.join(repo_root, "gnm_head.npz")):
+        if os.path.isfile(candidate):
+            return candidate
     return os.path.join(repo_root, "gnm", "shape", "data", "versions",
                         "v3_0", "gnm_head.npz")
 
@@ -143,15 +153,39 @@ class GNMBackend(FaceModelBackend):
     def __init__(self, npz_path: str = None):
         self.npz_path = npz_path or default_npz_path()
 
-    def load(self) -> FaceModelData:
+    def load(self, dtype=np.float32) -> FaceModelData:
         """Incarca gnm_head.npz si returneaza datele, in milimetri."""
-        npz = np.load(self.npz_path, allow_pickle=True)
-        mu = npz["template_vertex_positions"].astype(np.float64) * 1000.0
-        basis = npz["vertex_identity_basis"].astype(np.float64) * 1000.0
-        triangles = npz["triangles"].astype(np.int64)
-        mirror_indices = npz["mirror_indices"].astype(np.int64)
-        vertex_groups = npz["vertex_groups"]
-        vertex_group_names = [str(n) for n in npz["vertex_group_names"]]
+        if not os.path.isfile(self.npz_path):
+            raise ValueError(f"GNM model not found: {self.npz_path}. Set --npz or GNM_MODEL_PATH; see docs/INSTALL.md")
+        required = {"template_vertex_positions", "vertex_identity_basis", "triangles",
+                    "mirror_indices", "vertex_groups", "vertex_group_names"}
+        with np.load(self.npz_path, allow_pickle=False) as npz:
+            if not required.issubset(npz.files):
+                raise ValueError(f"GNM archive missing keys: {sorted(required - set(npz.files))}")
+            mu = np.asarray(npz["template_vertex_positions"], dtype=dtype) * 1000.0
+            basis = np.asarray(npz["vertex_identity_basis"], dtype=dtype) * 1000.0
+            triangles = npz["triangles"]
+            mirror_indices = npz["mirror_indices"]
+            vertex_groups = np.asarray(npz["vertex_groups"], dtype=dtype)
+            names = npz["vertex_group_names"]
+            if names.dtype.kind not in "US" or names.ndim != 1:
+                raise ValueError("vertex_group_names must be a one-dimensional string array")
+            vertex_group_names = [n.decode("utf-8") if isinstance(n, bytes) else str(n) for n in names]
+        n = len(mu)
+        if mu.shape != (n, 3) or n < 4 or basis.ndim != 3 or basis.shape[1:] != (n, 3) or not len(basis):
+            raise ValueError("Invalid model template or identity basis dimensions")
+        for name, array in (("template", mu), ("basis", basis), ("vertex_groups", vertex_groups)):
+            if not np.isfinite(array).all():
+                raise ValueError(f"Non-finite values in model {name}")
+        if (triangles.ndim != 2 or triangles.shape[1] != 3 or not len(triangles)
+                or triangles.dtype.kind not in "iu" or np.any(triangles < 0) or np.any(triangles >= n)):
+            raise ValueError("Invalid triangle topology")
+        if (mirror_indices.shape != (n,) or mirror_indices.dtype.kind not in "iu"
+                or np.any(mirror_indices < 0) or np.any(mirror_indices >= n)
+                or not np.array_equal(mirror_indices[mirror_indices], np.arange(n))):
+            raise ValueError("mirror_indices must be a valid involution")
+        if vertex_groups.shape != (len(vertex_group_names), n) or len(set(vertex_group_names)) != len(vertex_group_names):
+            raise ValueError("Invalid semantic vertex groups")
         return FaceModelData(
             mu=mu, basis=basis, triangles=triangles,
             mirror_indices=mirror_indices, vertex_groups=vertex_groups,
