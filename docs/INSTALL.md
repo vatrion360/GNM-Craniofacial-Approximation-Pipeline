@@ -2,7 +2,7 @@
 
 ## Tested versus targeted
 
-The Python pipeline is tested locally on Linux / Python 3.12.14 with the exact versions in `requirements-tested-py312.txt`. Python 3.10 and 3.12 on Windows/Linux are configured in CI, but a configured job is not an executed test. Blender 4.2+ is targeted; run the separate Blender gate below. The earlier README's Blender 3.6–5.0 and historical test badges were not supported by committed test evidence.
+The Python pipeline is tested locally on Linux / Python 3.12.14 with the exact versions in `requirements-tested-py312.txt`. The Python 3.10/3.12 Windows/Linux CI matrix passed. The headless integration test also passed in Blender 4.5.0 on Linux, including model loading, marker export, external fitting/import and cancellation; see the linked runs in [VALIDATION](VALIDATION.md). Blender 4.2+ remains the broader target; other versions/platforms and interactive workflows need their own acceptance checks. The earlier README's Blender 3.6–5.0 and historical test badges were not supported by committed test evidence.
 
 ## 1. Prepare the Python environment
 

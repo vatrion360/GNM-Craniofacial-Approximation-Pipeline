@@ -31,4 +31,4 @@ python gnm_reconstruct.py --input markeri.csv --npz models/gnm_head.npz --output
 
 RMSE mic la markeri arată potrivirea la țintele introduse. Nu demonstrează că fața persoanei a fost recuperată. Corecția locală se activează numai explicit, cu `--local-correction`; comparați întotdeauna cele două mesh-uri.
 
-[Fundamentarea științifică](SCIENCE.md), [protocolul pentru specialist](SPECIALIST_WORKFLOW.md), [auditul](AUDIT.md) și [validarea necesară](VALIDATION.md) explică ipotezele și limitele. Verificarea addon-ului într-un Blender real rămâne un pas de acceptanță obligatoriu pe stația de lucru.
+[Fundamentarea științifică](SCIENCE.md), [protocolul pentru specialist](SPECIALIST_WORKFLOW.md), [auditul](AUDIT.md) și [validarea necesară](VALIDATION.md) explică ipotezele și limitele. Testul automat în Blender 4.5.0 pe Linux a trecut, inclusiv calculul extern, importul și anularea. Verificarea interactivă pe stația de lucru rămâne un pas de acceptanță obligatoriu.

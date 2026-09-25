@@ -52,7 +52,7 @@ Local correction is opt-in (`--local-correction`). Dense skull constraints are e
 python tools/build_addon.py
 ```
 
-Install `dist/gnm_cranio-5.0.0rc1.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender **4.2+ is the target**, not a claim of a completed compatibility matrix.
+Install `dist/gnm_cranio-5.0.0rc1.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Headless integration **passed in Blender 4.5.0 on Linux**. Blender **4.2+ remains the broader target**; interactive and other platform/version checks remain pending.
 
 Select the local model, import the skull with explicit source units, place/review markers, and export v3 CSV. For **Run Offline Fit and Import**, select the external Python executable from the environment above and a case output folder. The add-on runs the CLI in a separate process, records a log, then imports the completed world-mm OBJ. Each run gets a new case subfolder. The default button uses marker-only statistical fitting; advanced dense/correction options are available through the CLI.
 
@@ -84,7 +84,7 @@ Set `GNM_MODEL_PATH` to include the real-model integration test. Run the Blender
 blender --background --factory-startup --python-exit-code 1 --python tools/blender_smoke.py
 ```
 
-[Validation status](docs/VALIDATION.md) distinguishes executed tests from pending Blender and scientific validation. No unexecuted test counts or forensic performance badges are advertised.
+[Validation status](docs/VALIDATION.md) distinguishes executed tests from pending interactive Blender and independent scientific validation. No unexecuted test counts or forensic performance badges are advertised.
 
 ## License and credit
 

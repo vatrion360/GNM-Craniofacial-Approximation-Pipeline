@@ -13,9 +13,12 @@ Local execution on 2026-09-25, Linux x86_64, Python 3.12.14, NumPy 2.3.5, SciPy 
 | Outer holdout evaluation on synthetic official-model markers | Executed; software sanity check only |
 | Reconstruction without network | Socket connection entry point blocked in the end-to-end test; runtime fitting contains no downloader |
 | Python build and complete add-on ZIP | Built; vendored Python sources compile; final wheel checked outside the source tree |
-| Blender runtime/headless test | **Not executed here**: no Blender executable; package/download installation attempts were unavailable in this environment |
+| Python matrix on GitHub Actions | All four Windows/Linux × Python 3.10/3.12 test/build jobs passed; [run](https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline/actions/runs/36188214492) |
+| Blender runtime/headless integration | **Passed in Blender 4.5.0 Linux**, build `8cb6b388974a`: ZIP registration twice, depth update, official model, v3/manual vertex export, external fitting/import and cancellation; [run](https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline/actions/runs/36188214530) |
 | Interactive Blender Windows/macOS/Linux acceptance | **Pending** |
 | Independent paired skull/face accuracy or recognition | **Not performed; no subject data supplied** |
+
+The linked remote runs tested commit `bd220b93617dd6dd49d5d07124376838be18d052` on 2026-09-25. The Python-only matrix omits the optional official-asset test; that asset is exercised locally and by the dedicated Blender integration job. Blender was unavailable in the local environment, so its runtime check was performed on the GitHub runner. The job log contains both `BLENDER_SMOKE_PASS` and `BLENDER_EXTERNAL_FIT_IMPORT_CANCEL_PASS`.
 
 A synthetic test with targets derived from the same statistical model is expected to fit closely. It is not an empirical accuracy study. The parity result only checks neutral identity evaluation against upstream, not anatomical validity.
 
@@ -43,7 +46,7 @@ With the model environment variable set, run:
 blender --background --factory-startup --python-exit-code 1 --python tools/blender_smoke.py
 ```
 
-The ordinary Python test suite does not import `bpy`; passing it cannot establish Blender compatibility. CI includes a Python matrix and a Blender 4.5.0 Linux integration job. The latter verifies the official model checksum and exercises the ZIP, marker exchange, external fitting/import and cancellation. Configured jobs are not evidence of an executed run; record successful run URLs with a release. Set `GNM_EXTERNAL_PYTHON` to the external environment's Python executable to include fitting/import/cancellation in the local Blender script.
+The ordinary Python test suite does not import `bpy`; passing it cannot establish Blender compatibility. CI includes a Python matrix and a Blender 4.5.0 Linux integration job. The latter verifies the official model checksum and exercises the ZIP, marker exchange, external fitting/import and cancellation. The successful runs above provide evidence for the recorded revision; future releases must record their own run URLs. Set `GNM_EXTERNAL_PYTHON` to the external environment's Python executable to include fitting/import/cancellation in the local Blender script.
 
 ## Blender manual acceptance checklist
 

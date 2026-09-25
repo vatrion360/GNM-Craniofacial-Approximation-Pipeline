@@ -1,5 +1,9 @@
 name: Blender integration
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -31,6 +35,7 @@ jobs:
           sha256sum --check --ignore-missing blender-4.5.0.sha256
           tar -xf blender-4.5.0-linux-x64.tar.xz
       - name: Exercise ZIP, model, marker exchange and external fitting
+        shell: bash
         run: |
           export GNM_MODEL_PATH="$PWD/models/gnm_head.npz"
           export GNM_EXTERNAL_PYTHON="$(command -v python)"
