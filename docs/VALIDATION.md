@@ -6,7 +6,15 @@ Local execution on 2026-09-26, Linux x86_64, Python 3.12.14, NumPy 2.3.5, SciPy 
 
 New coverage checks the PDF's 21 rows / 32 positions, the 48-site union, distinct anatomical definitions, unique exterior GNM candidates and mirror pairs, the Pogonion correction, exclusion from numerical fitting while retaining documentation, provenance warnings, strict mapping review, interpreter/dependency validation and Unicode argument forwarding. Synthetic fitting is a software check, not anatomical validation.
 
-This revision adds Blender 4.5.0 integration on Windows as well as Linux. The script exercises 27-to-48 migration without losing placements/depths/overrides, the Paper 32 profile, rejection of the invalid script-as-interpreter selection before any run starts, environment checks, fitting/import in a Romanian path, marker exclusion and cancellation. **Remote results for this revision are pending** until linked here; previous results below do not establish compatibility of new code.
+All six remote jobs passed for code commit `59bbbadf459c44039921a9c85132b10ef26c01bb` on 2026-09-26:
+
+| Check | Evidence |
+| --- | --- |
+| Python 3.10 / 3.12 on Linux / Windows | All four test, lint and packaging jobs passed; [run 36219201946](https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline/actions/runs/36219201946). Windows Python 3.12: 82 passed, 2 skipped (POSIX symlink and separately provisioned model tests); native CreateProcess error 193 reproduced and handled. |
+| Blender 4.5.0, Linux and Windows | Both integration jobs passed, official build `8cb6b388974a`; [run 36219201964](https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline/actions/runs/36219201964). |
+| Built wheel outside the source tree | Strict 48-marker reconstruction with the official asset passed; synthetic final RMSE below 0.001 mm. |
+
+Both Blender logs contain `BLENDER_BAD_INTERPRETER_PREVENTED`, `BLENDER_EXTERNAL_FIT_IMPORT_CANCEL_PASS` and `BLENDER_SMOKE_PASS`. The script exercises 27-to-48 migration without losing placements/depths/overrides, the Paper 32 profile, rejection of the invalid script-as-interpreter selection before any run starts, environment checks, fitting/import in a Romanian path, marker exclusion and cancellation. The Windows runner uses Windows Server 2025 and external Python 3.12.10. These are headless software checks, not interactive workstation acceptance or scientific accuracy validation.
 
 ## Previous evidence: 5.0.0rc1
 

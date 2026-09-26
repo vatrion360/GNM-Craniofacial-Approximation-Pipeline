@@ -9,11 +9,10 @@ Addon-ul oferă **48 de markeri**, pipeline offline și verificarea mediului Pyt
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install .
-.\.venv\Scripts\python.exe -m cranio.doctor --npz models\gnm_head.npz
 (Resolve-Path .\.venv\Scripts\python.exe).Path
 ```
 
-2. Obține/verifică modelul oficial conform [INSTALL](INSTALL.md). Modelul se păstrează local și nu este inclus în addon.
+2. Obține modelul oficial conform [INSTALL](INSTALL.md), apoi verifică-l cu `.\.venv\Scripts\python.exe -m cranio.doctor --npz models\gnm_head.npz`. Modelul se păstrează local și nu este inclus în addon.
 3. Instalează `gnm_cranio-5.0.0rc2.zip` în Blender prin **Install from Disk** și activează **GNM Scientific Markers**. Dezactivează copia veche înainte de înlocuire. Pentru construirea ZIP-ului din surse: `python tools/build_addon.py`.
 4. La **Python executable / venv folder**, selectează `python.exe` din `.venv\Scripts`, sau directorul `.venv` creat pe Windows. Poți lipi calea afișată de ultima comandă de mai sus.
 5. Apasă **Check Python Environment**. Rezultatul trebuie să confirme Python 3.10+ pe 64 de biți și `numpy/scipy/trimesh OK`.
