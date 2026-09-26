@@ -1,4 +1,4 @@
-# Ghid rapid în română: 5.0.0rc2 / addon 15
+# Ghid rapid în română: 5.0.0rc3 / addon 16
 
 Addon-ul oferă **48 de markeri**, pipeline offline și verificarea mediului Python înainte de calcul. Tabelul 2 din PDF are 21 de tipuri anatomice, adică **32 de poziții**: 10 mediane și 11 perechi bilaterale. Reunirea lor cu cei 27 de markeri anteriori adaugă 21 de poziții noi.
 
@@ -13,7 +13,7 @@ py -3.12 -m venv .venv
 ```
 
 2. Obține modelul oficial conform [INSTALL](INSTALL.md), apoi verifică-l cu `.\.venv\Scripts\python.exe -m cranio.doctor --npz models\gnm_head.npz`. Modelul se păstrează local și nu este inclus în addon.
-3. Instalează `gnm_cranio-5.0.0rc2.zip` în Blender prin **Install from Disk** și activează **GNM Scientific Markers**. Dezactivează copia veche înainte de înlocuire. Pentru construirea ZIP-ului din surse: `python tools/build_addon.py`.
+3. Instalează `gnm_cranio-5.0.0rc3.zip` în Blender prin **Install from Disk** și activează **GNM Scientific Markers**. Dezactivează copia veche înainte de înlocuire. Pentru construirea ZIP-ului din surse: `python tools/build_addon.py`.
 4. La **Python executable / venv folder**, selectează `python.exe` din `.venv\Scripts`, sau directorul `.venv` creat pe Windows. Poți lipi calea afișată de ultima comandă de mai sus.
 5. Apasă **Check Python Environment**. Rezultatul trebuie să confirme Python 3.10+ pe 64 de biți și `numpy/scipy/trimesh OK`.
 
@@ -56,3 +56,13 @@ python gnm_reconstruct.py --input markeri.csv --npz models/gnm_head.npz --output
 - `fata_report.json`: parametri, versiuni, amprente, proveniență, repere excluse și reziduuri.
 
 RMSE mic arată potrivirea la țintele introduse. Numărul mai mare de markeri nu demonstrează automat acuratețe mai bună. Verificarea interactivă pe stația de lucru și validarea pe cazuri independente rămân necesare. [Protocolul bazat pe PDF](PDF_PROTOCOL.md) delimitează implementarea de metodele anatomice și artistice care nu au fost automatizate.
+
+## Cranii fragmentare, duplicate și lambda
+
+Nu mai există alegerea unei jumătăți globale de păstrat. Pentru craniu drept + os nazal + mandibulă stângă, creează trei regiuni prin **Add Active Fragment**: craniu drept cu **Mirror selected region**, os nazal cu **Keep preserved**, mandibulă stângă cu **Mirror selected region**. Poți folosi obiecte separate sau grupuri de vertecși în același mesh. Înregistrează toate fragmentele păstrate.
+
+Mandibula nearticulată necesită propriul obiect-plan; numai după verificarea articulației poți bifa **Mandible articulated with cranium**. Planul unui obiect este planul său local XY. Completările se generează separat; originalele nu sunt tăiate, ascunse sau sudate. Verifică îmbinările și repoziționează/reverifică markerii după modificarea fragmentelor. Detaliile și limitele filtrului de suprapuneri sunt în [FRAGMENT_RESTORATION](FRAGMENT_RESTORATION.md).
+
+**Audit Landmark Duplicates** verifică selecțiile manuale și țintele coincidente. Catalogul are 48 de etichete și 48 de vertecși unici; Nasospinale și Acanthion au candidații cutanați la 1,5 mm distanță și necesită verificarea definițiilor pe os.
+
+Lambda implicit este `lambda_bază × 48 / N_folosit`, limitat de minim/maxim: cu baza 1, pentru 12 repere lambda este 4; pentru 24 este 2; pentru 48 este 1. Se numără doar reperele plasate, mapate, distincte și incluse. Punctele dense și reperele excluse nu măresc numărul. Regula este o euristică; opțiunea LOO rămâne separată. Butonul offline transmite explicit modul ales.

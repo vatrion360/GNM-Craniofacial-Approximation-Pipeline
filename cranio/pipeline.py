@@ -130,6 +130,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
             warnings_list.append(
                 "--exclude: labels not found in the CSV: " + ", ".join(sorted(unknown)))
     records = _csv_meta.get("marker_records", {})
+    warnings_list.extend(_csv_meta.get('landmark_audit', {}).get('warnings', []))
     unreviewed = [t.label for t in targets if records.get(t.label, {}).get("tissue_source", "unspecified")
                   in ("unspecified", "legacy-unvalidated", "")]
     if unreviewed:
@@ -274,7 +275,13 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
             + ", ".join(swapped) + ". Check placement in Blender.")
 
     # --- Etapa 2: fit statistic -------------------------------------------
-    lam_arg = "auto" if str(cfg.regularization).lower() == "auto" else float(cfg.regularization)
+    from .regularization import adaptive_lambda
+    def selected_lambda(count):
+        mode = str(cfg.regularization).lower()
+        if mode == 'adaptive':
+            return adaptive_lambda(count, cfg.lambda_base, cfg.lambda_min, cfg.lambda_max)
+        return 'auto' if mode == 'auto' else float(cfg.regularization)
+    lam_arg = selected_lambda(len(targets))
     distance_pairs = ([(label_to_vertex[a], label_to_vertex[b])
                        for a, b in CONSISTENCY_PAIRS if a in label_to_vertex and b in label_to_vertex]
                       if cfg.distance_weight > 0.0 else None)
@@ -336,6 +343,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                     f"After outlier exclusion {len(targets)} markers "
                     f"remain (<10) - weakly constrained reconstruction.")
             print("    Re-running the statistical fit without outliers...")
+            lam_arg = selected_lambda(len(targets))
             c, scale, rot, trans, lam_used, fit_info, res_fit = fit_identity(
                 mu, basis, lm_idx, targets_xyz, weights, lam=lam_arg,
                 dense=dense, mirror_indices=model.mirror_indices,

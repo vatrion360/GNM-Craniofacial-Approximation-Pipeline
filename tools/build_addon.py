@@ -5,7 +5,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 def build(destination=None):
     root = Path(__file__).resolve().parents[1]
-    destination = Path(destination or root / 'dist' / 'gnm_cranio-5.0.0rc2.zip')
+    destination = Path(destination or root / 'dist' / 'gnm_cranio-5.0.0rc3.zip')
     destination.parent.mkdir(parents=True, exist_ok=True)
     files = [(root / 'addon_v13.py', 'gnm_cranio/__init__.py'),
              (root / 'gnm_reconstruct.py', 'gnm_cranio/gnm_reconstruct.py'),

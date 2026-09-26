@@ -1,4 +1,4 @@
-"""GNM Craniofacial Markers 15.0 / software package 5.0.0rc2.
+"""GNM Craniofacial Markers 16.0 / software package 5.0.0rc3.
 
 Install the complete ZIP built with tools/build_addon.py. The bundled numerical
 core is imported under the add-on namespace. Optional previews run serially in
@@ -35,7 +35,7 @@ from bpy_extras import view3d_utils
 bl_info = {
     "name": "GNM Scientific Markers",
     "author": "VATRION",
-    "version": (15, 0, 0),
+    "version": (16, 0, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > GNM Markers",
     "category": "3D View",
@@ -79,35 +79,27 @@ def _pair_label(label: str):
         return label.replace("_St", "_Dr")
     return None
 
+def _plane_markers(scene):
+    return [item for item in scene.gnm_markers
+            if item.side == 0 and item.bone_empty is not None
+            and item.use_for_plane and item.bone_status == 'observed'
+            and item.label not in _MARKER_DATA.MANDIBULAR_LANDMARKS]
+
+
 def _fit_midsagittal_plane(scene):
-    """Fiteaza planul medio-sagital din markerii mediani (side == 0) deja
-    plasati, folosind pozitia PE OS (bone_empty) - nu tinta de piele, care e
-    deja deplasata cu adancimea tesutului moale si ar deforma planul.
-
-    Foloseste regresie ortogonala (SVD): normala planului e vectorul singular
-    asociat celei mai mici valori singulare (directia de variatie minima).
-
-    Returneaza (plane_co, normal, rms_error) sau None daca sunt plasati mai
-    putin de 3 markeri mediani (minim necesar pentru a defini un plan)."""
-    import numpy as np
-    from mathutils import Vector
-
-    midline_pts = [
-        item.bone_empty.matrix_world.translation.copy()
-        for item in scene.gnm_markers
-        if item.side == 0 and item.bone_empty is not None
-    ]
-    if len(midline_pts) < 3:
+    """Observed cranial references only; detached mandible cannot tilt the plane."""
+    plane_object = scene.gnm_settings.restoration_plane_object
+    if plane_object is not None:
+        try:
+            return _core_module('blender_restoration').object_plane(plane_object)
+        except ValueError:
+            return None
+    points = [item.bone_empty.matrix_world.translation[:] for item in _plane_markers(scene)]
+    try:
+        centre, normal, rms = _core_module('restoration').fit_reference_plane(points)
+        return Vector(centre), Vector(normal), rms
+    except (ValueError, np.linalg.LinAlgError):
         return None
-
-    pts = np.array([(p.x, p.y, p.z) for p in midline_pts])
-    centroid_np = pts.mean(axis=0)
-    centered = pts - centroid_np
-    _, _, vt = np.linalg.svd(centered)
-    normal = Vector(vt[-1]).normalized()
-    plane_co = Vector(centroid_np)
-    rms = float(np.sqrt(np.mean((centered @ np.array(normal)) ** 2)))
-    return plane_co, normal, rms
 
 def _compute_asymmetry_rows(scene, plane_co, normal):
     """Pentru fiecare pereche Dr/St deja plasata complet, calculeaza distanta
@@ -119,6 +111,8 @@ def _compute_asymmetry_rows(scene, plane_co, normal):
     rows = []
     for item in scene.gnm_markers:
         if item.side not in (-1, 1):
+            continue
+        if item.label in _MARKER_DATA.MANDIBULAR_LANDMARKS and not scene.gnm_settings.mandible_aligned:
             continue
         if item.label in seen:
             continue
@@ -206,38 +200,16 @@ class GNMSettings(PropertyGroup):
     marker_size_mm: FloatProperty(name="Marker Radius (mm)", default=1.5, min=0.1)
     peg_thickness_mm: FloatProperty(name="Peg Thickness (mm)", default=0.5, min=0.1)
 
-    partea_intacta: EnumProperty(
-        name="Intact Side (Scanned)",
-        description=(
-            "The half of the skull that is complete and trustworthy. The other "
-            "half will be removed and rebuilt by mirroring across the "
-            "midsagittal plane computed from midline markers"
-        ),
-        items=[
-            ('DR', "Right (R)", "The right half (R) is intact"),
-            ('ST', "Left (L)", "The left half (L) is intact"),
-        ],
-        default='DR',
-    )
-    aplica_materiale_distincte: BoolProperty(
-        name="Color reconstructed part distinctly",
-        description=(
-            "Applies two different materials to the result, to visually tell "
-            "apart original (scanned) bone from the mirrored (reconstructed/"
-            "inferred) part"
-        ),
-        default=True,
-    )
-    mod_previzualizare: BoolProperty(
-        name="Preview mode (no welding)",
-        description=(
-            "Only mirrors the whole skull and keeps it visible next to the "
-            "original, WITHOUT cutting/joining/welding anything. Useful to "
-            "visually verify the plane and chosen intact side before the final "
-            "(irreversible) reconstruction"
-        ),
-        default=False,
-    )
+    restoration_plane_object: PointerProperty(
+        name="Cranial reference plane", type=bpy.types.Object,
+        description="Optional object whose local XY plane defines symmetry; otherwise use observed cranial midline markers")
+    mandible_aligned: BoolProperty(name="Mandible articulated with cranium", default=False,
+        description="Confirm its pose/occlusion has been reviewed before using the cranial plane for mandibular regions")
+    restoration_tolerance_mm: FloatProperty(name="Overlap tolerance (mm)", default=0.1, min=0.001, max=2.0,
+        description="Suppress generated triangles fully within this distance of registered preserved surfaces; inspect partial intersections")
+    aplica_materiale_distincte: BoolProperty(name="Color inferred patches", default=True)
+    restoration_status: StringProperty(default="Register each fragment; preserve central anatomy")
+
 
     sursa_fisier: StringProperty(name="Source File (Skull)", default="")
     ultim_export_csv: StringProperty(name="Last CSV Export", default="")
@@ -277,6 +249,7 @@ class GNMMarkerItem(PropertyGroup):
         ('observed', "Observed", "Landmark on preserved scanned anatomy"),
         ('reconstructed', "Digitally repaired", "Landmark on repaired or mirrored bone"),
         ('inferred', "Inferred", "Location inferred from incomplete anatomy")], default='unspecified')
+    use_for_plane: BoolProperty(name="Use observed cranial point for plane", default=True)
     marker_notes: StringProperty(name="Placement / direction notes")
     side: IntProperty(default=0)
     bone_empty: PointerProperty(type=bpy.types.Object)
@@ -469,6 +442,9 @@ class GNM_OT_place_marker(Operator):
             return  # marker median, nu are pereche
 
         pair_item = next((m for m in scene.gnm_markers if m.label == pair_label), None)
+        if (item.label in _MARKER_DATA.MANDIBULAR_LANDMARKS
+                and not scene.gnm_settings.mandible_aligned):
+            return
         if pair_item is None or pair_item.bone_empty is None:
             return  # perechea nu e inca plasata
 
@@ -507,8 +483,8 @@ class GNM_OT_place_marker(Operator):
         # V13: in workflow-ul live, capul GNM (piele) coexista cu craniul in
         # aceeasi lume si il invaluie; sarim peste obiectele GNM live ca sa
         # lovim intotdeauna craniul (ray-marching, vezi _ray_cast_skull).
-        result, location, normal = _ray_cast_skull(
-            scene, depsgraph, ray_origin, ray_dir)
+        result, location, normal, hit_object = _ray_cast_skull(
+            scene, depsgraph, ray_origin, ray_dir, return_object=True)
 
         if not result: return {"RUNNING_MODAL"}
 
@@ -527,6 +503,7 @@ class GNM_OT_place_marker(Operator):
         bone["gnm_normal"] = tuple(normal.normalized())
         context.collection.objects.link(bone)
         item.bone_empty = bone
+        _record_marker_surface(item, hit_object)
 
         tinta = bpy.data.objects.new(f"GNM_PIELE_{item.label}", None)
         tinta.empty_display_type = 'SPHERE'
@@ -679,8 +656,33 @@ class GNM_OT_recenter_on_plane(Operator):
             if extra is not None and extra not in to_move:
                 to_move.append(extra)
 
-        for o in to_move:
-            o.location = o.location + offset
+        for row in scene.gnm_restoration_regions:
+            to_move.extend(o for o in (row.source_object, row.result_object, row.plane_object) if o is not None)
+        if scene.gnm_settings.restoration_plane_object:
+            to_move.append(scene.gnm_settings.restoration_plane_object)
+        to_move = list(dict.fromkeys(to_move))
+        transforms = {o: o.matrix_world.copy() for o in to_move}
+        # Apply world transforms parent-first, from an unchanged snapshot.
+        def parent_depth(obj):
+            depth = 0
+            while obj.parent is not None:
+                depth += 1
+                obj = obj.parent
+            return depth
+        for o in sorted(to_move, key=parent_depth):
+            matrix = transforms[o]
+            matrix.translation += offset
+            o.matrix_world = matrix
+            if o.get('gnm_region_patch') and o.get('gnm_restoration_metadata'):
+                import json
+                metadata = json.loads(o['gnm_restoration_metadata'])
+                metadata['plane_origin_mm'] = list(Vector(metadata['plane_origin_mm']) + offset)
+                previous = Vector(metadata.get('post_generation_translation_mm', (0, 0, 0)))
+                metadata['post_generation_translation_mm'] = list(previous + offset)
+                o['gnm_restoration_metadata'] = json.dumps(metadata)
+        context.view_layer.update()
+        _LIVE.skull = None  # world-space samples must be prepared again
+        _LIVE.dense_set = None
 
         self.report({"INFO"},
                     f"Recentering complete: {len(to_move)} objects moved by "
@@ -700,7 +702,7 @@ class GNM_OT_asymmetry_report(Operator):
         scene = context.scene
         plane = _fit_midsagittal_plane(scene)
         if plane is None:
-            self.report({"ERROR"}, "At least 3 placed midline markers are required to compute the plane.")
+            self.report({"ERROR"}, "Use at least 3 non-collinear observed cranial midline markers, or a manual reference plane.")
             return {"CANCELLED"}
         plane_co, normal, rms = plane
 
@@ -709,7 +711,7 @@ class GNM_OT_asymmetry_report(Operator):
             self.report({"WARNING"}, "There is no complete R/L pair (both sides placed) yet.")
             return {"CANCELLED"}
 
-        n_midline = sum(1 for m in scene.gnm_markers if m.side == 0 and m.bone_empty is not None)
+        n_midline = len(_plane_markers(scene))
         lines = []
         lines.append("=== Bilateral Asymmetry Report (GNM) ===")
         lines.append(f"Midsagittal plane: fit RMS error = {rms:.3f} mm ({n_midline} midline markers)")
@@ -788,10 +790,10 @@ class GNM_OT_session_report(Operator):
 
         plane = _fit_midsagittal_plane(scene)
         if plane is None:
-            lines.append("Midsagittal plane: cannot be computed (fewer than 3 midline markers placed).")
+            lines.append("Midsagittal plane: cannot be computed (insufficient stable, observed cranial references; use a manual plane).")
         else:
             plane_co, normal, rms = plane
-            n_midline = sum(1 for m in scene.gnm_markers if m.side == 0 and m.bone_empty is not None)
+            n_midline = len(_plane_markers(scene))
             lines.append(f"Midsagittal plane: {n_midline} midline markers, RMS error = {rms:.3f} mm")
 
             rows = _compute_asymmetry_rows(scene, plane_co, normal)
@@ -940,215 +942,209 @@ class GNM_OT_capturi_standardizate(Operator):
         self.report({"INFO"}, f"3 captures saved in {self.directory} (front/three-quarter/profile).")
         return {"FINISHED"}
 
-class GNM_OT_mirror_reconstruct(Operator):
-    """Reconstructie bilaterala a unui craniu scanat partial.
+class GNMRestorationRegion(PropertyGroup):
+    uid: StringProperty()
+    name: StringProperty(name='Region', default='Preserved fragment')
+    enabled: BoolProperty(default=True)
+    source_object: PointerProperty(name='Preserved source', type=bpy.types.Object,
+                                  poll=lambda self, obj: obj.type == 'MESH')
+    vertex_group: StringProperty(name='Donor vertex group', description='Blank uses the entire object; only complete faces with all vertex weights > 0.5 are copied')
+    anatomy: EnumProperty(name='Anatomy', items=[('CRANIUM', 'Cranium', ''),
+        ('MANDIBLE', 'Mandible', ''), ('NASAL', 'Nasal / central', ''), ('OTHER', 'Other', '')])
+    action: EnumProperty(name='Action', items=[('KEEP', 'Keep preserved', 'Protect this original fragment without mirroring'),
+        ('MIRROR', 'Mirror selected region', 'Generate an inferred patch on the opposite side; originals remain untouched')], default='KEEP')
+    donor_side: EnumProperty(name='Anatomical donor side', items=[('DR', 'Right', ''), ('ST', 'Left', '')])
+    plane_object: PointerProperty(name='Region reference plane', type=bpy.types.Object,
+        description='Optional local XY plane; required for an unarticulated mandible')
+    result_object: PointerProperty(type=bpy.types.Object)
+    notes: StringProperty(name='Restoration / articulation notes')
 
-    Fiteaza planul medio-sagital prin regresie ortogonala (SVD) folosind
-    markerii MEDIANI deja plasati (side == 0), pe pozitia lor PE OS
-    (bone_empty) - nu tinta de piele, care e deja deplasata cu adancimea
-    tesutului moale si ar deforma planul. Taie apoi jumatatea deteriorata/
-    lipsa exact la acest plan si o inlocuieste in intregime cu o oglindire
-    a jumatatii intacte, sudand cusatura de-a lungul liniei mediane.
 
-    Cu "Mod previzualizare" bifat, se opreste dupa oglindire, INAINTE de
-    taiere/sudura - util ca sa verifici rezultatul inainte de pasul definitiv.
+def _region_plane(scene, region):
+    if region.plane_object is not None:
+        return _core_module('blender_restoration').object_plane(region.plane_object)
+    if region.anatomy == 'MANDIBLE' and not scene.gnm_settings.mandible_aligned:
+        raise ValueError(f'{region.name}: use a mandibular reference plane or confirm reviewed articulation with the cranium')
+    plane = _fit_midsagittal_plane(scene)
+    if plane is None:
+        raise ValueError('Set a reference-plane object or at least three non-collinear, observed cranial midline points enabled for the plane')
+    if plane[2] > 1.5:
+        raise ValueError('Plane RMS exceeds 1.5 mm. Review references or set an explicit plane before restoration')
+    return plane
 
-    Limitare de retinut: metoda presupune simetrie bilaterala perfecta, ceea
-    ce e doar o aproximare - nicio persoana reala nu e perfect simetrica, iar
-    o eventuala deformare taphonomica poate deplasa chiar si markerii mediani
-    fata de planul "adevarat". Rezultatul e o reconstructie plauzibila, nu
-    o certitudine anatomica.
-    """
-    bl_idname = "gnm.mirror_reconstruct"
-    bl_label = "3. Bilateral Reconstruction (Mirroring)"
-    bl_description = (
-        "Computes the midsagittal plane from placed midline markers and "
-        "rebuilds the missing/damaged half by mirroring the intact half"
-    )
-    bl_options = {"REGISTER", "UNDO"}
+
+def _restoration_records(scene):
+    import json
+    records = []
+    for item in scene.gnm_restoration_regions:
+        record = dict(region=item.name, enabled=item.enabled, anatomy=item.anatomy,
+                      action=item.action, donor_side=item.donor_side,
+                      source=item.source_object.name if item.source_object else None,
+                      vertex_group=item.vertex_group, notes=item.notes,
+                      mandible_articulated=scene.gnm_settings.mandible_aligned)
+        if item.result_object and item.result_object.get('gnm_region_patch') == item.uid:
+            record['generated_patch'] = json.loads(item.result_object.get('gnm_restoration_metadata', '{}'))
+        records.append(record)
+    return records
+
+
+class GNM_OT_region_add(Operator):
+    bl_idname = 'gnm.region_add'
+    bl_label = 'Add Active Fragment'
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
-        return context.active_object is not None and context.active_object.type == 'MESH'
+        return context.mode == 'OBJECT' and context.active_object is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
-        from mathutils import Matrix
+        import uuid
+        if context.active_object.get('gnm_region_patch'):
+            self.report({'ERROR'}, 'Select preserved bone, not a generated patch')
+            return {'CANCELLED'}
+        row = context.scene.gnm_restoration_regions.add()
+        row.uid = uuid.uuid4().hex
+        row.name = context.active_object.name
+        row.source_object = context.active_object
+        context.scene.gnm_restoration_active_index = len(context.scene.gnm_restoration_regions) - 1
+        return {'FINISHED'}
 
+
+class GNM_OT_region_remove(Operator):
+    bl_idname = 'gnm.region_remove'
+    bl_label = 'Remove Region and Its Generated Patch'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return bool(context.scene.gnm_restoration_regions)
+
+    def execute(self, context):
+        scene = context.scene
+        index = scene.gnm_restoration_active_index
+        row = scene.gnm_restoration_regions[index]
+        if row.result_object and row.result_object.get('gnm_region_patch') == row.uid:
+            bpy.data.objects.remove(row.result_object, do_unlink=True)
+        scene.gnm_restoration_regions.remove(index)
+        scene.gnm_restoration_active_index = min(index, max(0, len(scene.gnm_restoration_regions) - 1))
+        return {'FINISHED'}
+
+
+class GNM_UL_restoration_regions(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
+        row = layout.row(align=True)
+        row.prop(item, 'enabled', text='')
+        row.label(text=item.name, icon='MOD_MIRROR' if item.action == 'MIRROR' else 'LOCKED')
+
+
+class GNM_OT_mirror_reconstruct(Operator):
+    """Compatibility operator ID now generates separate, region-specific patches."""
+    bl_idname = 'gnm.mirror_reconstruct'
+    bl_label = 'Generate / Update Region Patches'
+    bl_description = 'Mirror explicitly selected donors; regenerate managed patches; preserve every original fragment without cutting, joining or welding it'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT' and bool(context.scene.gnm_restoration_regions)
+
+    def execute(self, context):
+        import json
         scene = context.scene
         settings = scene.gnm_settings
-        src_obj = context.active_object
+        geometry = _core_module('blender_restoration')
+        rows = [row for row in scene.gnm_restoration_regions if row.enabled and row.action == 'MIRROR']
+        try:
+            if scene.unit_settings.system != 'METRIC' or abs(scene.unit_settings.scale_length - 0.001) > 1e-8:
+                raise ValueError('Restoration requires world millimetres: Metric scale 0.001')
+            if not rows:
+                raise ValueError('Choose Mirror selected region for at least one donor; keep nasal/central anatomy as Keep preserved')
+            sources = list({row.source_object for row in scene.gnm_restoration_regions if row.source_object})
+            signatures = set()
+            for row in rows:
+                geometry.check_source(row.source_object)
+                if row.result_object and row.result_object.get('gnm_region_patch') != row.uid:
+                    raise ValueError('Result pointer does not refer to this region\'s generated patch')
+                signature = (row.source_object.as_pointer(), row.vertex_group)
+                if signature in signatures:
+                    raise ValueError('Duplicate donor region: the same source/group is scheduled more than once')
+                signatures.add(signature)
+            protected = geometry.protected_surface(sources)
+            prepared = []
+            # Complete preflight and geometry before changing any output object.
+            for row in rows:
+                vertices, faces, metadata = geometry.build_patch(row.source_object, row.vertex_group,
+                    _region_plane(scene, row), protected, settings.restoration_tolerance_mm)
+                metadata.update(region=row.name, anatomy=row.anatomy, donor_side=row.donor_side,
+                    notes=row.notes, preserved_objects=[obj.name for obj in sources],
+                    plane_reference=(row.plane_object.name if row.plane_object else
+                        settings.restoration_plane_object.name if settings.restoration_plane_object else
+                        'observed cranial landmarks'))
+                prepared.append((row, vertices, faces, metadata))
+            for row, vertices, faces, metadata in prepared:
+                obj = row.result_object
+                if not faces and obj is None:
+                    continue
+                mesh = bpy.data.meshes.new('GNM_Inferred_' + row.name)
+                mesh.from_pydata(vertices, [], faces)
+                mesh.update()
+                if obj is None:
+                    obj = bpy.data.objects.new('GNM_Inferred_' + row.name, mesh)
+                    scene.collection.objects.link(obj)
+                    row.result_object = obj
+                else:
+                    old_mesh = obj.data
+                    obj.data = mesh
+                    if old_mesh.users == 0:
+                        bpy.data.meshes.remove(old_mesh)
+                obj.parent = None
+                obj.matrix_world = Matrix.Identity(4)
+                obj.hide_set(not bool(faces))
+                obj['gnm_region_patch'] = row.uid
+                obj['gnm_reconstructed_via_mirroring'] = True
+                obj['gnm_mirror_source'] = row.source_object.name
+                obj['gnm_mirror_intact_side'] = row.donor_side
+                obj['gnm_mirror_rms_mm'] = metadata['plane_rms_mm']
+                obj['gnm_restoration_metadata'] = json.dumps(metadata)
+                if settings.aplica_materiale_distincte:
+                    mesh.materials.append(_get_or_create_material('GNM_Inferred_Bone', (0.3, 0.55, 0.85, 1.0)))
+            total = sum(len(faces) for _, _, faces, _ in prepared)
+            contact = sum(meta['partial_contact_faces'] for _, _, _, meta in prepared)
+            settings.restoration_status = f'{len(prepared)} regions; {total} inferred faces; {contact} faces near preserved surfaces. Inspect seams; originals retained.'
+            self.report({'INFO'}, settings.restoration_status)
+            return {'FINISHED'}
+        except (ValueError, RuntimeError) as exc:
+            settings.restoration_status = str(exc)
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
 
-        if src_obj is None or src_obj.type != 'MESH':
-            self.report({"ERROR"}, "Select the skull (mesh object) before reconstruction.")
-            return {"CANCELLED"}
 
-        plane_preview = bpy.data.objects.get("GNM_PLAN_PREVIEW")
-        if plane_preview:
-            bpy.data.objects.remove(plane_preview, do_unlink=True)
+class GNM_OT_audit_landmarks(Operator):
+    bl_idname = 'gnm.audit_landmarks'
+    bl_label = 'Audit Landmark Duplicates'
 
-        plane = _fit_midsagittal_plane(scene)
-        if plane is None:
-            n_midline = sum(1 for m in scene.gnm_markers if m.side == 0 and m.bone_empty is not None)
-            self.report({"ERROR"},
-                        f"At least 3 placed midline markers are required to compute "
-                        f"the midsagittal plane (found: {n_midline}).")
-            return {"CANCELLED"}
-        plane_co, normal, residual_rms = plane
+    def execute(self, context):
+        scene = context.scene
+        rows = [item for item in scene.gnm_markers if item.is_placed and item.use_for_fit]
+        bones = {item.label: item.bone_empty.matrix_world.translation[:] for item in rows}
+        result = _core_module('marker_audit').audit_landmarks(
+            [item.label for item in rows], [_resolve_vertex(item) for item in rows],
+            [item.target_empty.matrix_world.translation[:] for item in rows], bones)
+        missing = [item.label for item in rows if _resolve_vertex(item) is None]
+        if missing:
+            result['errors'].append('Unmapped: ' + ', '.join(missing))
+        lines = ['GNM landmark audit', f"Included, placed: {result['included_count']}",
+                 f"Unique model vertices: {result['unique_vertex_count']}"]
+        lines.extend('ERROR: ' + entry for entry in result['errors'])
+        lines.extend('REVIEW: ' + entry for entry in result['warnings'])
+        lines.append('Registry: 48 distinct labels and model vertices. Nasospinale/Acanthion candidates are 1.5 mm apart; review their distinct bone definitions. Proximity alone is not duplication.')
+        text = bpy.data.texts.get('GNM_Landmark_Audit') or bpy.data.texts.new('GNM_Landmark_Audit')
+        text.clear()
+        text.write('\n'.join(lines))
+        self.report({'WARNING'} if result['errors'] else {'INFO'},
+                    f"Audit: {len(result['errors'])} errors, {len(result['warnings'])} proximity warnings. See GNM_Landmark_Audit")
+        return {'FINISHED'}
 
-        n_midline = sum(1 for m in scene.gnm_markers if m.side == 0 and m.bone_empty is not None)
-        self.report({"INFO"},
-                    f"Midsagittal plane computed from {n_midline} markers "
-                    f"(RMS error: {residual_rms:.3f} mm).")
-        if residual_rms > 1.5:
-            self.report({"WARNING"},
-                        "Large RMS error in plane fitting (>1.5mm) - check midline "
-                        "marker placement; it may also indicate real asymmetry/deformation.")
-
-        wanted_side = -1 if settings.partea_intacta == 'DR' else 1
-        lateral_refs = [
-            item.bone_empty.matrix_world.translation
-            for item in scene.gnm_markers
-            if item.side == wanted_side and item.bone_empty is not None
-        ]
-        if not lateral_refs:
-            side_lbl = "Right (R)" if wanted_side == -1 else "Left (L)"
-            self.report({"ERROR"},
-                        f"Place at least one lateral marker on the {side_lbl} side "
-                        f"(declared intact) before reconstruction - otherwise we cannot "
-                        f"determine automatically and safely which half to keep.")
-            return {"CANCELLED"}
-
-        dots = [(p - plane_co).dot(normal) for p in lateral_refs]
-        if any(d * dots[0] < 0 for d in dots):
-            self.report({"WARNING"},
-                        "The lateral markers on the intact side are not all on the same "
-                        "side of the computed plane - check marker placement.")
-        if dots[0] < 0:
-            normal = -normal
-
-        reflect_matrix = (
-            Matrix.Translation(plane_co)
-            @ Matrix.Scale(-1.0, 4, normal)
-            @ Matrix.Translation(-plane_co)
-        )
-
-        if settings.mod_previzualizare:
-            old_preview = bpy.data.objects.get(f"{src_obj.name}_PreviewOglindit")
-            if old_preview:
-                bpy.data.objects.remove(old_preview, do_unlink=True)
-
-            bpy.ops.object.select_all(action='DESELECT')
-            src_obj.select_set(True)
-            context.view_layer.objects.active = src_obj
-            bpy.ops.object.duplicate(linked=False)
-            preview_obj = context.active_object
-            preview_obj.name = f"{src_obj.name}_PreviewOglindit"
-            bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-
-            preview_obj.matrix_world = reflect_matrix @ preview_obj.matrix_world
-            bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-
-            bpy.ops.object.mode_set(mode='EDIT')
-            bpy.ops.mesh.select_all(action='SELECT')
-            bpy.ops.mesh.flip_normals()
-            bpy.ops.object.mode_set(mode='OBJECT')
-
-            mat_preview = _get_or_create_material("GNM_Preview_Oglindire", (0.3, 0.55, 0.85, 1.0))
-            preview_obj.data.materials.clear()
-            preview_obj.data.materials.append(mat_preview)
-
-            self.report({"INFO"},
-                        f"Preview created: '{preview_obj.name}' (mirroring only, unwelded, "
-                        f"not finalized). Inspect visually, then uncheck 'Preview mode' "
-                        f"and run again for the final reconstruction.")
-            return {"FINISHED"}
-
-        old_preview = bpy.data.objects.get(f"{src_obj.name}_PreviewOglindit")
-        if old_preview:
-            bpy.data.objects.remove(old_preview, do_unlink=True)
-
-        bpy.ops.object.select_all(action='DESELECT')
-        src_obj.select_set(True)
-        context.view_layer.objects.active = src_obj
-        bpy.ops.object.duplicate(linked=False)
-        keep_obj = context.active_object
-        keep_obj.name = f"{src_obj.name}_Intact"
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-
-        bpy.ops.object.mode_set(mode='EDIT')
-        bm = bmesh.from_edit_mesh(keep_obj.data)
-        bm.verts.ensure_lookup_table()
-        bm.edges.ensure_lookup_table()
-        bm.faces.ensure_lookup_table()
-        bmesh.ops.bisect_plane(
-            bm,
-            geom=bm.verts[:] + bm.edges[:] + bm.faces[:],
-            plane_co=plane_co,
-            plane_no=normal,
-            clear_inner=True,
-            clear_outer=False,
-        )
-        bmesh.update_edit_mesh(keep_obj.data)
-        bpy.ops.object.mode_set(mode='OBJECT')
-
-        bpy.ops.object.select_all(action='DESELECT')
-        keep_obj.select_set(True)
-        context.view_layer.objects.active = keep_obj
-        bpy.ops.object.duplicate(linked=False)
-        mirror_obj = context.active_object
-        mirror_obj.name = f"{src_obj.name}_Oglindit"
-
-        mirror_obj.matrix_world = reflect_matrix @ mirror_obj.matrix_world
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.mesh.flip_normals()
-        bpy.ops.object.mode_set(mode='OBJECT')
-
-        if settings.aplica_materiale_distincte:
-            mat_original = _get_or_create_material("GNM_Os_Original", (0.82, 0.78, 0.68, 1.0))
-            mat_reconstruit = _get_or_create_material("GNM_Os_Reconstruit", (0.3, 0.55, 0.85, 1.0))
-            keep_obj.data.materials.clear()
-            keep_obj.data.materials.append(mat_original)
-            mirror_obj.data.materials.clear()
-            mirror_obj.data.materials.append(mat_reconstruit)
-
-        bpy.ops.object.select_all(action='DESELECT')
-        keep_obj.select_set(True)
-        mirror_obj.select_set(True)
-        context.view_layer.objects.active = keep_obj
-        bpy.ops.object.join()
-
-        bpy.ops.object.mode_set(mode='EDIT')
-        bm_final = bmesh.from_edit_mesh(keep_obj.data)
-        bm_final.verts.ensure_lookup_table()
-        bmesh.ops.remove_doubles(bm_final, verts=bm_final.verts[:], dist=0.001)
-        bmesh.update_edit_mesh(keep_obj.data)
-        bpy.ops.mesh.normals_make_consistent(inside=False)
-
-        bm_check = bmesh.from_edit_mesh(keep_obj.data)
-        open_edges = [e for e in bm_check.edges if e.is_boundary]
-        bpy.ops.object.mode_set(mode='OBJECT')
-
-        keep_obj.name = f"{src_obj.name}_Reconstruit"
-        if open_edges:
-            self.report({"WARNING"},
-                        f"{len(open_edges)} open edges remain after welding - possibly "
-                        f"a small gap between the scan edge and the midline plane. Inspect "
-                        f"the seam visually (a minor manual closure may be needed).")
-
-        keep_obj["gnm_reconstructed_via_mirroring"] = True
-        keep_obj["gnm_mirror_rms_mm"] = residual_rms
-        keep_obj["gnm_mirror_intact_side"] = settings.partea_intacta
-        keep_obj["gnm_mirror_source"] = src_obj.name
-
-        src_obj.hide_set(True)
-        context.view_layer.objects.active = keep_obj
-        keep_obj.select_set(True)
-
-        self.report({"INFO"}, f"Reconstruction complete: '{keep_obj.name}'.")
-        return {"FINISHED"}
 
 class GNM_OT_export_csv(Operator):
     bl_idname = "gnm.export_csv"
@@ -1243,16 +1239,36 @@ class GNM_PT_panel(Panel):
 
         layout.separator()
         box2 = layout.box()
-        box2.label(text="Partial Skull Reconstruction:")
-        box2.prop(settings, "partea_intacta")
-        box2.prop(settings, "aplica_materiale_distincte")
-        box2.prop(settings, "mod_previzualizare")
-
+        box2.label(text="Fragment restoration (originals preserved)")
+        box2.prop(settings, 'restoration_plane_object')
+        box2.label(text="Reference object's local XY plane")
+        box2.prop(settings, 'mandible_aligned')
+        box2.prop(settings, 'restoration_tolerance_mm')
+        row = box2.row(align=True)
+        row.operator('gnm.region_add', icon='ADD')
+        row.operator('gnm.region_remove', text='', icon='REMOVE')
+        box2.template_list('GNM_UL_restoration_regions', '', scene, 'gnm_restoration_regions',
+                           scene, 'gnm_restoration_active_index', rows=3)
+        if scene.gnm_restoration_regions:
+            region = scene.gnm_restoration_regions[scene.gnm_restoration_active_index]
+            box2.prop(region, 'name')
+            box2.prop(region, 'source_object')
+            box2.prop(region, 'anatomy')
+            box2.prop(region, 'action')
+            if region.action == 'MIRROR':
+                if region.source_object:
+                    box2.prop_search(region, 'vertex_group', region.source_object, 'vertex_groups')
+                box2.prop(region, 'donor_side')
+                box2.prop(region, 'plane_object')
+            box2.prop(region, 'notes')
+        box2.prop(settings, 'aplica_materiale_distincte')
         row2 = box2.row(align=True)
-        row2.operator("gnm.toggle_plane_preview", icon="MESH_PLANE", text="Plane")
-        row2.operator("gnm.asymmetry_report", icon="TEXT", text="Asymmetry Report")
-
-        box2.operator("gnm.mirror_reconstruct", icon="MOD_MIRROR")
+        row2.operator('gnm.toggle_plane_preview', icon='MESH_PLANE', text='Plane')
+        row2.operator('gnm.asymmetry_report', icon='TEXT', text='Asymmetry')
+        box2.operator('gnm.mirror_reconstruct', icon='MOD_MIRROR')
+        for line in textwrap.wrap(settings.restoration_status, width=48):
+            box2.label(text=line)
+        box2.label(text='Register every preserved fragment, including central bone')
 
         layout.separator()
         box3 = layout.box()
@@ -1261,6 +1277,7 @@ class GNM_PT_panel(Panel):
         box3.operator("gnm.capturi_standardizate", icon="CAMERA_DATA")
 
         layout.separator()
+        layout.operator('gnm.audit_landmarks', icon='VIEWZOOM')
         layout.operator("gnm.export_csv", icon="EXPORT")
         if scene.gnm_markers:
             item = scene.gnm_markers[scene.gnm_marker_active_index]
@@ -1269,6 +1286,8 @@ class GNM_PT_panel(Panel):
             details.prop(item, "fit_weight")
             details.prop(item, "mapping_reviewed")
             details.prop(item, "bone_status")
+            if item.side == 0 and item.label not in _MARKER_DATA.MANDIBULAR_LANDMARKS:
+                details.prop(item, 'use_for_plane')
             details.prop(item, "marker_notes")
             details.prop(item, "tissue_source")
             hint = _MARKER_DATA.PLACEMENT_HINTS.get(item.label, "Review anatomical location and target direction.")
@@ -1288,6 +1307,8 @@ class GNM_PT_panel(Panel):
             box.label(text=line)
         box.label(text="Windows: .venv / Scripts / python.exe")
         box.prop(settings, "case_directory")
+        box.label(text='Lambda: conditional LOO' if scene.gnm_live.loo_auto
+                       else 'Lambda: adaptive from included markers')
         box.operator("gnm.run_offline", icon="PLAY")
         box.operator("gnm.cancel_offline", icon="CANCEL")
         for line in textwrap.wrap(settings.offline_status, width=48):
@@ -1427,7 +1448,7 @@ class _LiveState:
                     "dense_max_rows": 1500, "clip_sigma": 3.0}
         self.last_c = None         # ultimii coeficienti (pt. picking)
         self.prior = None          # {"mean","scale"} npz demografic (sau None)
-        self.loo_cache = {"n": -1, "lam": None}  # lambda LOO per nr. markeri
+        self.loo_cache = {"key": None, "lam": None}
         # V13.2: aliniere ICP + constrangeri dense din craniu
         self.skull = None          # {"points","normals","tree","source","flipped"}
         self.dense_full = None     # (dense_idx, offsets, max_dists) scalp+fata
@@ -1734,7 +1755,18 @@ def _update_gerasimov_ghost(scene, ger):
 # -----------------------------------------------------------------------
 # V13: raycast filtrat (craniul sta "in interiorul" capului GNM)
 # -----------------------------------------------------------------------
-def _ray_cast_skull(scene, depsgraph, origin, direction, max_hops=8):
+def _record_marker_surface(item, hit_object):
+    inferred = hit_object is not None and hit_object.get('gnm_reconstructed_via_mirroring')
+    item.bone_status = 'reconstructed' if inferred else 'observed'
+    if item.bone_empty is not None and hit_object is not None:
+        item.bone_empty['gnm_bone_source'] = hit_object.name
+    if inferred:
+        item.use_for_fit = False
+        item.use_for_plane = False
+        item.marker_notes = 'Placed on inferred bone; review before including in fit. ' + item.marker_notes
+
+
+def _ray_cast_skull(scene, depsgraph, origin, direction, max_hops=8, return_object=False):
     """scene.ray_cast care ignora obiectele GNM-live.
 
     Capul GNM (piele) invaluie craniul in aceeasi lume; fara filtrare,
@@ -1744,20 +1776,22 @@ def _ray_cast_skull(scene, depsgraph, origin, direction, max_hops=8):
     Returneaza (result, location, normal) ca scene.ray_cast.
     """
     excluded = _gnm_live_objects()
-    if not excluded:
-        result, location, normal, _i, _o, _m = scene.ray_cast(
-            depsgraph, origin, direction)
-        return result, location, normal
+    excluded.update(row.plane_object for row in scene.gnm_restoration_regions if row.plane_object)
+    if scene.gnm_settings.restoration_plane_object:
+        excluded.add(scene.gnm_settings.restoration_plane_object)
+    preview = bpy.data.objects.get('GNM_PLAN_PREVIEW')
+    if preview:
+        excluded.add(preview)
     o = origin.copy()
     for _ in range(max_hops):
         result, location, normal, _i, hit_obj, _m = scene.ray_cast(
             depsgraph, o, direction)
         if not result:
-            return False, None, None
+            return (False, None, None, None) if return_object else (False, None, None)
         if hit_obj not in excluded:
-            return True, location, normal
+            return (True, location, normal, hit_obj) if return_object else (True, location, normal)
         o = location + direction * 0.05
-    return False, None, None
+    return (False, None, None, None) if return_object else (False, None, None)
 
 
 # -----------------------------------------------------------------------
@@ -2078,7 +2112,7 @@ def _icp_deform_job(snap):
     })
     # Auto-dense scurt: fituri consecutive cu corespondente reimprospatate.
     n_markers = len(snap["labels"])
-    lam, lam_src = _live_lambda(max(n_markers, 24), snap)
+    lam, lam_src = _live_lambda(n_markers, snap)
     prior_kwargs = {}
     if _LIVE.prior is not None:
         prior_kwargs = {
@@ -2311,6 +2345,7 @@ def _build_snapshot(scene):
         verts.append(vid)
         tgts.append((p.x, p.y, p.z))
         ws.append(_weight_of(item.label, item))
+    _core_module('marker_audit').require_unique_landmarks(labels, verts, tgts)
     # V13.2: modul dense continuu + poza curenta a obiectului GNM (necesara
     # pentru calculul corespondentelor in worker; citita aici, pe main thread).
     gnm_obj = bpy.data.objects.get(GNM_MESH_NAME)
@@ -2340,66 +2375,41 @@ def _request_refit(scene):
         return
     try:
         snap = _build_snapshot(scene)
-    except Exception:
+    except (ValueError, TypeError) as exc:
+        scene.gnm_live.status_text = 'Cannot fit: ' + str(exc)
+        with _LIVE.pending_lock:
+            _LIVE.pending = None
         return
     with _LIVE.pending_lock:
         _LIVE.pending = snap
 
 
 def _adaptive_lambda(n_markers, base, lam_min, lam_max):
-    """Lambda adaptiv: cu cat sunt mai putini markeri, cu atat shrink-ul
-    spre prior e mai puternic.
-
-    lam = clamp(base * 24/n, lam_min, lam_max).
-
-    CALIBRARE (V13.1, masurata pe exporturile reale ken5/ken-6.csv):
-    vechiul base=30 producea ||beta|| ~ 2 (cap practic nedeformat -
-    "rigid"), in timp ce LOO-CV din pipeline-ul offline alegea 0.3
-    (marginea grilei) -> ||beta|| ~ 25, morfologie robusta. base=1.0
-    reproduca acel regim la setul complet (24 markeri -> 1.0) si lasa
-    regularizarea sa creasca spre 6-8 la 3-4 markeri (stabilitate la
-    inceput). lam_min=0.3 = marginea inferioara a grilei LOO offline."""
-    if n_markers <= 0:
-        return lam_max
-    return float(min(max(base * 24.0 / n_markers, lam_min), lam_max))
+    return _core_module('regularization').adaptive_lambda(n_markers, base, lam_min, lam_max)
 
 
 def _live_lambda(n, snap):
-    """Lambda pentru urmatorul fit: formula recalibrata (implicit) sau
-    LOO-CV cache-uit per numar de markeri (modul 'ca offline').
-
-    LOO-CV costa ~0.7-1 s, deci il rerulam NUMAI cand se schimba numarul
-    de markeri (n >= 4), in serialized preview; intre timp folosim valoarea
-    cache-uita cu o podea de siguranta joasa (0.3*24/n) - LOO devine
-    zgomotos la putine puncte."""
+    """Actual included count; conditional LOO is cached by data, not count."""
     cfg = _LIVE.cfg
-    lam_formula = _adaptive_lambda(
-        n, float(cfg.get("lambda_base", 1.0)),
-        float(cfg.get("lambda_min", 0.3)),
-        float(cfg.get("lambda_max", 1000.0)))
-    if not cfg.get("loo_auto", False) or n < 4:
-        return lam_formula, "formula"
+    base = float(cfg.get('lambda_base', 1.0))
+    minimum, maximum = float(cfg.get('lambda_min', 0.3)), float(cfg.get('lambda_max', 1000.0))
+    lam_formula = _adaptive_lambda(n, base, minimum, maximum)
+    if not cfg.get('loo_auto', False) or n < 4:
+        return lam_formula, 'adaptive' if n else 'no landmarks: maximum'
+    module = _core_module('regularization')
+    key = module.tuning_key(snap['verts'], snap['targets'], snap['weights'], id(_LIVE.model))
     cache = _LIVE.loo_cache
-    if cache.get("n") != n:
-        lam_loo = None
-        try:
-            fit_identity = _CRANIO["fit_identity"]
-            LossConfig = _CRANIO["LossConfig"]
-            _c, _s, _r, _t, lam_used, _i, _res = fit_identity(
-                _LIVE.model.mu, _LIVE.model.basis, snap["verts"],
-                snap["targets"], snap["weights"], lam="auto",
-                loss_cfg=LossConfig())
-            lam_loo = float(lam_used)
-        except Exception:
-            lam_loo = None
-        cache["n"] = n
-        cache["lam"] = lam_loo
-    lam_loo = cache.get("lam")
-    if lam_loo is None:
-        return lam_formula, "formula(loo esuat)"
-    floor = _adaptive_lambda(n, 0.3, 0.3, 30.0)
-    return max(lam_loo, floor), "loo"
+    if cache.get('key') != key:
+        _c, _s, _r, _t, value, _info, _res = _CRANIO['fit_identity'](
+            _LIVE.model.mu, _LIVE.model.basis, snap['verts'], snap['targets'],
+            snap['weights'], lam='auto', loss_cfg=_CRANIO['LossConfig']())
+        cache.update(key=key, lam=float(value))
+    return float(cache['lam']), 'conditional LOO'
 
+
+def _on_fit_settings_update(self, context):
+    if context is not None:
+        _request_refit(context.scene)
 
 def _gerasimov_worker(snap, scale, rot, trans, v_model):
     """Diagnosticul Gerasimov/Ullrich-Stephan (V13.6). WORKER-safe: numpy pur.
@@ -2484,9 +2494,8 @@ def _compute_fit(snap):
             dense_rstats = dinfo["region_stats"]
         else:
             dense_keep = 0
-    # Cu 0 markeri + dense: tratam ca "set complet" pentru schedule-ul lambda.
-    lam, lam_src = _live_lambda(max(n, 24) if (dense_on and n == 0) else n,
-                                snap)
+    # Dense samples never inflate the anatomical landmark count.
+    lam, lam_src = _live_lambda(n, snap)
     prior_kwargs = {}
     if _LIVE.prior is not None:
         prior_kwargs = {
@@ -3032,7 +3041,7 @@ class GNM_OT_load_live_model(Operator):
             self.report({"ERROR"}, f"Cannot load the npz: {exc}")
             return {"CANCELLED"}
         _LIVE.label_to_vertex = _label_to_vertex_map()
-        _LIVE.loo_cache = {"n": -1, "lam": None}  # model nou -> cache invalid
+        _LIVE.loo_cache = {"key": None, "lam": None}
         # V13.2: setul dens (scalp + regiuni) depinde de model; orientarea
         # fetelor GNM se determina deterministic din volumul semnat.
         _LIVE.dense_full = None
@@ -3317,28 +3326,16 @@ class GNMLiveSettings(PropertyGroup):
         description="How many result applications per second (the fit itself "
                     "runs serially in the main-thread timer and may pause the UI)")
     lambda_base: FloatProperty(
-        name="Deformation (lambda base)", default=1.0,
-        min=0.05, max=1000.0, soft_min=0.3, soft_max=30.0,
-        description="Heuristic ridge regularization for a 24-marker "
-                    "reference set (V13.5); effective lambda = base * 24 / "
-                    "n_markers. Calibrated on real data: 1.0 gives robust "
-                    "morphology (like offline); raise for a more "
-                    "'average'/rigid head, lower towards 0.3 for maximum "
-                    "deformation")
-    lambda_min: FloatProperty(
-        name="Lambda Min", default=0.3, min=0.01,
-        description="Lower bound of adaptive regularization (= the LOO grid "
-                    "edge of the offline pipeline)")
-    lambda_max: FloatProperty(
-        name="Lambda Max", default=1000.0, min=1.0,
-        description="Upper bound of adaptive regularization (at very few "
-                    "markers)")
-    loo_auto: BoolProperty(
-        name="Automatic lambda (LOO, like offline)",
-        default=False,
-        description="When the marker count changes, lambda is chosen by "
-                    "leave-one-out cross-validation (like the offline "
-                    "pipeline; costs ~1s once, in the background thread)")
+        name="Lambda at 48 landmarks", default=1.0, min=0.05, max=1000.0,
+        soft_min=0.3, soft_max=30.0, update=_on_fit_settings_update,
+        description="Count heuristic: base * 48 / actual included landmarks; not an accuracy calibration")
+    lambda_min: FloatProperty(name="Lambda Min", default=0.3, min=0.01, update=_on_fit_settings_update)
+    lambda_max: FloatProperty(name="Lambda Max", default=1000.0, min=1.0, update=_on_fit_settings_update)
+    loo_auto: BoolProperty(name="Conditional LOO tuning (slower)", default=False,
+        update=_on_fit_settings_update,
+        description="Tune with current positions, vertices and weights; cached only while inputs stay identical. Runs on the main thread")
+
+
     prior_sex: EnumProperty(
         name="Sex (prior)", default='NONE',
         items=[
@@ -3459,6 +3456,16 @@ def _draw_live_section(layout, context):
     # Preview regularisation heuristic; see docs/SCIENCE.md.
     box.prop(st, "lambda_base", slider=True)
     box.prop(st, "loo_auto")
+    row = box.row(align=True)
+    row.prop(st, 'lambda_min')
+    row.prop(st, 'lambda_max')
+    try:
+        used = len(_build_snapshot(scene)['labels'])
+        value = _adaptive_lambda(used, st.lambda_base, st.lambda_min, st.lambda_max)
+        box.label(text=f"Included: {used}; conditional LOO tuning" if st.loo_auto
+                       else f"Included: {used}; adaptive lambda = {value:.4g}")
+    except ValueError as exc:
+        box.label(text=str(exc)[:80], icon='ERROR')
 
     if st.status_text:
         box.label(text=st.status_text[:170])
@@ -3564,6 +3571,8 @@ def _export_markers(scene, path):
             "tissue_reference": _core_module('paper_reference').reference_metadata(),
             "cranial_modification": scene.gnm_settings.cranial_modification,
             "case_notes": scene.gnm_settings.case_notes,
+            "plane_marker_labels": [item.label for item in _plane_markers(scene)],
+            "restoration_regions": _restoration_records(scene),
             "target_construction": "bone plus operator-reviewed depth/direction; local normal is initial heuristic"}
     _core_module('io_csv').write_marker_csv_v3(path, rows, meta)
     # Validate exactly what the CLI will consume, including manual overrides.
@@ -3690,7 +3699,11 @@ class GNM_OT_run_offline(Operator):
             _export_markers(scene, str(folder / 'markers.csv'))
             arguments = ['--input', str(folder / 'markers.csv'),
                        '--npz', bpy.path.abspath(scene.gnm_live.npz_path),
-                       '--output', str(folder / 'face.obj')]
+                       '--output', str(folder / 'face.obj'),
+                       '--regularization', 'auto' if scene.gnm_live.loo_auto else 'adaptive',
+                       '--lambda-base', str(scene.gnm_live.lambda_base),
+                       '--lambda-min', str(scene.gnm_live.lambda_min),
+                       '--lambda-max', str(scene.gnm_live.lambda_max)]
             log = (folder / 'run.log').open('w', encoding='utf-8')
             try:
                 process = _core_module('external_python').start_pipeline(
@@ -3723,7 +3736,9 @@ class GNM_OT_cancel_offline(Operator):
 
 
 _classes = (
-    GNMSettings, GNMMarkerItem, GNM_OT_import_setup, GNM_OT_init_markers,
+    GNMSettings, GNMMarkerItem, GNMRestorationRegion,
+    GNM_OT_region_add, GNM_OT_region_remove, GNM_UL_restoration_regions, GNM_OT_audit_landmarks,
+    GNM_OT_import_setup, GNM_OT_init_markers,
     GNM_OT_place_marker, GNM_OT_next_unplaced, GNM_OT_toggle_plane_preview,
     GNM_OT_recenter_on_plane, GNM_OT_asymmetry_report, GNM_OT_session_report,
     GNM_OT_capturi_standardizate, GNM_OT_mirror_reconstruct, GNM_OT_export_csv,
@@ -3744,6 +3759,8 @@ def register():
     bpy.types.Scene.gnm_markers = CollectionProperty(type=GNMMarkerItem)
     bpy.types.Scene.gnm_marker_active_index = IntProperty(default=0)
     bpy.types.Scene.gnm_live = PointerProperty(type=GNMLiveSettings)
+    bpy.types.Scene.gnm_restoration_regions = CollectionProperty(type=GNMRestorationRegion)
+    bpy.types.Scene.gnm_restoration_active_index = IntProperty(default=0)
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
     for h in list(bpy.app.handlers.load_post):
@@ -3763,6 +3780,8 @@ def unregister():
             bpy.app.handlers.load_post.remove(h)
     if hasattr(bpy.types.Scene, "gnm_live"):
         del bpy.types.Scene.gnm_live
+    del bpy.types.Scene.gnm_restoration_regions
+    del bpy.types.Scene.gnm_restoration_active_index
     for cls in reversed(_classes): bpy.utils.unregister_class(cls)
     del bpy.types.Scene.gnm_settings
     del bpy.types.Scene.gnm_markers

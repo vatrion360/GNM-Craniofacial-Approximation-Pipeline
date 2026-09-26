@@ -82,7 +82,10 @@ def parse_args(argv=None) -> PipelineConfig:
     parser.add_argument("--npz", default=default_npz_path(),
                         help="Path to gnm_head.npz")
     parser.add_argument("--regularization", default="auto",
-                        help="'auto' (LOO-CV) or a fixed value, e.g. 30")
+                        help="'auto' (conditional LOO-CV), 'adaptive' (base*48/included count), or a fixed value")
+    parser.add_argument("--lambda-base", type=float, default=1.0)
+    parser.add_argument("--lambda-min", type=float, default=0.3)
+    parser.add_argument("--lambda-max", type=float, default=1000.0)
     parser.add_argument("--exclude", nargs="+", default=[], metavar="LABEL",
                         help="Marker labels manually excluded from the fit and "
                              "the TPS centres (e.g. --exclude Pogonion Rhinion)")
@@ -152,6 +155,9 @@ def parse_args(argv=None) -> PipelineConfig:
         npz=args.npz,
         skull=args.skull,
         regularization=args.regularization,
+        lambda_base=args.lambda_base,
+        lambda_min=args.lambda_min,
+        lambda_max=args.lambda_max,
         exclude=args.exclude,
         exclude_outliers=args.exclude_outliers,
         skip_tps=args.skip_tps or not args.local_correction,

@@ -30,6 +30,9 @@ class PipelineConfig:
 
     # Fit statistic
     regularization: str = "auto"          # "auto" (LOO-CV) sau valoare fixa
+    lambda_base: float = 1.0
+    lambda_min: float = 0.3
+    lambda_max: float = 1000.0
     exclude: List[str] = field(default_factory=list)
     exclude_outliers: bool = False
 
@@ -81,10 +84,12 @@ class PipelineConfig:
                 raise ValueError(f"{name} must be a nonnegative integer")
         if self.dense_samples < 10:
             raise ValueError("dense_samples must be at least 10")
-        if str(self.regularization).lower() != "auto":
+        from .regularization import adaptive_lambda
+        adaptive_lambda(0, self.lambda_base, self.lambda_min, self.lambda_max)
+        if str(self.regularization).lower() not in ("auto", "adaptive"):
             value = float(self.regularization)
             if not math.isfinite(value) or value <= 0:
-                raise ValueError("regularization must be 'auto' or finite and positive")
+                raise ValueError("regularization must be 'auto', 'adaptive' or finite and positive")
         from .validation import validate_outputs
         validate_outputs([self.input, self.npz, self.skull],
                          [self.output, self.output_error_mesh, self.output_stats,
