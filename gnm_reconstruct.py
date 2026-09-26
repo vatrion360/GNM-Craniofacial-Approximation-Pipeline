@@ -78,7 +78,7 @@ def parse_args(argv=None) -> PipelineConfig:
     parser.add_argument("--output-statistical", default=None, help="Unwarped statistical OBJ")
     parser.add_argument("--seed", type=int, default=42, help="Deterministic sampling seed")
     parser.add_argument("--overwrite", action="store_true", help="Explicitly replace previous outputs")
-    parser.add_argument("--strict", action="store_true", help="Require v3, model hash and documented tissue sources")
+    parser.add_argument("--strict", action="store_true", help="Require v3, model hash, documented tissue sources and no explicitly unreviewed included mappings")
     parser.add_argument("--npz", default=default_npz_path(),
                         help="Path to gnm_head.npz")
     parser.add_argument("--regularization", default="auto",

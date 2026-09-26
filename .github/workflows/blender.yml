@@ -8,7 +8,11 @@ permissions:
   contents: read
 jobs:
   blender:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     env:
       OPENBLAS_NUM_THREADS: '1'
@@ -29,19 +33,42 @@ jobs:
           python tools/prepare_model.py --source vendor/GNM/gnm/shape/data/versions/v3_0/gnm_head.npz --destination models/gnm_head.npz
           python tools/build_addon.py
       - name: Download fixed Blender test version and verify official checksum
+        if: runner.os == 'Linux'
         run: |
           curl --fail --location --retry 3 --output blender-4.5.0-linux-x64.tar.xz https://download.blender.org/release/Blender4.5/blender-4.5.0-linux-x64.tar.xz
           curl --fail --location --retry 3 --output blender-4.5.0.sha256 https://download.blender.org/release/Blender4.5/blender-4.5.0.sha256
           sha256sum --check --ignore-missing blender-4.5.0.sha256
           tar -xf blender-4.5.0-linux-x64.tar.xz
+      - name: Download Windows Blender and verify official checksum
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $archiveName = 'blender-4.5.0-windows-x64.zip'
+          Invoke-WebRequest "https://download.blender.org/release/Blender4.5/$archiveName" -OutFile $archiveName
+          Invoke-WebRequest 'https://download.blender.org/release/Blender4.5/blender-4.5.0.sha256' -OutFile 'blender-4.5.0.sha256'
+          $hashLine = Get-Content 'blender-4.5.0.sha256' | Where-Object { $_ -match [regex]::Escape($archiveName) }
+          if (-not $hashLine) { throw 'Archive missing from official checksum manifest' }
+          $expectedHash = ($hashLine.Trim() -split '\s+')[0].ToLowerInvariant()
+          $actualHash = (Get-FileHash $archiveName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) { throw 'Blender checksum mismatch' }
+          Expand-Archive -Path $archiveName -DestinationPath .
       - name: Exercise ZIP, model, marker exchange and external fitting
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           export GNM_MODEL_PATH="$PWD/models/gnm_head.npz"
           export GNM_EXTERNAL_PYTHON="$(command -v python)"
           ./blender-4.5.0-linux-x64/blender --background --factory-startup --python-exit-code 1 --python tools/blender_smoke.py 2>&1 | tee blender-smoke.log
+      - name: Exercise Windows Blender and external Python
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:GNM_MODEL_PATH = Join-Path $PWD 'models/gnm_head.npz'
+          $env:GNM_EXTERNAL_PYTHON = (Get-Command python).Source
+          & './blender-4.5.0-windows-x64/blender.exe' --background --factory-startup --python-exit-code 1 --python tools/blender_smoke.py 2>&1 | Tee-Object -FilePath blender-smoke.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: blender-4.5.0-linux-smoke
+          name: blender-4.5.0-${{ runner.os }}-smoke
           path: blender-smoke.log

@@ -17,7 +17,7 @@ import zipfile
 import bpy
 
 root = Path(__file__).resolve().parents[1]
-archive = root / 'dist' / 'gnm_cranio-5.0.0rc1.zip'
+archive = root / 'dist' / 'gnm_cranio-5.0.0rc2.zip'
 with tempfile.TemporaryDirectory() as directory:
     with zipfile.ZipFile(archive) as z:
         z.extractall(directory)
@@ -33,6 +33,7 @@ with tempfile.TemporaryDirectory() as directory:
         scene = bpy.context.scene
         scene.unit_settings.system = 'METRIC'
         scene.unit_settings.scale_length = .001
+        scene.gnm_settings.marker_set = 'LEGACY_27'
         assert bpy.ops.gnm.init_markers() == {'FINISHED'}
         assert len(scene.gnm_markers) == 27
         item = scene.gnm_markers[0]
@@ -45,6 +46,25 @@ with tempfile.TemporaryDirectory() as directory:
         item.tissue_depth_mm = 8
         bpy.context.view_layer.update()
         assert abs(item.target_empty.matrix_world.translation.z - 8) < 1e-5
+        item.gnm_vertex_override = 12310
+        bone_name = item.bone_empty.name
+        scene.gnm_settings.marker_set = 'EXTENDED_48'
+        assert bpy.ops.gnm.init_markers() == {'FINISHED'}
+        assert len(scene.gnm_markers) == 48
+        item = scene.gnm_markers[0]
+        assert item.bone_empty.name == bone_name and item.tissue_depth_mm == 8
+        assert item.gnm_vertex_override == 12310
+        assert bpy.ops.gnm.init_markers() == {'FINISHED'}
+        assert len(scene.gnm_markers) == 48
+        paper_scene = bpy.data.scenes.new('Paper 32')
+        paper_scene.gnm_settings.marker_set = 'PAPER_32'
+        with bpy.context.temp_override(scene=paper_scene):
+            assert bpy.ops.gnm.init_markers() == {'FINISHED'}
+        assert len(paper_scene.gnm_markers) == 32
+        paper = addon._core_module('paper_reference')
+        for marker in paper_scene.gnm_markers:
+            assert marker.tissue_depth_mm == paper.PAPER_DEPTHS[marker.label]
+            assert paper.DOI in marker.tissue_source
         if os.environ.get('GNM_MODEL_PATH'):
             scene.gnm_live.npz_path = os.environ['GNM_MODEL_PATH']
             model = addon._load_gnm_model(scene.gnm_live.npz_path)
@@ -57,10 +77,16 @@ with tempfile.TemporaryDirectory() as directory:
                                                                           backend.landmark_vertex_map)
             assert targets[0].vertex == 12310
             assert meta['bone_positions_mm']['Nasion'] == [0, 0, 0]
+            assert bpy.ops.gnm.apply_paper_tissues() == {'FINISHED'}
+            bpy.context.view_layer.update()
+            assert item.tissue_depth_mm == 7
+            assert abs(item.target_empty.matrix_world.translation.z - 7) < 1e-5
             if os.environ.get('GNM_EXTERNAL_PYTHON'):
                 # Synthetic mean targets test software plumbing, not anatomy.
                 for marker in scene.gnm_markers:
                     marker.gnm_vertex_override = -1
+                    marker.mapping_reviewed = True
+                    marker.bone_status = 'observed'
                     target = model.mu[addon._resolve_vertex(marker)]
                     bone = target.copy()
                     bone[2] -= marker.tissue_depth_mm
@@ -74,8 +100,25 @@ with tempfile.TemporaryDirectory() as directory:
                     marker.tissue_source = 'synthetic model mean; software test only'
                 bpy.context.view_layer.update()
                 settings = scene.gnm_settings
-                settings.python_executable = os.environ['GNM_EXTERNAL_PYTHON']
                 settings.case_directory = str(Path(directory) / 'caz sintetic șță')
+                # The formerly accepted .py selection must fail before a case
+                # directory/process is created, with a useful Windows remedy.
+                settings.python_executable = str(root / 'gnm_reconstruct.py')
+                try:
+                    assert bpy.ops.gnm.run_offline() == {'CANCELLED'}
+                except RuntimeError as exc:
+                    assert 'not a Python executable' in str(exc)
+                assert addon._OFFLINE['process'] is None
+                assert not Path(settings.case_directory).exists()
+                assert 'Scripts/python.exe' in settings.offline_status
+                print('BLENDER_BAD_INTERPRETER_PREVENTED')
+                settings.python_executable = os.environ['GNM_EXTERNAL_PYTHON']
+                assert bpy.ops.gnm.check_python() == {'FINISHED'}
+                assert 'numpy/scipy/trimesh OK' in settings.python_status
+                for marker in scene.gnm_markers:
+                    if marker.label == 'Vertex_VarfCap':
+                        marker.use_for_fit = False
+                assert len(addon._build_snapshot(scene)['labels']) == 47
                 assert bpy.ops.gnm.run_offline() == {'FINISHED'}
                 assert bpy.app.timers.is_registered(addon._offline_poll)
                 folder = Path(addon._OFFLINE['folder'])
@@ -88,6 +131,8 @@ with tempfile.TemporaryDirectory() as directory:
                     raise AssertionError(settings.offline_status)
                 report = json.loads((folder / 'face_report.json').read_text(encoding='utf-8'))
                 assert report['metrics']['final_fit']['rmse_mm'] < .01
+                assert len(report['landmarks']) == 47
+                assert not report['marker_metadata']['marker_records']['Vertex_VarfCap']['use_for_fit']
                 imported = [obj for obj in scene.objects if obj.get('gnm_report') == str(folder / 'face_report.json')]
                 assert len(imported) == 1 and len(imported[0].data.vertices) == model.vertex_count
                 # Direct polling in this headless script does not unregister a

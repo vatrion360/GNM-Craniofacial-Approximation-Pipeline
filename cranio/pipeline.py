@@ -120,13 +120,6 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         warnings_list.append("Legacy CSV assumes world mm and loses bone positions, overrides and tissue provenance; export v3.")
     if not recorded_hash:
         warnings_list.append("Marker CSV has no model SHA-256; manually verify topology/correspondences.")
-    records = _csv_meta.get("marker_records", {})
-    unreviewed = [t.label for t in targets if records.get(t.label, {}).get("tissue_source", "unspecified")
-                  in ("unspecified", "legacy-unvalidated", "")]
-    if unreviewed:
-        warnings_list.append("Unreviewed tissue sources: " + ", ".join(unreviewed))
-    if cfg.strict and (_csv_meta["version"] < 3 or not recorded_hash or unreviewed):
-        raise ValueError("Strict preflight requires v3, matching model hash and reviewed tissue sources for all placed markers")
     if cfg.exclude:
         excl = set(cfg.exclude)
         skipped.extend((t[0], "manually excluded (--exclude)")
@@ -136,6 +129,23 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         if unknown:
             warnings_list.append(
                 "--exclude: labels not found in the CSV: " + ", ".join(sorted(unknown)))
+    records = _csv_meta.get("marker_records", {})
+    unreviewed = [t.label for t in targets if records.get(t.label, {}).get("tissue_source", "unspecified")
+                  in ("unspecified", "legacy-unvalidated", "")]
+    if unreviewed:
+        warnings_list.append("Unreviewed tissue sources: " + ", ".join(unreviewed))
+    unreviewed_map = [t.label for t in targets if records.get(t.label, {}).get('mapping_reviewed') is False]
+    if unreviewed_map:
+        warnings_list.append('Operator has not reviewed skin correspondences: ' + ', '.join(unreviewed_map))
+    repaired = [t.label for t in targets if records.get(t.label, {}).get('bone_status') in ('reconstructed', 'inferred')]
+    if repaired:
+        warnings_list.append('Fitting includes repaired/inferred bone landmarks: ' + ', '.join(repaired))
+    if any('10.4995/var.2024.24796' in r.get('tissue_source', '') for r in records.values()):
+        warnings_list.append('VAR 2026 Table 2 uses a normal-female Southwestern Native American reference. Review applicability; this is not a universal tissue table or independent validation.')
+    if _csv_meta.get('cranial_modification') == 'present':
+        warnings_list.append('Intentional cranial modification recorded: general GNM identity variation may not represent the altered vault. Review vault constraints and preserve the original anatomy.')
+    if cfg.strict and (_csv_meta["version"] < 3 or not recorded_hash or unreviewed or unreviewed_map):
+        raise ValueError("Strict preflight requires v3, matching model hash, recorded tissue sources and no explicitly unreviewed skin correspondences")
     for label, reason in skipped:
         print(f"    - excluded {label}: {reason}")
     if len(targets) < 4:

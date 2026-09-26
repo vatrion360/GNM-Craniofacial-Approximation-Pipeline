@@ -1,3 +1,15 @@
+# 5.0.0rc2 / Blender add-on 15.0.0
+
+- Extend to 48 unique marker sites; selectable 32-position paper and 27-position legacy sets.
+- Transcribe and cite Table 2 of Rangel-de Lazaro et al. (2026), with explicit case/population applicability and anatomical definitions.
+- Preserve existing placements, tissue edits and manual correspondences when adding missing markers; provide an explicit tissue-profile application action.
+- Correct the default Pogonion skin candidate from lower-lip vertex 12284 to chin vertex 12261. Explicit v3 and manual picks remain authoritative; review previous cases.
+- Record observed/repaired/inferred bone, placement notes, operator correspondence review and documentation-only markers across Blender, CSV and offline reports.
+- Exclude documentation-only markers from preview/offline fitting; apply CLI exclusions before strict review checks.
+- Check external Python executable type, version, bitness and imports before creating case output. Reject wrong scripts/installers, copied foreign-platform environments and Blender itself, with actionable Windows 193 diagnostics.
+- Isolate child Python paths from Blender's embedded environment; preserve virtualenv symlinks, Unicode paths, logs and cancellation.
+- Add regression tests and Windows Blender integration to the existing Linux and Python CI checks.
+
 # 5.0.0rc1 / Blender add-on 14.0.0
 
 - Installable Python package/CLI and complete Blender ZIP with a namespaced numerical core.

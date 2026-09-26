@@ -1,6 +1,14 @@
 # Validation and release gates
 
-## Evidence obtained for this revision
+## Evidence for 5.0.0rc2 / add-on 15
+
+Local execution on 2026-09-26, Linux x86_64, Python 3.12.14, NumPy 2.3.5, SciPy 1.17.0, trimesh 5.1.0: **83 passed, 1 skipped** with the pinned official model. The skipped test reproduces native Windows error 193 and requires Windows. Ruff, wheel/source build and the installable add-on ZIP build passed.
+
+New coverage checks the PDF's 21 rows / 32 positions, the 48-site union, distinct anatomical definitions, unique exterior GNM candidates and mirror pairs, the Pogonion correction, exclusion from numerical fitting while retaining documentation, provenance warnings, strict mapping review, interpreter/dependency validation and Unicode argument forwarding. Synthetic fitting is a software check, not anatomical validation.
+
+This revision adds Blender 4.5.0 integration on Windows as well as Linux. The script exercises 27-to-48 migration without losing placements/depths/overrides, the Paper 32 profile, rejection of the invalid script-as-interpreter selection before any run starts, environment checks, fitting/import in a Romanian path, marker exclusion and cancellation. **Remote results for this revision are pending** until linked here; previous results below do not establish compatibility of new code.
+
+## Previous evidence: 5.0.0rc1
 
 Local execution on 2026-09-25, Linux x86_64, Python 3.12.14, NumPy 2.3.5, SciPy 1.17.0, trimesh 5.1.0.
 
@@ -46,7 +54,7 @@ With the model environment variable set, run:
 blender --background --factory-startup --python-exit-code 1 --python tools/blender_smoke.py
 ```
 
-The ordinary Python test suite does not import `bpy`; passing it cannot establish Blender compatibility. CI includes a Python matrix and a Blender 4.5.0 Linux integration job. The latter verifies the official model checksum and exercises the ZIP, marker exchange, external fitting/import and cancellation. The successful runs above provide evidence for the recorded revision; future releases must record their own run URLs. Set `GNM_EXTERNAL_PYTHON` to the external environment's Python executable to include fitting/import/cancellation in the local Blender script.
+The ordinary Python test suite does not import `bpy`; passing it cannot establish Blender compatibility. CI includes a Python matrix and Blender 4.5.0 Linux/Windows integration jobs. The latter verify the official model checksum and exercise the ZIP, marker exchange, external fitting/import and cancellation. Linked successful runs provide evidence only for their recorded revision. Set `GNM_EXTERNAL_PYTHON` to the external environment's Python executable to include fitting/import/cancellation in the local Blender script.
 
 ## Blender manual acceptance checklist
 
