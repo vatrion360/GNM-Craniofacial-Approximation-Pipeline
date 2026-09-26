@@ -1,3 +1,11 @@
+# 5.0.0rc3 / Blender add-on 16.0.0
+
+- Audit runtime duplicate labels, model vertices and coincident skin targets; preserve distinct anatomical sites and flag near bone placements.
+- Share the base * 48 / actual included count lambda rule between preview and Blender-launched offline fitting. Remove artificial 24-marker counts from dense/ICP paths; invalidate LOO cache on changed data, not just count.
+- Replace global half-skull cutting with per-region inferred patches that preserve mixed-side original fragments. Support vertex-group donors and independent mandibular planes, and reject mixed-side donor selection.
+- Fit automatic cranial planes only to stable observed cranial references; keep unarticulated mandibular/inferred landmarks out. Record inferred-surface placement and exclude it from fit by default.
+- Add mixed-fragment and lambda/duplicate regression coverage; document methods and limitations in FRAGMENT_RESTORATION.md.
+
 # 5.0.0rc2 / Blender add-on 15.0.0
 
 - Extend to 48 unique marker sites; selectable 32-position paper and 27-position legacy sets.

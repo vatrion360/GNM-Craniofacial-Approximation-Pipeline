@@ -129,6 +129,11 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
             raise ValueError(f"CSV data row {line_number}: {exc}") from exc
     metadata["bone_positions_mm"] = bones
     metadata["marker_records"] = records
+    from .marker_audit import require_unique_landmarks, audit_landmarks
+    labels, vertices = [t.label for t in targets], [t.vertex for t in targets]
+    require_unique_landmarks(labels, vertices, [t.xyz for t in targets])
+    metadata['landmark_audit'] = audit_landmarks(
+        labels, vertices, bones={label: bones[label] for label in labels if label in bones})
     if version < 3:
         metadata["legacy_assumptions"] = "world millimetres; origin means unplaced; no bone positions"
     return targets, skipped, metadata

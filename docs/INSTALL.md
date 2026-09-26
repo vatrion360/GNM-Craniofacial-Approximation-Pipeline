@@ -42,7 +42,7 @@ Use `--npz` for every command, or set `GNM_MODEL_PATH` to an absolute filename. 
 python tools/build_addon.py
 ```
 
-In Blender: Preferences → Add-ons → Install from Disk → select `dist/gnm_cranio-5.0.0rc2.zip` → enable **GNM Scientific Markers**. The sidebar is **GNM Markers**. Disable previous copies to avoid duplicate operator registrations.
+In Blender: Preferences → Add-ons → Install from Disk → select `dist/gnm_cranio-5.0.0rc3.zip` → enable **GNM Scientific Markers**. The sidebar is **GNM Markers**. Disable previous copies to avoid duplicate operator registrations.
 
 Select `gnm_head.npz`. Import a skull and explicitly select mm/cm/m according to the source file. The resulting scene uses **one Blender coordinate = one millimetre**, represented by metric scale `0.001`. Check a known anatomical/scanner measurement after import; STL/OBJ do not reliably carry physical units.
 
@@ -84,7 +84,7 @@ Copy the project wheel, wheelhouse, model + upstream notices, add-on ZIP and thi
 On the offline workstation, create/activate a fresh virtualenv, then:
 
 ```bash
-python -m pip install --no-index --find-links wheelhouse dist/gnm_craniofacial-5.0.0rc2-py3-none-any.whl
+python -m pip install --no-index --find-links wheelhouse dist/gnm_craniofacial-5.0.0rc3-py3-none-any.whl
 python -m cranio.doctor --npz models/gnm_head.npz
 ```
 

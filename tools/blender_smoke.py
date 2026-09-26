@@ -17,7 +17,10 @@ import zipfile
 import bpy
 
 root = Path(__file__).resolve().parents[1]
-archive = root / 'dist' / 'gnm_cranio-5.0.0rc2.zip'
+sys.path.insert(0, str(root / 'tools'))
+from blender_fragment_checks import run_fragment_checks, run_lambda_checks
+
+archive = root / 'dist' / 'gnm_cranio-5.0.0rc3.zip'
 with tempfile.TemporaryDirectory() as directory:
     with zipfile.ZipFile(archive) as z:
         z.extractall(directory)
@@ -30,6 +33,7 @@ with tempfile.TemporaryDirectory() as directory:
         assert not hasattr(bpy.types.Scene, 'gnm_markers')
     addon.register()
     try:
+        run_fragment_checks(addon)
         scene = bpy.context.scene
         scene.unit_settings.system = 'METRIC'
         scene.unit_settings.scale_length = .001
@@ -99,6 +103,7 @@ with tempfile.TemporaryDirectory() as directory:
                         obj.location = position.tolist()
                     marker.tissue_source = 'synthetic model mean; software test only'
                 bpy.context.view_layer.update()
+                run_lambda_checks(addon, scene, model)
                 settings = scene.gnm_settings
                 settings.case_directory = str(Path(directory) / 'caz sintetic șță')
                 # The formerly accepted .py selection must fail before a case
@@ -132,6 +137,7 @@ with tempfile.TemporaryDirectory() as directory:
                 report = json.loads((folder / 'face_report.json').read_text(encoding='utf-8'))
                 assert report['metrics']['final_fit']['rmse_mm'] < .01
                 assert len(report['landmarks']) == 47
+                assert abs(report['lambda'] - 48 / 47) < 1e-8
                 assert not report['marker_metadata']['marker_records']['Vertex_VarfCap']['use_for_fit']
                 imported = [obj for obj in scene.objects if obj.get('gnm_report') == str(folder / 'face_report.json')]
                 assert len(imported) == 1 and len(imported[0].data.vertices) == model.vertex_count

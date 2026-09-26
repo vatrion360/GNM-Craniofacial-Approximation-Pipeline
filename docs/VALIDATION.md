@@ -1,5 +1,9 @@
 # Validation and release gates
 
+## Evidence for 5.0.0rc3 / add-on 16
+
+Local run on 2026-09-26 with the pinned official GNM asset: **99 passed, 1 Windows-only test skipped**. Ruff and the add-on build passed. Tests add duplicate constraints, near-site warnings, count/exclusion-based regularization, changed-data LOO keys and stable plane/reflection checks. Expanded Blender regression for mixed fragments is awaiting remote execution; previous revisions' passes do not establish the new restoration operator's compatibility.
+
 ## Evidence for 5.0.0rc2 / add-on 15
 
 Local execution on 2026-09-26, Linux x86_64, Python 3.12.14, NumPy 2.3.5, SciPy 1.17.0, trimesh 5.1.0: **83 passed, 1 skipped** with the pinned official model. The skipped test reproduces native Windows error 193 and requires Windows. Ruff, wheel/source build and the installable add-on ZIP build passed.

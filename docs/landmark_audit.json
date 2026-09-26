@@ -1,0 +1,31 @@
+{
+  "included_count": 48,
+  "unique_vertex_count": 48,
+  "errors": [],
+  "warnings": [],
+  "model_sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de",
+  "proximity_threshold_mm": 2.0,
+  "candidate_proximity_is_not_anatomical_equivalence": true,
+  "marker_set_sizes": {
+    "extended": 48,
+    "paper": 32,
+    "legacy": 27
+  },
+  "near_candidates": [
+    {
+      "labels": [
+        "Nasospinale_BazaNas",
+        "Acanthion"
+      ],
+      "vertices": [
+        12298,
+        12297
+      ],
+      "distance_mm": 1.4997029304504395,
+      "placement_definitions": [
+        "intersection of the midsagittal plane with the line joining the lowest inferior nasal-aperture margins; distinguish from the anterior nasal-spine tip (Acanthion). The inherited skin candidate is only 1.5 mm from Acanthion; review both definitions and directions",
+        "tip of the anterior nasal spine (midline, at the base of the septum), on bone - NOT on the cartilaginous septum"
+      ]
+    }
+  ]
+}

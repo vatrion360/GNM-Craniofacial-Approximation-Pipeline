@@ -194,6 +194,10 @@ for _label in ADDED_LANDMARKS:
     LANDMARK_ORDER.append(_label)
     CONFIDENCE_WEIGHTS[_label] = 0.5  # relative influence, not statistical confidence
 PLACEMENT_HINTS.update(PAPER_DEFINITIONS)
+PLACEMENT_HINTS['Nasospinale_BazaNas'] = (
+    'intersection of the midsagittal plane with the line joining the lowest '
+    'inferior nasal-aperture margins; distinguish from the anterior nasal-spine tip (Acanthion). '
+    'The inherited skin candidate is only 1.5 mm from Acanthion; review both definitions and directions')
 for _label in ADDED_LANDMARKS:
     if _label.endswith('_Dr'):
         CONSISTENCY_PAIRS.append((_label, pair_label(_label)))
@@ -213,3 +217,9 @@ def initial_tissue_source(label):
     # Existing defaults are preserved; only newly introduced rows inherit
     # paper depths automatically. Applying the whole table is a separate UI action.
     return TISSUE_SOURCE if label in ADDED_LANDMARKS else 'legacy-unvalidated'
+
+
+MANDIBULAR_LANDMARKS = frozenset({
+    'Pogonion', 'Gnathion', 'Menton', 'Infradentale_BuzaInf', 'Supramentale',
+    'Gonion_Dr', 'Gonion_St', 'Midmasseter_Dr', 'Midmasseter_St', 'SubM2_Dr', 'SubM2_St',
+})
