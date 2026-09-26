@@ -2,7 +2,7 @@
 
 ## Tested versus targeted
 
-The Python pipeline is tested locally on Linux / Python 3.12.14 with the exact versions in `requirements-tested-py312.txt`. The Python 3.10/3.12 Windows/Linux CI matrix passed. The headless integration test also passed in Blender 4.5.0 on Linux, including model loading, marker export, external fitting/import and cancellation; see the linked runs in [VALIDATION](VALIDATION.md). Blender 4.2+ remains the broader target; other versions/platforms and interactive workflows need their own acceptance checks. The earlier README's Blender 3.6–5.0 and historical test badges were not supported by committed test evidence.
+The Python pipeline is tested locally on Linux / Python 3.12.14 with the exact versions in `requirements-tested-py312.txt`. CI covers Python 3.10/3.12 on Windows/Linux and headless Blender 4.5.0 on both systems, including model loading, marker export, external fitting/import and cancellation; see the revision-specific results in [VALIDATION](VALIDATION.md). Blender 4.2+ remains the broader target; other versions/platforms and interactive workflows need their own acceptance checks. The earlier README's Blender 3.6–5.0 and historical test badges were not supported by committed test evidence.
 
 ## 1. Prepare the Python environment
 
@@ -42,11 +42,30 @@ Use `--npz` for every command, or set `GNM_MODEL_PATH` to an absolute filename. 
 python tools/build_addon.py
 ```
 
-In Blender: Preferences → Add-ons → Install from Disk → select `dist/gnm_cranio-5.0.0rc1.zip` → enable **GNM Scientific Markers**. The sidebar is **GNM Markers**. Disable previous copies to avoid duplicate operator registrations.
+In Blender: Preferences → Add-ons → Install from Disk → select `dist/gnm_cranio-5.0.0rc2.zip` → enable **GNM Scientific Markers**. The sidebar is **GNM Markers**. Disable previous copies to avoid duplicate operator registrations.
 
 Select `gnm_head.npz`. Import a skull and explicitly select mm/cm/m according to the source file. The resulting scene uses **one Blender coordinate = one millimetre**, represented by metric scale `0.001`. Check a known anatomical/scanner measurement after import; STL/OBJ do not reliably carry physical units.
 
 To run the pipeline from Blender, set **Python executable** to `.venv/Scripts/python.exe` on Windows or `.venv/bin/python` on Linux/macOS. Select a case output folder. The add-on invokes its bundled CLI with that interpreter; required dependencies must already be installed in the environment. Blender's own Python does not need SciPy or trimesh for marker placement/preview.
+
+### Windows interpreter check and WinError 193
+
+`[WinError 193] %1 is not a valid Win32 application` is Windows loader error `ERROR_BAD_EXE_FORMAT`: the selected executable could not be started. It occurs before the numerical fit. Earlier add-on versions checked only that the selected file existed, allowing a `.py` script, a foreign-platform interpreter or another unsuitable file to reach `CreateProcess`. The message alone cannot identify which file was selected on a particular workstation. [Microsoft error-code reference](https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-).
+
+Prepare the environment on the Windows workstation from the repository directory (PowerShell):
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install .
+.\.venv\Scripts\python.exe -m cranio.doctor --npz models\gnm_head.npz
+(Resolve-Path .\.venv\Scripts\python.exe).Path
+```
+
+Paste the last command's output into Blender's **Python executable / venv folder** field. The field takes one interpreter path, without script names or command arguments. Click **Check Python Environment**: it must show Python 3.10+ / 64-bit and `numpy/scipy/trimesh OK`. Select a case folder, place/review at least four included markers, then run the offline fit. For an air-gapped workstation, use the wheelhouse instructions below in place of the connected `pip install` step.
+
+Add-on 15 rejects scripts, activation files, installers, `blender.exe`, `pythonw.exe` and non-Windows binary signatures. It also checks the actual Python version/bitness and imports the required packages, with actionable dependency/DLL errors. Child processes receive a clean Python environment rather than Blender's `PYTHONHOME`/`PYTHONPATH`. Arguments stay separate with `shell=False`, including paths with spaces and Romanian characters. The run log records the interpreter and argument list.
+
+Create each virtualenv on its target operating system; copying a Linux/macOS `.venv` onto Windows cannot make its interpreter a Windows executable. If a binary-format error persists after choosing the correct interpreter, use the full path and diagnostic shown by **Check Python Environment** to check that installation and CPU/OS compatibility.
 
 The default **Run Offline Fit and Import** creates a unique subfolder, exports v3 markers, runs the marker-only statistical fit, writes `run.log`, and imports the resulting OBJ without axis conversion. Cancellation terminates the process and retains partial files. A completed JSON report is the completion marker. Advanced CLI settings do not silently carry over from the preview controls.
 
@@ -65,7 +84,7 @@ Copy the project wheel, wheelhouse, model + upstream notices, add-on ZIP and thi
 On the offline workstation, create/activate a fresh virtualenv, then:
 
 ```bash
-python -m pip install --no-index --find-links wheelhouse dist/gnm_craniofacial-5.0.0rc1-py3-none-any.whl
+python -m pip install --no-index --find-links wheelhouse dist/gnm_craniofacial-5.0.0rc2-py3-none-any.whl
 python -m cranio.doctor --npz models/gnm_head.npz
 ```
 

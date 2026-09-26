@@ -1,4 +1,4 @@
-"""GNM Craniofacial Markers 14.0 / software package 5.0.0rc1.
+"""GNM Craniofacial Markers 15.0 / software package 5.0.0rc2.
 
 Install the complete ZIP built with tools/build_addon.py. The bundled numerical
 core is imported under the add-on namespace. Optional previews run serially in
@@ -20,6 +20,7 @@ import shutil
 import sys
 import threading
 import time
+import textwrap
 import bpy
 import bmesh
 import numpy as np  # livrat cu Blender (fitul live e numpy-pur, fara scipy)
@@ -34,7 +35,7 @@ from bpy_extras import view3d_utils
 bl_info = {
     "name": "GNM Scientific Markers",
     "author": "VATRION",
-    "version": (14, 0, 0),
+    "version": (15, 0, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > GNM Markers",
     "category": "3D View",
@@ -43,31 +44,19 @@ bl_info = {
 # -----------------------------------------------------------------------
 # BAZA DE DATE MARKERI
 # -----------------------------------------------------------------------
-# Inherited V12 skin-vertex candidates; anatomical review required (docs/SCIENCE.md).
-# Format: (vertex_id_GNM_v3, eticheta, adancime_tesut_mm, latura, is_exact)
-LANDMARKS = [
-    # V13.4: Rhinion 12296 -> 12310 (12296 este iBUG 30 = pronasale/varful
-    # nasului; 12310 este iBUG 29 = puntea nazala osoasa, rhinion-ul
-    # craniometric real, 25.1 mm sub Nasion - vezi cranio.backend).
-    (12319, "Nasion", 6.0, 0, True), (12310, "Rhinion", 3.0, 0, True),
-    (12337, "Glabella", 5.0, 0, True), (12284, "Pogonion", 10.0, 0, True),
-    (12258, "Gnathion", 10.5, 0, True), (8737, "Gonion_Dr", 13.0, -1, True),
-    (2609,  "Gonion_St", 13.0, 1, True), (7426,  "Orbita_Dr_Ext", 8.0, -1, True),
-    (1298,  "Orbita_St_Ext", 8.0, 1, True), (11027, "Orbita_Dr_Int", 6.0, -1, True),
-    (4899,  "Orbita_St_Int", 6.0, 1, True), (7566,  "Supraorbitale_Dr", 7.0, -1, True),
-    (1438,  "Supraorbitale_St", 7.0, 1, True), (9903,  "Infraorbitale_Dr", 7.0, -1, True),
-    (3775,  "Infraorbitale_St", 7.0, 1, True), (10002, "Zygion_Dr", 8.5, -1, True),
-    (3874,  "Zygion_St", 8.5, 1, True), (10105, "Alare_Dr", 4.5, -1, True),
-    (3977,  "Alare_St", 4.5, 1, True), (7765, "Eurion_Dr", 5.0, -1, True),
-    (1637,  "Eurion_St", 5.0, 1, True), (12398, "Vertex_VarfCap", 5.5, 0, True),
-    (12298, "Nasospinale_BazaNas", 11.0, 0, True), (12276, "Prosthion_BuzaSup", 12.0, 0, True),
-    # V13.6: Acanthion + marginile inferioare ale aperturei piriforme, pentru
-    # diagnosticul de proiectie nazala (Gerasimov/Ullrich-Stephan) - vezi
-    # cranio.backend.gnm_backend. 12297 = imediat sub subnasale (proiectia
-    # spinei nazale); 10215/4087 = +-12.4 mm (proiectia marginii aperturei).
-    (12297, "Acanthion", 10.0, 0, True),
-    (10215, "Piriform_Dr", 6.5, -1, True), (4087, "Piriform_St", 6.5, 1, True),
-]
+def _core_module(name):
+    import importlib
+    # ZIP vendors the numerical package under this add-on namespace. Never
+    # evict unrelated modules or infer executable code paths from model paths.
+    return importlib.import_module((__package__ + ".cranio." if __package__ else "cranio.") + name)
+
+
+# One canonical registry supplies the GUI and offline pipeline.
+_MARKER_DATA = _core_module('landmarks')
+_VERTEX_DATA = _core_module('backend.gnm_backend')
+LANDMARKS = [(_VERTEX_DATA.LABEL_TO_VERTEX[label], label,
+               *_MARKER_DATA.LANDMARK_INFO[label], True)
+             for label in _MARKER_DATA.LANDMARK_ORDER]
 
 def _encode_index(v_id: int, is_exact: bool) -> int:
     return -(v_id + 1) if is_exact else v_id
@@ -201,7 +190,17 @@ def _estimate_facial_axes(scene):
 # PROPRIETATI
 # -----------------------------------------------------------------------
 class GNMSettings(PropertyGroup):
-    python_executable: StringProperty(name="Python executable", subtype="FILE_PATH")
+    marker_set: EnumProperty(name="Marker set", items=[
+        ('EXTENDED_48', "Extended 48", "Existing 27 plus 21 additional Table 2 positions"),
+        ('PAPER_32', "VAR 2026 Table 2: 32", "10 median plus 11 bilateral sites; case-study tissue reference"),
+        ('LEGACY_27', "Legacy 27", "Original set with current candidate correspondences")], default='EXTENDED_48')
+    cranial_modification: EnumProperty(name="Cranial modification", items=[
+        ('unknown', "Not assessed", "No assessment recorded"),
+        ('absent', "Not observed", "Operator reports no intentional modification"),
+        ('present', "Present / suspected", "Document altered vault and review the general GNM model's applicability")], default='unknown')
+    case_notes: StringProperty(name="Case / restoration notes")
+    python_status: StringProperty(default="Select an installed 64-bit Python 3.10+ interpreter")
+    python_executable: StringProperty(name="Python executable / venv folder", subtype="FILE_PATH", description="Windows: select .venv/Scripts/python.exe, not gnm_reconstruct.py or blender.exe")
     case_directory: StringProperty(name="Case output folder", subtype="DIR_PATH")
     offline_status: StringProperty(default="Ready")
     marker_size_mm: FloatProperty(name="Marker Radius (mm)", default=1.5, min=0.1)
@@ -259,11 +258,26 @@ def _update_tissue_depth(self, context):
         self.peg_object.rotation_quaternion = direction.to_track_quat("Z", "Y")
 
 
+def _marker_fit_changed(self, context):
+    if context is not None and hasattr(context.scene, 'gnm_live'):
+        _refresh_marker_objects(context.scene)
+        _request_refit(context.scene)
+
+
 class GNMMarkerItem(PropertyGroup):
     gnm_index: IntProperty()
     label: StringProperty()
     tissue_depth_mm: FloatProperty(default=5.0, min=0.0, update=_update_tissue_depth)
     tissue_source: StringProperty(name="Tissue source / method", default="legacy-unvalidated")
+    use_for_fit: BoolProperty(name="Include in fit", default=True, update=_marker_fit_changed)
+    fit_weight: FloatProperty(name="Weight (0 = preset)", default=0.0, min=0.0, max=1.0, update=_marker_fit_changed)
+    mapping_reviewed: BoolProperty(name="Skin correspondence reviewed", default=False, update=_marker_fit_changed)
+    bone_status: EnumProperty(name="Bone provenance", items=[
+        ('unspecified', "Not recorded", "Record whether the site is preserved or inferred"),
+        ('observed', "Observed", "Landmark on preserved scanned anatomy"),
+        ('reconstructed', "Digitally repaired", "Landmark on repaired or mirrored bone"),
+        ('inferred', "Inferred", "Location inferred from incomplete anatomy")], default='unspecified')
+    marker_notes: StringProperty(name="Placement / direction notes")
     side: IntProperty(default=0)
     bone_empty: PointerProperty(type=bpy.types.Object)
     target_empty: PointerProperty(type=bpy.types.Object)
@@ -370,21 +384,49 @@ class GNM_OT_import_setup(Operator):
 
 class GNM_OT_init_markers(Operator):
     bl_idname = "gnm.init_markers"
-    bl_label = "2. Load Marker List"
+    bl_label = "Add Missing Markers"
+    bl_description = "Add the chosen set while preserving existing placements, tissue values and manual vertices"
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         scene = context.scene
-        scene.gnm_markers.clear()
-        
-        for v_id, lbl, depth, side, is_exact in LANDMARKS:
+        existing = {item.label for item in scene.gnm_markers}
+        paper = _core_module('paper_reference')
+        added = 0
+        for label in _MARKER_DATA.marker_labels(scene.gnm_settings.marker_set):
+            if label in existing:
+                continue
             item = scene.gnm_markers.add()
-            item.gnm_index = _encode_index(v_id, is_exact)
-            item.label = lbl
-            item.tissue_depth_mm = depth
-            item.side = side
-            
-        scene.gnm_marker_active_index = 0
-        return {"FINISHED"}
+            item.gnm_index = _encode_index(_VERTEX_DATA.LABEL_TO_VERTEX[label], True)
+            item.label = label
+            item.tissue_depth_mm, item.side = _MARKER_DATA.LANDMARK_INFO[label]
+            item.tissue_source = _MARKER_DATA.initial_tissue_source(label)
+            if scene.gnm_settings.marker_set == 'PAPER_32':
+                item.tissue_depth_mm = paper.PAPER_DEPTHS[label]
+                item.tissue_source = paper.TISSUE_SOURCE
+            added += 1
+        scene.gnm_marker_active_index = min(scene.gnm_marker_active_index, max(0, len(scene.gnm_markers) - 1))
+        self.report({'INFO'}, f"Added {added}; {len(scene.gnm_markers)} markers. Existing case data preserved.")
+        return {'FINISHED'}
+
+
+class GNM_OT_apply_paper_tissues(Operator):
+    bl_idname = 'gnm.apply_paper_tissues'
+    bl_label = 'Apply Table 2 Tissue Depths'
+    bl_description = 'Replace depths at the paper sites using its normal-female reference; review applicability. Undo restores previous values'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        paper = _core_module('paper_reference')
+        count = 0
+        for item in context.scene.gnm_markers:
+            if item.label in paper.PAPER_DEPTHS:
+                item.tissue_depth_mm = paper.PAPER_DEPTHS[item.label]
+                item.tissue_source = paper.TISSUE_SOURCE
+                count += 1
+        self.report({'INFO'}, f"Updated {count} Table 2 sites; review study applicability and placement direction.")
+        return {'FINISHED'}
+
 
 class GNM_OT_place_marker(Operator):
     bl_idname = "gnm.place_marker"
@@ -1144,6 +1186,7 @@ class GNM_UL_markers(UIList):
         row.label(text="", icon="CHECKMARK" if item.is_placed else "RADIOBUT_OFF")
         side_str = "[M]" if item.side == 0 else ("[R]" if item.side == -1 else "[L]")
         row.label(text=f"{side_str} {item.label}")
+        row.prop(item, "use_for_fit", text="")
         row.prop(item, "tissue_depth_mm", text="mm")
         # V13: iconita de status a correspondentei GNM (manual > V12 > JSON).
         # Protejata cu try/except: nu trebuie sa crape lista daca modelul
@@ -1177,8 +1220,12 @@ class GNM_PT_panel(Panel):
         box.prop(settings, "peg_thickness_mm")
         layout.separator()
 
+        layout.prop(settings, "marker_set")
+        layout.operator("gnm.init_markers", icon="ADD")
+        layout.operator("gnm.apply_paper_tissues", icon="PRESET")
+        layout.label(text="Table 2: normal female; SW Native American")
+        layout.label(text="Case-study reference; review applicability")
         if not scene.gnm_markers:
-            layout.operator("gnm.init_markers", icon="ADD")
             return
 
         layout.template_list("GNM_UL_markers", "", scene, "gnm_markers", scene, "gnm_marker_active_index")
@@ -1217,14 +1264,34 @@ class GNM_PT_panel(Panel):
         layout.operator("gnm.export_csv", icon="EXPORT")
         if scene.gnm_markers:
             item = scene.gnm_markers[scene.gnm_marker_active_index]
-            layout.prop(item, "tissue_source")
+            details = layout.box()
+            details.prop(item, "use_for_fit")
+            details.prop(item, "fit_weight")
+            details.prop(item, "mapping_reviewed")
+            details.prop(item, "bone_status")
+            details.prop(item, "marker_notes")
+            details.prop(item, "tissue_source")
+            hint = _MARKER_DATA.PLACEMENT_HINTS.get(item.label, "Review anatomical location and target direction.")
+            for line in textwrap.wrap(hint, width=48):
+                details.label(text=line)
+            caveat = _core_module('paper_reference').CAVEATS.get(item.label)
+            if caveat:
+                for line in textwrap.wrap(caveat, width=48):
+                    details.label(text=line, icon='INFO' if line == textwrap.wrap(caveat, width=48)[0] else 'NONE')
+        layout.prop(settings, "cranial_modification")
+        layout.prop(settings, "case_notes")
         box = layout.box()
         box.label(text="Offline fit (external Python)")
         box.prop(settings, "python_executable")
+        box.operator("gnm.check_python", icon="CHECKMARK")
+        for line in textwrap.wrap(settings.python_status, width=48):
+            box.label(text=line)
+        box.label(text="Windows: .venv / Scripts / python.exe")
         box.prop(settings, "case_directory")
         box.operator("gnm.run_offline", icon="PLAY")
         box.operator("gnm.cancel_offline", icon="CANCEL")
-        box.label(text=settings.offline_status)
+        for line in textwrap.wrap(settings.offline_status, width=48):
+            box.label(text=line)
         box.label(text="Fit residuals are not reconstruction accuracy")
 
         # V13: sectiunea de reconstructie live (definita mai jos in fisier).
@@ -1382,12 +1449,6 @@ def _repo_root_from_npz(npz_path):
         os.path.dirname(npz_path), "..", "..", "..", "..", ".."))
 
 
-def _core_module(name):
-    import importlib
-    # ZIP vendors the numerical package under this add-on namespace. Never
-    # evict unrelated modules or infer executable code paths from model paths.
-    return importlib.import_module((__package__ + ".cranio." if __package__ else "cranio.") + name)
-
 
 def _ensure_cranio(npz_path):
     try:
@@ -1461,16 +1522,17 @@ def _gnm_live_row_status(item):
         return "PINNED", "M"
     if _resolve_vertex(item) is None:
         return "ERROR", "!"
-    if (_json_confidence(item.label) or "") == "low":
+    if not item.mapping_reviewed or (_json_confidence(item.label) or "") == "low":
         return "QUESTION", "~"
     return "LINKED", ""
 
 
-def _weight_of(label):
+def _weight_of(label, item=None):
     """Ponderea de incredere a landmarkului (aceeasi ca in pipeline-ul
     offline: cranio.landmarks.CONFIDENCE_WEIGHTS)."""
-    cw = _CRANIO.get("CONFIDENCE_WEIGHTS") or {}
-    return float(cw.get(label, _CRANIO.get("DEFAULT_CONFIDENCE", 0.7)))
+    if item is not None and item.fit_weight > 0:
+        return float(item.fit_weight)
+    return float(_MARKER_DATA.CONFIDENCE_WEIGHTS.get(label, _MARKER_DATA.DEFAULT_CONFIDENCE))
 
 
 # -----------------------------------------------------------------------
@@ -1547,11 +1609,13 @@ def _ensure_gnm_mesh_object(context):
 
 def _ghost_color(item):
     """Culoarea ghost-ului dupa sursa/confidence (vezi legenda din panou)."""
+    if item is not None and not item.use_for_fit:
+        return (0.5, 0.5, 0.5, 0.6)
     if item is not None and item.gnm_vertex_override >= 0:
         return (0.75, 0.35, 0.9, 0.6)   # picking manual: mov
     if item is not None and _resolve_vertex(item) is None:
         return (0.95, 0.15, 0.15, 0.6)  # lipsa correspondenta: rosu
-    if item is not None and (_json_confidence(item.label) or "") == "low":
+    if item is not None and (not item.mapping_reviewed or (_json_confidence(item.label) or "") == "low"):
         return (1.0, 0.55, 0.1, 0.6)    # confidence low in JSON: portocaliu
     return (0.25, 0.85, 0.35, 0.6)      # V12 / JSON medium-high: verde
 
@@ -1584,7 +1648,7 @@ def _refresh_ghosts(scene):
             continue
         item = _marker_item(scene, lbl)
         obj.color = _ghost_color(item)
-        unmapped = (item is not None and _resolve_vertex(item) is None)
+        unmapped = (item is None or _resolve_vertex(item) is None)
         obj.hide_set((not show) or unmapped)
         obj.empty_display_size = size
     # Betele/empties-urile markerilor (viewport-ul stang) urmeaza aceeasi
@@ -1601,7 +1665,8 @@ def _ensure_ghosts(context):
     m_world = (np.array(mesh_obj.matrix_world, dtype=np.float64)
                if mesh_obj is not None else np.eye(4))
     model = _LIVE.model
-    for _vid, lbl, _d, _s, _e in LANDMARKS:
+    for item in scene.gnm_markers:
+        lbl = item.label
         name = GNM_GHOST_PREFIX + lbl
         obj = bpy.data.objects.get(name)
         if obj is None:
@@ -2225,7 +2290,7 @@ def _fingerprint(scene):
             continue
         b = item.bone_empty.matrix_world.translation
         t = item.target_empty.matrix_world.translation
-        parts.append((item.label, item.gnm_vertex_override, 1,
+        parts.append((item.label, item.gnm_vertex_override, item.use_for_fit, item.fit_weight, 1,
                       round(b.x, 3), round(b.y, 3), round(b.z, 3),
                       round(t.x, 3), round(t.y, 3), round(t.z, 3)))
     return tuple(parts)
@@ -2236,7 +2301,7 @@ def _build_snapshot(scene):
     markerii plasati si mapati. Ruleaza pe MAIN thread (citeste bpy)."""
     labels, verts, tgts, ws = [], [], [], []
     for item in scene.gnm_markers:
-        if not item.is_placed:
+        if not item.is_placed or not item.use_for_fit:
             continue
         vid = _resolve_vertex(item)
         if vid is None:
@@ -2245,7 +2310,7 @@ def _build_snapshot(scene):
         labels.append(item.label)
         verts.append(vid)
         tgts.append((p.x, p.y, p.z))
-        ws.append(_weight_of(item.label))
+        ws.append(_weight_of(item.label, item))
     # V13.2: modul dense continuu + poza curenta a obiectului GNM (necesara
     # pentru calculul corespondentelor in worker; citita aici, pe main thread).
     gnm_obj = bpy.data.objects.get(GNM_MESH_NAME)
@@ -3094,6 +3159,7 @@ class GNM_OT_pick_gnm_vertex(Operator):
             item = _marker_item(context.scene, self._label)
             if item is not None:
                 item.gnm_vertex_override = vid
+                item.mapping_reviewed = True
                 _refresh_ghosts(context.scene)
                 _request_refit(context.scene)
                 self.report({"INFO"},
@@ -3153,6 +3219,7 @@ class GNM_OT_clear_gnm_override(Operator):
         scene = context.scene
         item = scene.gnm_markers[scene.gnm_marker_active_index]
         item.gnm_vertex_override = -1
+        item.mapping_reviewed = False
         _refresh_ghosts(scene)
         _request_refit(scene)
         self.report({"INFO"}, f"{item.label}: override cleared (back to V12/JSON).")
@@ -3200,7 +3267,7 @@ class GNM_OT_export_landmark_json(Operator):
                 "position": (model.mu[vid].astype(np.float64) / 1000.0).tolist(),
                 "source": "manual_picked_blender",
                 "confidence": "manual",
-                "note": (f"Manually picked in Blender (addon V13) on {stamp}; "
+                "note": (f"Manually picked in Blender (addon {bl_info['version'][0]}) on {stamp}; "
                          f"addon label: {item.label}"),
             }
             n_merged += 1
@@ -3445,8 +3512,8 @@ def _draw_live_section(layout, context):
     sub.prop(st, "dense_max_rows")
     sub.prop(st, "clip_sigma")
     sub.prop(st, "prior_dir")
-    box.label(text="Color legend (ghosts + marker pegs): green=V12/JSON")
-    box.label(text="map, orange=JSON low, purple=manual picking,")
+    box.label(text="Green=reviewed map; orange=needs review;")
+    box.label(text="purple=manual; grey=documentation only;")
     box.label(text="red=no correspondence, cyan=Gerasimov pronasale (diag).")
 
 
@@ -3470,8 +3537,11 @@ def _export_markers(scene, path):
     for item in scene.gnm_markers:
         vid = _resolve_vertex(item)
         row = dict(label=item.label, vertex=vid if vid is not None else '',
-                   placed=int(item.is_placed), x='', y='', z='', weight=_weight_of(item.label),
-                   tissue_source=item.tissue_source)
+                   placed=int(item.is_placed), x='', y='', z='', weight=_weight_of(item.label, item),
+                   tissue_source=item.tissue_source, use_for_fit=int(item.use_for_fit),
+                   bone_status=item.bone_status, mapping_reviewed=int(item.mapping_reviewed),
+                   mapping_source='operator-selected' if item.gnm_vertex_override >= 0 else _VERTEX_DATA.MAPPING_REVISION,
+                   marker_notes=item.marker_notes)
         if item.is_placed:
             if vid is None:
                 raise ValueError(f"No model correspondence: {item.label}")
@@ -3488,6 +3558,12 @@ def _export_markers(scene, path):
             "model_sha256": model_digest,
             "skull_source": scene.gnm_settings.sursa_fisier,
             "scene_scale_length": scene.unit_settings.scale_length,
+            "requested_marker_set": scene.gnm_settings.marker_set,
+            "marker_count": len(scene.gnm_markers),
+            "mapping_revision": _VERTEX_DATA.MAPPING_REVISION,
+            "tissue_reference": _core_module('paper_reference').reference_metadata(),
+            "cranial_modification": scene.gnm_settings.cranial_modification,
+            "case_notes": scene.gnm_settings.case_notes,
             "target_construction": "bone plus operator-reviewed depth/direction; local normal is initial heuristic"}
     _core_module('io_csv').write_marker_csv_v3(path, rows, meta)
     # Validate exactly what the CLI will consume, including manual overrides.
@@ -3559,16 +3635,44 @@ def _offline_poll():
     return None
 
 
+def _selected_python(scene):
+    selection = os.path.expandvars(os.path.expanduser(scene.gnm_settings.python_executable.strip().strip('"')))
+    return bpy.path.abspath(selection) if selection.startswith('//') else selection
+
+
+def _check_external_python(scene):
+    info = _core_module('external_python').inspect_python(_selected_python(scene))
+    scene.gnm_settings.python_executable = info['executable']
+    version = '.'.join(map(str, info['version']))
+    scene.gnm_settings.python_status = f"Python {version}, {info['bits']}-bit; numpy/scipy/trimesh OK"
+    return info
+
+
+class GNM_OT_check_python(Operator):
+    bl_idname = 'gnm.check_python'
+    bl_label = 'Check Python Environment'
+
+    def execute(self, context):
+        try:
+            _check_external_python(context.scene)
+            self.report({'INFO'}, context.scene.gnm_settings.python_status)
+            return {'FINISHED'}
+        except ValueError as exc:
+            context.scene.gnm_settings.python_status = str(exc)
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+
+
 class GNM_OT_run_offline(Operator):
     bl_idname = 'gnm.run_offline'
     bl_label = 'Run Offline Fit and Import'
 
     @classmethod
     def poll(cls, context):
-        return _OFFLINE.get('process') is None and len(context.scene.gnm_markers) >= 4
+        return (_OFFLINE.get('process') is None and
+                sum(item.is_placed and item.use_for_fit for item in context.scene.gnm_markers) >= 4)
 
     def execute(self, context):
-        import subprocess
         import uuid
         from pathlib import Path
         scene = context.scene
@@ -3576,22 +3680,21 @@ class GNM_OT_run_offline(Operator):
         try:
             if not settings.python_executable or not settings.case_directory:
                 raise ValueError('Select the external Python executable and case output folder')
-            executable = Path(bpy.path.abspath(settings.python_executable))
-            if not executable.is_file():
-                raise ValueError('External Python executable does not exist')
+            # Fail before creating a case folder or launching the fit. In
+            # particular, .py/ELF files cannot be executed by Windows.
+            info = _check_external_python(scene)
             root = Path(__file__).resolve().parent
             folder = Path(bpy.path.abspath(settings.case_directory)) / (
                 datetime.datetime.now().strftime('%Y%m%dT%H%M%S') + '_' + uuid.uuid4().hex[:8])
             folder.mkdir(parents=True, exist_ok=False)
             _export_markers(scene, str(folder / 'markers.csv'))
-            command = [str(executable), str(root / 'gnm_reconstruct.py'),
-                       '--input', str(folder / 'markers.csv'),
+            arguments = ['--input', str(folder / 'markers.csv'),
                        '--npz', bpy.path.abspath(scene.gnm_live.npz_path),
                        '--output', str(folder / 'face.obj')]
             log = (folder / 'run.log').open('w', encoding='utf-8')
             try:
-                process = subprocess.Popen(command, cwd=str(root), stdout=log, stderr=subprocess.STDOUT,
-                                           shell=False, stdin=subprocess.DEVNULL)
+                process = _core_module('external_python').start_pipeline(
+                    info, root / 'gnm_reconstruct.py', arguments, log)
             except Exception:
                 log.close()
                 raise
@@ -3600,6 +3703,7 @@ class GNM_OT_run_offline(Operator):
             bpy.app.timers.register(_offline_poll, first_interval=0.5)
             return {'FINISHED'}
         except (ValueError, OSError, ImportError) as exc:
+            settings.offline_status = 'Cannot start: ' + str(exc)
             self.report({'ERROR'}, str(exc))
             return {'CANCELLED'}
 
@@ -3624,6 +3728,7 @@ _classes = (
     GNM_OT_recenter_on_plane, GNM_OT_asymmetry_report, GNM_OT_session_report,
     GNM_OT_capturi_standardizate, GNM_OT_mirror_reconstruct, GNM_OT_export_csv,
     GNM_UL_markers, GNM_PT_panel, GNM_OT_run_offline, GNM_OT_cancel_offline,
+    GNM_OT_check_python, GNM_OT_apply_paper_tissues,
     # V13:
     GNMLiveSettings, GNM_OT_setup_dual_viewports, GNM_OT_toggle_skull_overlay,
     GNM_OT_load_live_model, GNM_OT_toggle_live, GNM_OT_delete_marker,

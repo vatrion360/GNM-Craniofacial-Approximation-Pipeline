@@ -24,4 +24,12 @@ def test_official_asset_end_to_end(tmp_path):
     assert run_pipeline(cfg) == 0
     report = json.loads(Path(cfg.output_json).read_text())
     assert report['metrics']['final_fit']['rmse_mm'] < .001
-    assert len(report['landmarks']) == 27
+    assert len(report['landmarks']) == 48
+    mapping = GNMBackend(model_path).landmark_vertex_map
+    assert len(set(mapping.values())) == 48
+    assert not model.group_mask('lower_lip')[mapping['Pogonion']]
+    assert model.group_mask('lower_lip')[mapping['Infradentale_BuzaInf']]
+    for label, index in mapping.items():
+        assert model.group_mask('skin_exterior')[index]
+        if label.endswith('_Dr'):
+            assert model.mirror_indices[index] == mapping[label[:-3] + '_St']

@@ -10,7 +10,8 @@ from .validation import finite_array
 V2_MAGIC = "# gnm-marker-csv v2"
 V3_MAGIC = "# gnm-marker-csv v3"
 V3_FIELDS = ["label", "vertex", "placed", "x", "y", "z", "weight",
-             "bone_x", "bone_y", "bone_z", "tissue_depth_mm", "tissue_source"]
+             "bone_x", "bone_y", "bone_z", "tissue_depth_mm", "tissue_source",
+             "use_for_fit", "bone_status", "mapping_reviewed", "mapping_source", "marker_notes"]
 
 
 class MarkerTarget(NamedTuple):
@@ -52,6 +53,7 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
     bones, records = {}, {}
     for line_number, row in enumerate(reader, 1):
         try:
+            use_for_fit = True
             if None in row:
                 raise ValueError("extra columns")
             if version == 3:
@@ -68,6 +70,10 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
                     continue
                 vertex = int(row["vertex"])
                 weight = float(row["weight"])
+                enabled = row.get('use_for_fit') or '1'
+                if enabled not in ('0', '1'):
+                    raise ValueError('use_for_fit must be 0 or 1')
+                use_for_fit = enabled == '1'
             else:
                 enc = int(row["gnm_landmark_index"])
                 label = index_to_label.get(enc)
@@ -82,13 +88,22 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
             if version < 3 and np.all(np.abs(xyz) < 1e-9):
                 skipped.append((label, "legacy unplaced origin sentinel"))
                 continue
-            if vertex < 0 or vertex in seen_vertices:
+            if vertex < 0 or (use_for_fit and vertex in seen_vertices):
                 raise ValueError(f"negative or duplicate vertex {vertex}")
             if not np.isfinite(weight) or not 0 < weight <= 1:
                 raise ValueError("weight must be finite and in (0, 1]")
-            seen_vertices.add(vertex)
             if version == 3:
-                record = {}
+                review = row.get('mapping_reviewed') or ''
+                if review not in ('', '0', '1'):
+                    raise ValueError('mapping_reviewed must be 0 or 1 when specified')
+                bone_status = row.get('bone_status') or 'unspecified'
+                if bone_status not in ('unspecified', 'observed', 'reconstructed', 'inferred'):
+                    raise ValueError('invalid bone_status')
+                record = {'use_for_fit': use_for_fit, 'bone_status': bone_status,
+                          'mapping_reviewed': None if review == '' else review == '1',
+                          'mapping_source': row.get('mapping_source') or 'unspecified',
+                          'marker_notes': row.get('marker_notes') or '',
+                          'vertex': vertex, 'target_xyz_mm': xyz.tolist()}
                 values = [row.get("bone_" + axis, "") for axis in "xyz"]
                 if any(v not in ("", None) for v in values):
                     bone = finite_array([float(v) for v in values], f"{label} bone", (3,))
@@ -105,6 +120,10 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
                         raise ValueError("bone-to-target distance differs from tissue_depth_mm")
                 record["tissue_source"] = row.get("tissue_source", "") or "unspecified"
                 records[label] = record
+            if not use_for_fit:
+                skipped.append((label, 'documentation only (use_for_fit=0)'))
+                continue
+            seen_vertices.add(vertex)
             targets.append(MarkerTarget(label, vertex, xyz, weight))
         except (TypeError, KeyError, ValueError) as exc:
             raise ValueError(f"CSV data row {line_number}: {exc}") from exc
@@ -121,7 +140,7 @@ def write_marker_csv_v3(csv_path, rows, metadata=None):
     with open(csv_path, "w", newline="", encoding="utf-8") as stream:
         stream.write(V3_MAGIC + "\n# " + json.dumps(meta, sort_keys=True, ensure_ascii=False,
                                                    allow_nan=False) + "\n")
-        writer = csv.DictWriter(stream, fieldnames=V3_FIELDS)
+        writer = csv.DictWriter(stream, fieldnames=V3_FIELDS, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     return meta
@@ -132,7 +151,7 @@ def write_marker_csv_v2(csv_path, rows, metadata=None):
     with open(csv_path, "w", newline="", encoding="utf-8") as stream:
         stream.write(V2_MAGIC + "\n# " + json.dumps(meta, ensure_ascii=False,
                                                   allow_nan=False) + "\n")
-        writer = csv.writer(stream)
+        writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(["gnm_landmark_index", "x", "y", "z"])
         writer.writerows(sorted(rows))
     return meta

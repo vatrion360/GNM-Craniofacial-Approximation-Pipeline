@@ -20,6 +20,7 @@ def main():
         xyz = model.mu[vertex].astype(float)
         rows.append(dict(label=label, vertex=vertex, placed=1,
                          x=xyz[0], y=xyz[1], z=xyz[2], weight=1,
+                         mapping_reviewed=1, mapping_source='synthetic model correspondence',
                          tissue_source='synthetic mean-model target; not FSTT data'))
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     write_marker_csv_v3(args.output, rows,

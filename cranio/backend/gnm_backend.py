@@ -18,6 +18,7 @@ import numpy as np
 from .base import FaceModelBackend, FaceModelData
 
 OFFICIAL_V3_SHA256 = "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de"
+MAPPING_REVISION = "gnm-v3-candidates-15"
 
 # ---------------------------------------------------------------------------
 # TABELE DE CORESPONDENTA LANDMARKURI (GNM Head v3.0, skin)
@@ -105,6 +106,26 @@ LABEL_TO_VERTEX = {
     "Acanthion": 12297,
     "Piriform_Dr": 10215, "Piriform_St": 4087,
 }
+
+# v15 candidates selected on the neutral exterior, with bilateral pairs from
+# mirror_indices. They are not correspondences supplied/validated by Table 2.
+# Inspection also found the inherited Pogonion 12284 inside GNM's lower_lip
+# group; 12261 is the reviewed chin candidate. Explicit CSV/manual indices
+# remain authoritative. See docs/PDF_PROTOCOL.md for evidence and limitations.
+LABEL_TO_VERTEX['Pogonion'] = 12261
+ADDED_VERTEX_CANDIDATES = {
+    'Supraglabella': 12335, 'Midphiltrum': 12274,
+    'Infradentale_BuzaInf': 12284, 'Supramentale': 12266, 'Menton': 12346,
+    'FrontalEminence_Dr': 7073, 'FrontalEminence_St': 945,
+    'Suborbitale_Dr': 10880, 'Suborbitale_St': 4752,
+    'InferiorMalar_Dr': 7529, 'InferiorMalar_St': 1401,
+    'LateralOrbit_Dr': 7600, 'LateralOrbit_St': 1472,
+    'Supraglenoid_Dr': 11114, 'Supraglenoid_St': 4986,
+    'SupraM2_Dr': 7491, 'SupraM2_St': 1363,
+    'Midmasseter_Dr': 11258, 'Midmasseter_St': 5130,
+    'SubM2_Dr': 10025, 'SubM2_St': 3897,
+}
+LABEL_TO_VERTEX.update(ADDED_VERTEX_CANDIDATES)
 
 
 def encode_index(v_id: int, is_exact: bool) -> int:

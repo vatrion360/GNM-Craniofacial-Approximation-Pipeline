@@ -11,7 +11,8 @@ Legatura dintre etichete si indecsii de vertex ai unui model concret
 (ex. GNM Head v3.0) NU sta aici - este responsabilitatea backend-ului
 (vezi cranio.backend.gnm_backend).
 
-The numeric defaults are inherited heuristics without row-level traceability.
+The original numeric defaults are inherited heuristics without row-level traceability.
+Additional v15 sites use the cited case-study reference in paper_reference.py.
 They are NOT certified transcriptions of the cited tissue-depth literature.
 Weights are relative influence controls, not probabilities or inverse variances.
 See docs/SCIENCE.md and docs/SPECIALIST_WORKFLOW.md before casework.
@@ -180,3 +181,35 @@ def bilateral_pairs():
             if st in LANDMARK_INFO:
                 pairs.append((label, st))
     return pairs
+
+
+# v15: union of the inherited 27 and the paper's 32 spatial positions.
+# Do not collapse orbital-rim/foramen, lateral-orbit/canthus or menton/gnathion.
+from .paper_reference import PAPER_LABELS, PAPER_DEPTHS, PAPER_DEFINITIONS, TISSUE_SOURCE
+
+LEGACY_LANDMARK_ORDER = tuple(LANDMARK_ORDER)
+ADDED_LANDMARKS = tuple(label for label in PAPER_LABELS if label not in LANDMARK_INFO)
+for _label in ADDED_LANDMARKS:
+    LANDMARK_INFO[_label] = (PAPER_DEPTHS[_label], side_of(_label))
+    LANDMARK_ORDER.append(_label)
+    CONFIDENCE_WEIGHTS[_label] = 0.5  # relative influence, not statistical confidence
+PLACEMENT_HINTS.update(PAPER_DEFINITIONS)
+for _label in ADDED_LANDMARKS:
+    if _label.endswith('_Dr'):
+        CONSISTENCY_PAIRS.append((_label, pair_label(_label)))
+CONSISTENCY_PAIRS.extend([('Nasion', 'Menton'), ('Pogonion', 'Menton'),
+                          ('Prosthion_BuzaSup', 'Infradentale_BuzaInf')])
+
+
+def marker_labels(marker_set='EXTENDED_48'):
+    sets = {'EXTENDED_48': tuple(LANDMARK_ORDER), 'PAPER_32': PAPER_LABELS,
+            'LEGACY_27': LEGACY_LANDMARK_ORDER}
+    if marker_set not in sets:
+        raise ValueError(f'Unknown marker set: {marker_set}')
+    return sets[marker_set]
+
+
+def initial_tissue_source(label):
+    # Existing defaults are preserved; only newly introduced rows inherit
+    # paper depths automatically. Applying the whole table is a separate UI action.
+    return TISSUE_SOURCE if label in ADDED_LANDMARKS else 'legacy-unvalidated'
