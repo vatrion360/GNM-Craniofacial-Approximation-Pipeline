@@ -69,6 +69,8 @@ Create each virtualenv on its target operating system; copying a Linux/macOS `.v
 
 The default **Run Offline Fit and Import** creates a unique subfolder, exports v3 markers, runs the marker-only statistical fit, writes `run.log`, and imports the resulting OBJ without axis conversion. Cancellation terminates the process and retains partial files. A completed JSON report is the completion marker. Advanced CLI settings do not silently carry over from the preview controls.
 
+Add-on 16 explicitly shares the regularization choice with this button: adaptive `base * 48 / included marker count`, or conditional LOO when selected. It passes the adaptive base/min/max values to the CLI. Other advanced preview options are not implicitly applied to the offline run. See [FRAGMENT_RESTORATION](FRAGMENT_RESTORATION.md) for duplicate checks and mixed-fragment restoration.
+
 ## 4. Build an air-gapped installation kit
 
 On a connected machine with the **same OS, CPU architecture and Python minor version** as the target:

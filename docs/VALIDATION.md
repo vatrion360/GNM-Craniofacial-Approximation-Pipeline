@@ -2,7 +2,17 @@
 
 ## Evidence for 5.0.0rc3 / add-on 16
 
-Local run on 2026-09-26 with the pinned official GNM asset: **99 passed, 1 Windows-only test skipped**. Ruff and the add-on build passed. Tests add duplicate constraints, near-site warnings, count/exclusion-based regularization, changed-data LOO keys and stable plane/reflection checks. Expanded Blender regression for mixed fragments is awaiting remote execution; previous revisions' passes do not establish the new restoration operator's compatibility.
+Local run on 2026-09-26 with the pinned official GNM asset: **99 passed, 1 Windows-only test skipped**. Ruff, wheel/source and add-on builds passed. Tests add duplicate constraints, near-site warnings, count/exclusion-based regularization, changed-data LOO keys and stable plane/reflection checks.
+
+All six remote jobs passed for code commit `3fdc7355dcbe527d3029113fb86b39d558ae56ae`:
+
+| Check | Evidence |
+| --- | --- |
+| Python 3.10 / 3.12 on Linux / Windows | All four test/lint/build jobs passed; [run 36234424209](https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline/actions/runs/36234424209). |
+| Blender 4.5.0 on Linux / Windows | Both integration jobs passed; [run 36234424218](https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline/actions/runs/36234424218). |
+| Built wheel outside the source tree | Official-model strict adaptive fit with one excluded landmark: 47 retained, lambda = 48/47 = 1.0212765957446808. |
+
+Both Blender logs contain `BLENDER_MIXED_FRAGMENTS_PRESERVED_PASS`, `BLENDER_DUPLICATE_AND_LAMBDA_PASS`, `BLENDER_BAD_INTERPRETER_PREVENTED`, `BLENDER_EXTERNAL_FIT_IMPORT_CANCEL_PASS` and `BLENDER_SMOKE_PASS`. The mixed-fragment fixture is one transformed mesh with separate right-cranial, nasal and left-mandibular groups. It checks independent mandibular-plane use, exact source preservation, normals, repeated generation, mixed-side rejection, preserved-surface precedence, inferred-marker flags and collective recentering. This synthetic geometry tests software behavior; no patient/specimen-specific anatomical or interactive workstation validation is implied.
 
 ## Evidence for 5.0.0rc2 / add-on 15
 

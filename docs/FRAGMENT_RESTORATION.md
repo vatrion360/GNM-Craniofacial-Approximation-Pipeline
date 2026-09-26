@@ -51,6 +51,8 @@ The previous function selected one globally intact side, cut away the opposite s
 
 The replacement creates **separate inferred patches for explicitly defined donor regions**. It never cuts, joins, welds, moves, hides or recolors the preserved sources during generation. A later explicit recenter command moves all registered fragments, reference planes and markers together. Generated patches remain distinguishable and carry source/plane/provenance metadata.
 
+Existing `.blend` files keep their source objects, previous outputs and markers. The old global intact-side setting is not automatically converted into anatomical regions: register them explicitly. Previous landmarks with unspecified provenance must be reviewed and marked Observed before contributing to an automatic cranial plane, or use a reviewed manual plane.
+
 ## Workflow for right cranium + nasal bone + left mandible
 
 Register **every preserved fragment**, including central anatomy, so its surface is protected. Sources can be separate objects or distinct vertex groups in a single composite mesh. Apply active geometry modifiers on a working copy first. In Object Mode, select a source and press **Add Active Fragment**; repeat for each region. For a vertex group, only complete faces whose vertices all have weights above 0.5 are donors.
