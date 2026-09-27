@@ -46,3 +46,7 @@ v1/v2 `gnm_landmark_index,x,y,z` remain supported. Encoded indices are decoded u
 For an existing `.blend`, install the new ZIP, select the reviewed model, inspect every target/direction, document tissue sources, then export v3. Do not relabel a v1 file as v3: missing information cannot be recovered reliably. Legacy CSVs cannot drive the offline nasal bone diagnostic.
 
 In add-on 15, **Add Missing Markers** preserves placed objects, manually entered depths and manual vertex selections. The default Pogonion candidate changes from the lower-lip vertex 12284 to chin candidate 12261. Explicit v3/manual indices remain authoritative; review existing cases deliberately. New sites need anatomical review; the PDF does not supply GNM correspondences. See [PDF protocol](PDF_PROTOCOL.md).
+
+## Additional v3 provenance fields in 5.0.0rc4
+
+Optional `bone_source_id`, `bone_source_geometry_sha256`, `bone_anatomy` and `articulation_reviewed` (0/1) link each placement to an evaluated observed source. CSV metadata contains the source manifest, raw file hashes, transforms and case/observer/protocol IDs. Missing fields remain readable for migration; frozen protocols require complete provenance. Quoted multiline notes are retained; duplicate headers are rejected. Reviewed reusable JSON maps and precedence are specified in [SCIENTIFIC_HARDENING](SCIENTIFIC_HARDENING.md).

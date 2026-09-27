@@ -18,9 +18,10 @@ import bpy
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'tools'))
+from blender_hardening_checks import run_source_checks, run_map_checks, run_icp_score_check
 from blender_fragment_checks import run_fragment_checks, run_lambda_checks
 
-archive = root / 'dist' / 'gnm_cranio-5.0.0rc3.zip'
+archive = root / 'dist' / 'gnm_cranio-5.0.0rc4.zip'
 with tempfile.TemporaryDirectory() as directory:
     with zipfile.ZipFile(archive) as z:
         z.extractall(directory)
@@ -34,6 +35,7 @@ with tempfile.TemporaryDirectory() as directory:
     addon.register()
     try:
         run_fragment_checks(addon)
+        run_source_checks(addon, directory)
         scene = bpy.context.scene
         scene.unit_settings.system = 'METRIC'
         scene.unit_settings.scale_length = .001
@@ -73,6 +75,9 @@ with tempfile.TemporaryDirectory() as directory:
             scene.gnm_live.npz_path = os.environ['GNM_MODEL_PATH']
             model = addon._load_gnm_model(scene.gnm_live.npz_path)
             assert model.vertex_count == 17821
+            addon._ensure_cranio(scene.gnm_live.npz_path)
+            run_map_checks(addon, scene, model, directory)
+            run_icp_score_check(addon)
             item.gnm_vertex_override = 12310
             path = Path(directory) / 'test.csv'
             addon._export_markers(scene, str(path))
@@ -103,7 +108,20 @@ with tempfile.TemporaryDirectory() as directory:
                         obj.location = position.tolist()
                     marker.tissue_source = 'synthetic model mean; software test only'
                 bpy.context.view_layer.update()
+                scene.gnm_settings.mandible_aligned = True
                 run_lambda_checks(addon, scene, model)
+                assert bpy.ops.gnm.load_live_model() == {'FINISHED'}
+                result = addon._compute_fit(addon._build_snapshot(scene))
+                assert result['rms'] < .001 and result['solver']['converged']
+                addon._start_live(scene)
+                addon._live_timer_tick()
+                assert scene.gnm_live.n_fitted == 48 and scene.gnm_live.rms_mm < .001
+                addon._stop_live()
+                addon._LIVE.geometry_epoch += 1
+                previous_status = scene.gnm_live.status_text
+                addon._apply_result(scene, dict(result, rms=999))
+                assert scene.gnm_live.status_text == previous_status
+                print('BLENDER_SHARED_FIT_TIMER_STALE_RESULT_PASS')
                 settings = scene.gnm_settings
                 settings.case_directory = str(Path(directory) / 'caz sintetic șță')
                 # The formerly accepted .py selection must fail before a case

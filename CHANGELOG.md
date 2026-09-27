@@ -1,3 +1,11 @@
+# 5.0.0rc4 / add-on 17.0.0
+
+- Shared live/offline dense objective, single Huber layer, pose-aware convergence and weighted-rank diagnostics.
+- ICP coverage-score fix, explicit exterior-normal review, multiple observed bone sources and case-state invalidation.
+- Reviewed model-bound maps, orbital bilateral-pair coverage, multiline CSV validation and placement source hashes.
+- Geometry QC at both stages, report schema 2 and an enforceable numerical freeze for planned blinded CT studies.
+- Hashed Python 3.12 runtime, expanded Blender regressions, official-model CI and dependency audit.
+
 # 5.0.0rc3 / Blender add-on 16.0.0
 
 - Audit runtime duplicate labels, model vertices and coincident skin targets; preserve distinct anatomical sites and flag near bone placements.

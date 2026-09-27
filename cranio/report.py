@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Raportul TXT de reconstructie (format identic cu v3.1)."""
+"""Human-readable diagnostics and the versioned machine-readable audit trail."""
 
 import datetime
 import os
@@ -18,8 +18,9 @@ def write_stats(path, cfg, targets, skipped, scale, lam_used, fit_info,
     vechiul obiect ``args`` din v3.1).
     """
     loo_table, history, dense_stats = fit_info
+    diagnostics = fit_info.diagnostics
     lines = []
-    lines.append("=== GNM Craniofacial Reconstruction Statistics v3.1 ===")
+    lines.append("=== GNM Craniofacial Approximation Diagnostics ===")
     lines.append(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append(f"Input CSV: {os.path.abspath(cfg.input)}")
     lines.append(f"Model: {os.path.abspath(cfg.npz)}")
@@ -50,6 +51,7 @@ def write_stats(path, cfg, targets, skipped, scale, lam_used, fit_info,
                  f"|c|max = {np.abs(c).max():.2f} sigma, "
                  f"|c|mean = {np.abs(c).mean():.2f} sigma, "
                  f"RMS = {rmse(res_fit):.2f} mm")
+    lines.append(f"  Solver converged: {diagnostics['converged']}; stop: {diagnostics['stop_reason']}")
     if loo_table:
         lines.append("  Conditional fixed-pose LOO tuning (model-space mean distance -> lambda; NOT independent validation):")
         for err, lam in loo_table:
@@ -106,6 +108,7 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
     from . import __version__
     from .export import atomic_text
 
+    from .provenance import implementation_manifest, numerical_environment
     software = {"pipeline": __version__, "python": platform.python_version(),
                 "platform": platform.platform()}
     for package in ("numpy", "scipy", "trimesh"):
@@ -113,6 +116,8 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
             software[package] = version(package)
         except PackageNotFoundError:
             software[package] = None
+    software['implementation'] = implementation_manifest()
+    software['numerical_environment'] = numerical_environment()
     outputs = {name: {"path": os.path.abspath(getattr(cfg, name)),
                       "sha256": sha256_file(getattr(cfg, name))}
                for name in ("output", "output_statistical", "output_error_mesh", "output_stats")}
@@ -120,10 +125,13 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
               "model": {"path": os.path.abspath(cfg.npz), "sha256": model_hash}}
     if cfg.skull:
         inputs["skull"] = {"path": os.path.abspath(cfg.skull), "sha256": sha256_file(cfg.skull)}
+    for name in ('prior', 'landmark_map', 'protocol', 'case_metadata'):
+        if getattr(cfg, name):
+            inputs[name] = dict(path=os.path.abspath(getattr(cfg, name)), sha256=sha256_file(getattr(cfg, name)))
     loo, history, dense_history = fit_info
     correction = np.linalg.norm(field, axis=1)
     report = {
-        "schema_version": 1, "status": "completed", "units": "mm",
+        "schema_version": 2, "status": "completed", "units": "mm",
         "generated_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "scientific_status": "research software; no subject-level forensic validation supplied",
         "software": software, "config": asdict(cfg), "inputs": inputs, "outputs": outputs,
@@ -140,12 +148,16 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
                              "scores_model_space_mm": loo,
                              "independent_validation": False},
         "iteration_history": history,
+        "solver": fit_info.diagnostics,
+        "geometry_quality": metadata.get("geometry_quality"),
         "dense_history": [[n, d if np.isfinite(d) else None] for n, d in dense_history],
         "landmarks": [{"label": t.label, "vertex": t.vertex, "target_mm": t.xyz.tolist(),
                        "weight": t.weight, "alignment_mm": float(a), "fit_mm": float(b), "final_mm": float(c)}
                       for t, a, b, c in zip(targets, alignment, fit, final)],
         "skipped": skipped, "auto_excluded": excluded_auto, "warnings": warnings_list,
     }
+    for row, weight in zip(report['landmarks'], fit_info.diagnostics['final_irls_weights']):
+        row['final_irls_weight'] = weight
     with atomic_text(cfg.output_json) as stream:
         json.dump(report, stream, indent=2, ensure_ascii=False, allow_nan=False)
         stream.write("\n")

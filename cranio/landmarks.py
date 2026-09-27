@@ -156,9 +156,9 @@ NOSE_BRIDGE_TIP_CUT_MM = 6.0    # exclude vertecsii sub varf+6 mm (cartilaj)
 
 def side_of(label: str) -> int:
     """-1 pentru *_Dr (dreapta), +1 pentru *_St (stanga), 0 altfel."""
-    if label.endswith("_Dr"):
+    if "Dr" in label.split("_"):
         return -1
-    if label.endswith("_St"):
+    if "St" in label.split("_"):
         return 1
     return 0
 
@@ -176,7 +176,7 @@ def bilateral_pairs():
     """Lista de perechi (dr, st) ordonate, derivata din LANDMARK_INFO."""
     pairs = []
     for label in LANDMARK_ORDER:
-        if label.endswith("_Dr"):
+        if "Dr" in label.split("_"):
             st = pair_label(label)
             if st in LANDMARK_INFO:
                 pairs.append((label, st))

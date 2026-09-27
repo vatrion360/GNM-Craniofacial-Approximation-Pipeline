@@ -1,5 +1,15 @@
 # Validation and release gates
 
+## Evidence for 5.0.0rc4 / add-on 17
+
+Local execution on 2026-09-27, Linux x86_64, Python 3.12.14, NumPy 2.3.5, SciPy 1.17.0, trimesh 5.1.0: **120 passed, 1 native-Windows test skipped**, including the pinned official model. Ruff passed. The 17 topological bilateral pairs, including both orbital pairs, are tested separately from the template's small spatial asymmetry.
+
+**Actual Blender 4.5.0 Linux**, official build `8cb6b388974a`, passed the packaged ZIP regressions: all previous marker/fragment/external-process tests plus multiple observed bone sources, articulation guard, reviewed normals, evaluated modifiers, transform invalidation, generated-face ray exclusion, raw import calibration, reviewed-map priority, case-state reset, ICP coverage scoring, shared live fit, timer execution and stale-result rejection. The official-model mean demonstration also passed full geometry QC with `--require-qc`. These are software tests on synthetic cases.
+
+`pip-audit 2.10.1` reported no known vulnerabilities for the three exact runtime pins on this date. This does not audit Blender's bundled libraries or the separate optional TensorFlow generator. The runtime hash lock is enforced by the Python 3.12 and Blender CI jobs; Python 3.10 jobs exercise declared compatibility ranges. Remote results for this revision will be linked after the PR gates complete.
+
+Interactive acceptance, other Blender versions/macOS, real mixed-fragment scan cases, demographic-prior generation and independent paired CT/recognition validation remain pending. No new empirical anatomical accuracy claim is made. See [numerical contract and CT preparation](SCIENTIFIC_HARDENING.md).
+
 ## Evidence for 5.0.0rc3 / add-on 16
 
 Local run on 2026-09-26 with the pinned official GNM asset: **99 passed, 1 Windows-only test skipped**. Ruff, wheel/source and add-on builds passed. Tests add duplicate constraints, near-site warnings, count/exclusion-based regularization, changed-data LOO keys and stable plane/reflection checks.

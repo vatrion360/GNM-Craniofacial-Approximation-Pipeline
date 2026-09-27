@@ -1,59 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-GNM Reconstructie Craniofaciala (v4.0)
-======================================
+"""Offline craniofacial approximation CLI.
 
-Pipeline stiintific de reconstructie faciala (facial approximation) pornind de
-la markerii craniofaciali plasati pe un craniu scanat cu addon-ul Blender
-``addon_v11.py`` / ``addon_v12.py`` si de la modelul statistic de cap uman
-GNM Head v3.0 (Google).
-
-Noutati v4.0 - refactorizare in pachetul ``cranio`` + termeni noi de loss:
-    * Toata logica numerica a fost extrasa neschimbata in pachetul pur-Python
-      ``cranio`` (fara dependinte de Blender, testabil): registru anatomic
-      unic (cranio.landmarks), backend de model abstract
-      (cranio.backend.GNMBackend), optimizor cu termeni de loss conectabili
-      (cranio.optimize), verificari, geometrie, exporturi, raport.
-      Acest script este doar un CLI subtire peste cranio.pipeline.
-    * Termeni optionali de loss (implicit dezactivati = rezultate identice
-      cu v3.1): --symmetry-weight (prior de simetrie bilaterala in spatiul
-      latent), --distance-weight (constrangeri de distanta intre perechile
-      de landmarkuri, tinta = template-ul statistic),
-      --prior-soft-sigma (prior latent moale peste prag, in locul singurului
-      clip dur la 3 sigma).
-    * Diagnostice de stabilitate: avertismente explicite cand LOO-CV alege
-      lambda la marginea grilei sau cand coeficientii ating clipul dur.
-    * Cititor CSV v2 (metadate JSON: unitati, versiune addon, fisier craniu,
-      adancimi de tesut) cu compatibilitate legacy v11/v12.
-
-Noutati v3.1 - robustete la markeri plasati gresit + TPS region-aware:
-    * Verificare de consistenta a plasarii (Etapa 0): rapoartele distantelor
-      inter-landmark CSV vs template GNM (normalizate robust la scara) scot
-      in evidenta markerii plasati gresit INAINTE de fit.
-    * ``--exclude LABEL...`` si ``--exclude-outliers``: markerii cu reziduu
-      mare pot fi exclusi complet din fit si din centrele TPS.
-    * Corectia TPS tine cont de CONFIDENCE_WEIGHTS, are cap per-vertex si
-      amortizare pe geometria fara ancore anatomice (ochi/buze/gura).
-
-Noutati v3.0 / v2.0 - constrangeri dense de suprafata (optional, --skull):
-    atractia de craniu pe scalp + regiuni faciale cu tesut SUBTIRE, fiecare
-    cu offsetul ei (brow ~5mm, punte nazala ~3mm, zigomatic ~8.5mm,
-    barbie ~10mm, infraorbital ~7mm), cu respingere automata a
-    corespondentelor invalide.
-
-Metodologie (in 4 etape):
-    0.  Incarcare si verificari (consistenta plasarii markerilor).
-    1.  Aliniere de similaritate (Umeyama 1991, ponderata, robusta).
-    2.  Fit statistic: estimare alternativa a coeficientilor de identitate
-        GNM (ridge LSQ ponderat, IRLS) si a transformarii de similaritate;
-        lambda ales prin LOO-CV daca --regularization auto.
-    3.  Corectie locala limitata (hibrid): camp TPS (Bookstein 1989) cu o
-        singura limitare neta (tanh) si cap per-vertex.
-    4.  Export OBJ + PLY heatmap + TXT cu statistici complete.
-
-Dependente: numpy, scipy, trimesh (doar pentru incarcarea craniului).
-Rulare din consola (CPython), NU din Blender.
+Fits neutral GNM identity to reviewed world-mm targets, with optional dense
+bone constraints and bounded local correction. See docs/SCIENTIFIC_HARDENING.md
+for the numerical contract, QC limits and frozen CT protocol preparation.
 """
 
 import argparse
@@ -67,7 +18,7 @@ from cranio.pipeline import run_pipeline
 def parse_args(argv=None) -> PipelineConfig:
     parser = argparse.ArgumentParser(
         description="GNM facial reconstruction from craniofacial markers (Blender addon CSV).")
-    parser.add_argument("--input", required=True, help="CSV exported by the addon (v11/v12/v2)")
+    parser.add_argument("--input", required=True, help="World-mm marker CSV v3; legacy v1/v2 also readable")
     parser.add_argument("--output", default=None,
                         help="Output OBJ (default: <input>_reconstructie.obj)")
     parser.add_argument("--output-error-mesh", default=None,
@@ -140,10 +91,39 @@ def parse_args(argv=None) -> PipelineConfig:
                              "prior activates; 0 = disabled (hard clip only)")
     parser.add_argument("--prior-soft-weight", type=float, default=4.0,
                         help="Strength of the soft prior (multiple of lambda)")
+    parser.add_argument('--prior', default=None)
+    parser.add_argument('--landmark-map', default=None)
+    parser.add_argument('--protocol', default=None)
+    parser.add_argument('--case-metadata', default=None)
+    parser.add_argument('--max-iter', type=int, default=30)
+    parser.add_argument('--tolerance', type=float, default=1e-5)
+    parser.add_argument('--clip-sigma', type=float, default=3.0)
+    parser.add_argument('--prior-weight', type=float, default=1.0)
+    parser.add_argument('--dense-max-rows', type=int, default=1500)
+    parser.add_argument('--dense-nose-weight', type=float, default=0.7)
+    parser.add_argument('--skull-normals-reviewed', action="store_true")
+    parser.add_argument('--skull-flip-normals', action="store_true")
+    parser.add_argument('--geometry-qc', default='basic')
+    parser.add_argument('--require-qc', action="store_true")
     args = parser.parse_args(argv)
 
     return PipelineConfig(
         input=args.input,
+        prior=args.prior,
+        landmark_map=args.landmark_map,
+        protocol=args.protocol,
+        case_metadata=args.case_metadata,
+        max_iter=args.max_iter,
+        tolerance=args.tolerance,
+        clip_sigma=args.clip_sigma,
+        prior_weight=args.prior_weight,
+        dense_max_rows=args.dense_max_rows,
+        dense_nose_weight=args.dense_nose_weight,
+        skull_normals_reviewed=args.skull_normals_reviewed,
+        skull_flip_normals=args.skull_flip_normals,
+        geometry_qc=args.geometry_qc,
+        require_qc=args.require_qc,
+
         output=args.output,
         output_error_mesh=args.output_error_mesh,
         output_stats=args.output_stats,
@@ -180,6 +160,8 @@ def parse_args(argv=None) -> PipelineConfig:
 
 
 def main(argv=None) -> int:
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
     return run_pipeline(parse_args(argv))
 
 

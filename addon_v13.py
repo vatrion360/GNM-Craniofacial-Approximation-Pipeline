@@ -1,4 +1,4 @@
-"""GNM Craniofacial Markers 16.0 / software package 5.0.0rc3.
+"""GNM Craniofacial Markers 17.0 / software package 5.0.0rc4.
 
 Install the complete ZIP built with tools/build_addon.py. The bundled numerical
 core is imported under the add-on namespace. Optional previews run serially in
@@ -35,7 +35,7 @@ from bpy_extras import view3d_utils
 bl_info = {
     "name": "GNM Scientific Markers",
     "author": "VATRION",
-    "version": (16, 0, 0),
+    "version": (17, 0, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > GNM Markers",
     "category": "3D View",
@@ -183,7 +183,124 @@ def _estimate_facial_axes(scene):
 # -----------------------------------------------------------------------
 # PROPRIETATI
 # -----------------------------------------------------------------------
+def _case_token(scene):
+    import uuid
+    if not scene.gnm_settings.case_id:
+        scene.gnm_settings.case_id = uuid.uuid4().hex
+    return (int(scene.as_pointer()), scene.gnm_settings.case_id)
+
+
+def _bind_case(scene):
+    token = _case_token(scene)
+    if _LIVE.case_token != token:
+        _stop_live()
+        _LIVE.__init__()
+        _LIVE.case_token, _LIVE.scene_name = token, scene.name
+
+
+def _source_changed(self, context):
+    if context and context.scene and _LIVE.case_token == _case_token(context.scene):
+        _LIVE.geometry_epoch += 1
+        _LIVE.skull, _LIVE.last_c, _LIVE.pending, _LIVE.result = None, None, None, None
+        context.scene.gnm_live.skull_status = 'Bone sources changed; prepare again'
+
+
+class GNMBoneSource(PropertyGroup):
+    uid: StringProperty()
+    source_object: PointerProperty(type=bpy.types.Object, update=_source_changed)
+    enabled: BoolProperty(name='Use', default=True, update=_source_changed)
+    use_dense: BoolProperty(name='Dense', default=True, update=_source_changed)
+    normals_reviewed: BoolProperty(name='Exterior normals reviewed', default=False, update=_source_changed)
+    flip_normals: BoolProperty(name='Reverse normals', default=False, update=_source_changed)
+    anatomy: EnumProperty(name='Anatomy', items=[('CRANIUM', 'Cranium', ''), ('NASAL', 'Nasal', ''),
+        ('MANDIBLE', 'Mandible', ''), ('MIXED', 'Mixed / unclassified', '')], default='MIXED', update=_source_changed)
+
+
+def _bone_sources(scene, dense=False):
+    rows = []
+    for row in scene.gnm_bone_sources:
+        if not row.enabled or (dense and not row.use_dense):
+            continue
+        obj = row.source_object
+        if obj is None or obj.name not in scene.objects or _core_module('blender_sources').generated_surface(obj):
+            raise ValueError('Registered bone source is missing or is generated geometry')
+        rows.append(row)
+    return rows
+
+
+def _register_bone_source(scene, obj):
+    import uuid
+    if obj.type != 'MESH' or _core_module('blender_sources').generated_surface(obj):
+        raise ValueError('Register preserved bone only; generated faces, pegs and inferred patches are excluded')
+    row = next((row for row in scene.gnm_bone_sources if row.source_object == obj), None)
+    if row is None:
+        row = scene.gnm_bone_sources.add()
+        row.uid, row.source_object = uuid.uuid4().hex, obj
+    return row
+
+
+class GNM_OT_register_bone_sources(Operator):
+    bl_idname = 'gnm.register_bone_sources'
+    bl_label = 'Register Selected Preserved Bones'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        try:
+            selected = [o for o in context.selected_objects if o.type == 'MESH']
+            if not selected or any(_core_module('blender_sources').generated_surface(o) for o in selected):
+                raise ValueError('Select preserved bone meshes only')
+            for obj in selected:
+                _register_bone_source(context.scene, obj)
+            return {'FINISHED'}
+        except ValueError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+
+
+def _source_manifest(scene, depsgraph):
+    rows = []
+    for row in _bone_sources(scene):
+        _, _, digest, transform = _core_module('blender_sources').source_geometry(row.source_object, depsgraph, row.flip_normals)
+        obj = row.source_object
+        rows.append(dict(id=row.uid, name=obj.name, geometry_sha256=digest, evaluated_world_matrix=transform,
+            anatomy=row.anatomy, use_dense=row.use_dense, normals_reviewed=row.normals_reviewed, explicit_normal_flip=row.flip_normals,
+            acquisition_path=obj.get('gnm_acquisition_path', ''), acquisition_sha256=obj.get('gnm_acquisition_sha256', ''),
+            acquisition_units=obj.get('gnm_acquisition_units', ''), acquisition_to_world=list(obj.get('gnm_acquisition_to_world', [])),
+            import_object_matrix=list(obj.get('gnm_import_object_matrix', []))))
+    return rows
+
+
+def _assert_prepared_current(scene, depsgraph):
+    if _LIVE.skull is not None:
+        current = [row for row in _source_manifest(scene, depsgraph) if row['use_dense']]
+        if current != _LIVE.skull['sources']:
+            _source_changed(None, bpy.context)
+            raise ValueError('Bone geometry/transform changed; Prepare Registered Bones again')
+
+
+def _export_registered_bones(scene, path, depsgraph):
+    vertices, faces, offset = [], [], 0
+    for row in _bone_sources(scene, True):
+        if not row.normals_reviewed:
+            raise ValueError('Review exterior normals before dense fitting')
+        if row.anatomy in ('MANDIBLE', 'MIXED') and not scene.gnm_settings.mandible_aligned:
+            raise ValueError('Classify bones and review mandibular articulation before dense fitting')
+        points, triangles, _, _ = _core_module('blender_sources').source_geometry(row.source_object, depsgraph, row.flip_normals)
+        vertices.append(points)
+        faces.append(triangles+offset)
+        offset += len(points)
+    if not vertices:
+        raise ValueError('Register and enable preserved dense bone surfaces')
+    _core_module('export').export_obj(path, np.concatenate(vertices), np.concatenate(faces))
+
+
 class GNMSettings(PropertyGroup):
+    case_id: StringProperty(name='Pseudonymous case ID')
+    observer_id: StringProperty(name='Observer ID')
+    protocol_id: StringProperty(name='Protocol / revision')
+    offline_dense: BoolProperty(name='Include registered bones offline', default=False)
+    local_correction: BoolProperty(name='Local correction offline', default=False)
+
     marker_set: EnumProperty(name="Marker set", items=[
         ('EXTENDED_48', "Extended 48", "Existing 27 plus 21 additional Table 2 positions"),
         ('PAPER_32', "VAR 2026 Table 2: 32", "10 median plus 11 bilateral sites; case-study tissue reference"),
@@ -295,11 +412,11 @@ class GNM_OT_import_setup(Operator):
         objects_before = set(context.scene.objects)
         try:
             if ext == 'stl':
-                if hasattr(bpy.ops.wm, "stl_import"): bpy.ops.wm.stl_import(filepath=self.filepath)
+                if hasattr(bpy.ops.wm, "stl_import"): bpy.ops.wm.stl_import(filepath=self.filepath, forward_axis='Y', up_axis='Z')
                 else: bpy.ops.import_mesh.stl(filepath=self.filepath)
             elif ext == 'obj':
-                if hasattr(bpy.ops.wm, "obj_import"): bpy.ops.wm.obj_import(filepath=self.filepath)
-                else: bpy.ops.import_scene.obj(filepath=self.filepath, split_mode='OFF')
+                if hasattr(bpy.ops.wm, "obj_import"): bpy.ops.wm.obj_import(filepath=self.filepath, forward_axis='Y', up_axis='Z')
+                else: bpy.ops.import_scene.obj(filepath=self.filepath, axis_forward='Y', axis_up='Z')
             else:
                 self.report({"ERROR"}, "Unsupported format!")
                 return {"CANCELLED"}
@@ -307,53 +424,33 @@ class GNM_OT_import_setup(Operator):
             self.report({"ERROR"}, f"Import error: {e}")
             return {"CANCELLED"}
 
-        # Unele fisiere (mai ales .obj cu grupuri/obiecte multiple, sau
-        # fragmente scanate neconectate) aduc MAI MULTE obiecte separate la
-        # import. Inainte procesam doar primul selectat - restul ramaneau
-        # neatinse, la scara/pozitia bruta din fisier. Le unim intr-un singur
-        # obiect ÎNAINTE de centrare/scalare, ca sa fie procesate uniform.
-        imported_objects = [o for o in context.scene.objects if o not in objects_before and o.type == 'MESH']
-        if not imported_objects:
-            self.report({"ERROR"}, "The import produced no mesh object.")
-            return {"CANCELLED"}
-
-        bpy.ops.object.select_all(action='DESELECT')
-        for o in imported_objects:
-            o.select_set(True)
-        context.view_layer.objects.active = imported_objects[0]
-
-        joined_multiple = len(imported_objects) > 1
-        if joined_multiple:
-            bpy.ops.object.join()
-
-        obj = context.view_layer.objects.active
-
-        # Aliniere si Scalare
-        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
-        obj.location = (0, 0, 0)
-
-        factor = {"mm": 1.0, "cm": 10.0, "m": 1000.0}[self.source_units]
-        obj.scale *= factor
-            
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-
-        # CORECTAREA NORMALELOR
-        # Nota: pe fragmente neconectate (insule separate topologic in acelasi
-        # mesh, ca la un craniu partial cu bucati care nu se ating), aceasta
-        # corectie ruleaza independent pe fiecare insula - e posibil, desi rar,
-        # ca o insula sa iasa cu normalele inversate fata de restul. Daca vezi
-        # o zona cu shading ciudat/negru pe o singura piesa, verific-o manual.
-        bm = bmesh.new()
-        bm.from_mesh(obj.data)
-        bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
-        bm.to_mesh(obj.data)
-        bm.free()
-
-        msg = "Skull imported, scaled and normals fixed!"
-        if joined_multiple:
-            msg = f"The import brought {len(imported_objects)} separate objects - they were joined into one. " + msg
-        self.report({"INFO"}, msg)
-        return {"FINISHED"}
+        imported = [o for o in scene.objects if o not in objects_before and o.type == 'MESH']
+        context.view_layer.update()
+        points = [o.matrix_world @ v.co for o in imported for v in o.data.vertices]
+        if not points:
+            self.report({'ERROR'}, 'Import produced no mesh vertices')
+            return {'CANCELLED'}
+        bounds = np.asarray(points, dtype=float)
+        if not np.isfinite(bounds).all():
+            self.report({'ERROR'}, 'Import contains NaN/Inf')
+            return {'CANCELLED'}
+        center = (bounds.min(axis=0)+bounds.max(axis=0))/2
+        factor = {'mm': 1., 'cm': 10., 'm': 1000.}[self.source_units]
+        calibration = Matrix.Scale(factor, 4) @ Matrix.Translation(Vector(-center))
+        digest = _core_module('validation').sha256_file(self.filepath)
+        for obj in imported:
+            original = obj.matrix_world.copy()
+            obj.matrix_world = calibration @ original
+            obj['gnm_acquisition_path'] = os.path.abspath(self.filepath)
+            obj['gnm_acquisition_sha256'] = digest
+            obj['gnm_acquisition_units'] = self.source_units
+            obj['gnm_acquisition_to_world'] = [float(x) for row in calibration for x in row]
+            obj['gnm_import_object_matrix'] = [float(x) for row in original for x in row]
+            _register_bone_source(scene, obj)
+        context.view_layer.objects.active = imported[0]
+        context.view_layer.update()
+        self.report({'INFO'}, f'{len(imported)} observed objects imported in mm; review normals and articulation')
+        return {'FINISHED'}
 
 class GNM_OT_init_markers(Operator):
     bl_idname = "gnm.init_markers"
@@ -1307,6 +1404,11 @@ class GNM_PT_panel(Panel):
             box.label(text=line)
         box.label(text="Windows: .venv / Scripts / python.exe")
         box.prop(settings, "case_directory")
+        box.prop(settings, 'offline_dense')
+        box.prop(settings, 'local_correction')
+        box.prop(settings, 'case_id')
+        box.prop(settings, 'observer_id')
+        box.prop(settings, 'protocol_id')
         box.label(text='Lambda: conditional LOO' if scene.gnm_live.loo_auto
                        else 'Lambda: adaptive from included markers')
         box.operator("gnm.run_offline", icon="PLAY")
@@ -1429,6 +1531,10 @@ class _LiveState:
     """
 
     def __init__(self):
+        self.case_token = None
+        self.geometry_epoch = 0
+        self.reviewed_map = {}
+        self.model_hash = None
         self.model = None          # FaceModelData (mu/basis float32, mm)
         self.label_to_vertex = None  # dict din cranio.backend (sau fallback)
         self.json_map = None       # dict parsat din landmark_vertex_map.json
@@ -1441,7 +1547,7 @@ class _LiveState:
         self.result_lock = threading.Lock()
         self.fingerprints = {}     # nume_scena -> fingerprint markeri
         self.cfg = {"lambda_base": 1.0, "lambda_min": 0.3,
-                    "lambda_max": 1000.0, "max_iter": 8,
+                    "lambda_max": 1000.0, "max_iter": 30,
                     "loo_auto": False, "prior_weight": 1.0,
                     # V13.3: forta/geometria constrangerilor dense + clip.
                     "dense_strength": 1.0, "dense_nose_weight": 0.7,
@@ -1520,13 +1626,11 @@ def _resolve_vertex(item):
     picking' si exclus din fit pana la un picking manual)."""
     if item.gnm_vertex_override >= 0:
         return int(item.gnm_vertex_override)
+    if _LIVE.case_token == _case_token(item.id_data) and item.label in _LIVE.reviewed_map:
+        return _LIVE.reviewed_map[item.label]
     vid = _label_to_vertex_map().get(item.label)
     if vid is not None:
         return int(vid)
-    jk = ADDON_TO_JSON_KEY.get(item.label)
-    entry = (_LIVE.json_map or {}).get(jk) if jk else None
-    if entry and "vertex_index" in entry:
-        return int(entry["vertex_index"])
     return None
 
 
@@ -1559,10 +1663,16 @@ def _weight_of(label, item=None):
 # -----------------------------------------------------------------------
 # V13: obiecte scena (colectie, mesh GNM, ghost-uri)
 # -----------------------------------------------------------------------
+def _case_name(base, scene=None):
+    scene = scene or bpy.context.scene
+    _case_token(scene)
+    return base + '_' + scene.gnm_settings.case_id[:12]
+
+
 def _gnm_collection():
-    coll = bpy.data.collections.get(GNM_LIVE_COLLECTION)
+    coll = bpy.data.collections.get(_case_name(GNM_LIVE_COLLECTION))
     if coll is None:
-        coll = bpy.data.collections.new(GNM_LIVE_COLLECTION)
+        coll = bpy.data.collections.new(_case_name(GNM_LIVE_COLLECTION))
         bpy.context.scene.collection.children.link(coll)
     return coll
 
@@ -1570,16 +1680,16 @@ def _gnm_collection():
 def _gnm_live_objects():
     """Setul obiectelor vizibile doar in viewport-ul drept (mesh + ghost)."""
     objs = set()
-    obj = bpy.data.objects.get(GNM_MESH_NAME)
+    obj = bpy.context.scene.objects.get(_case_name(GNM_MESH_NAME))
     if obj is not None:
         objs.add(obj)
-    for o in bpy.data.objects:
+    for o in bpy.context.scene.objects:
         if o.name.startswith(GNM_GHOST_PREFIX):
             objs.add(o)
     # V13.6 fix: ghost-ul cyan Gerasimov nu are prefixul GNM_LM_ (nu e
     # landmark de fit), dar apartine tot viewport-ului drept - altfel nu
     # intra in local-view la setup/sync/overlay si parea "inexistent" live.
-    ger = bpy.data.objects.get(GNM_GERASIMOV_NAME)
+    ger = bpy.context.scene.objects.get(_case_name(GNM_GERASIMOV_NAME))
     if ger is not None:
         objs.add(ger)
     return objs
@@ -1593,7 +1703,7 @@ def _ensure_gnm_mesh_object(context):
     fiecare update rescriem doar pozitiile (foreach_set), nu si topologia.
     """
     model = _LIVE.model
-    obj = bpy.data.objects.get(GNM_MESH_NAME)
+    obj = bpy.context.scene.objects.get(_case_name(GNM_MESH_NAME))
     if obj is not None:
         # La re-incarcare: rescriem template-ul si resetam poza cosmetica
         # (un eventual fit vechi nu mai corespunde noului model).
@@ -1618,7 +1728,8 @@ def _ensure_gnm_mesh_object(context):
     me.validate()
     me.polygons.foreach_set("use_smooth", np.ones(nf, dtype=np.bool_))
 
-    obj = bpy.data.objects.new(GNM_MESH_NAME, me)
+    obj = bpy.data.objects.new(_case_name(GNM_MESH_NAME), me)
+    obj['gnm_generated'] = True
     # Cosmetic pre-fit: modelul e Y-up, lumea Blender Z-up (vezi ipoteza 1).
     obj.rotation_euler = (np.deg2rad(90.0), 0.0, 0.0)
     obj.color = (0.76, 0.57, 0.42, 1.0)
@@ -1664,7 +1775,7 @@ def _refresh_ghosts(scene):
     show = scene.gnm_live.show_ghosts
     size = scene.gnm_settings.marker_size_mm * 1.3
     for _vid, lbl, _d, _s, _e in LANDMARKS:
-        obj = bpy.data.objects.get(GNM_GHOST_PREFIX + lbl)
+        obj = scene.objects.get(_case_name(GNM_GHOST_PREFIX + lbl, scene))
         if obj is None:
             continue
         item = _marker_item(scene, lbl)
@@ -1682,13 +1793,13 @@ def _ensure_ghosts(context):
     la pozitiile din template (prin matrix_world curent al mesh-ului GNM)."""
     scene = context.scene
     coll = _gnm_collection()
-    mesh_obj = bpy.data.objects.get(GNM_MESH_NAME)
+    mesh_obj = bpy.context.scene.objects.get(_case_name(GNM_MESH_NAME))
     m_world = (np.array(mesh_obj.matrix_world, dtype=np.float64)
                if mesh_obj is not None else np.eye(4))
     model = _LIVE.model
     for item in scene.gnm_markers:
         lbl = item.label
-        name = GNM_GHOST_PREFIX + lbl
+        name = _case_name(GNM_GHOST_PREFIX + lbl, scene)
         obj = bpy.data.objects.get(name)
         if obj is None:
             obj = bpy.data.objects.new(name, None)
@@ -1706,9 +1817,9 @@ def _ensure_ghosts(context):
             obj.location = mesh_obj.matrix_world.translation
     # V13.6: ghost-ul cyan Gerasimov - separat de prefixul GNM_LM_ (nu e
     # landmark de fit), ascuns pana exista o estimare valida din worker.
-    obj = bpy.data.objects.get(GNM_GERASIMOV_NAME)
+    obj = bpy.context.scene.objects.get(_case_name(GNM_GERASIMOV_NAME))
     if obj is None:
-        obj = bpy.data.objects.new(GNM_GERASIMOV_NAME, None)
+        obj = bpy.data.objects.new(_case_name(GNM_GERASIMOV_NAME), None)
         obj.empty_display_type = 'SPHERE'
         obj.color = GNM_GERASIMOV_COLOR
         coll.objects.link(obj)
@@ -1733,7 +1844,7 @@ def _update_ghosts_from_fit(scene, v_model, scale, rot, trans):
         return
     vw = scale * (v_model[np.asarray(idxs)] @ rot.T) + trans
     for k, lbl in enumerate(idx_labels):
-        obj = bpy.data.objects.get(GNM_GHOST_PREFIX + lbl)
+        obj = scene.objects.get(_case_name(GNM_GHOST_PREFIX + lbl, scene))
         if obj is not None:
             obj.location = vw[k]
 
@@ -1743,7 +1854,7 @@ def _update_gerasimov_ghost(scene, ger):
 
     ger = res["gerasimov"] din worker (None = nicio informatie -> ascuns).
     Respecta toggle-ul global show_ghosts."""
-    obj = bpy.data.objects.get(GNM_GERASIMOV_NAME)
+    obj = bpy.context.scene.objects.get(_case_name(GNM_GERASIMOV_NAME))
     if obj is None:
         return
     ok = bool(ger) and ger.get("ok") and ger.get("xyz") is not None
@@ -1756,41 +1867,38 @@ def _update_gerasimov_ghost(scene, ger):
 # V13: raycast filtrat (craniul sta "in interiorul" capului GNM)
 # -----------------------------------------------------------------------
 def _record_marker_surface(item, hit_object):
-    inferred = hit_object is not None and hit_object.get('gnm_reconstructed_via_mirroring')
+    scene = bpy.context.scene
+    inferred = hit_object is not None and bool(hit_object.get('gnm_reconstructed_via_mirroring'))
+    source = next((r for r in _bone_sources(scene) if r.source_object == hit_object), None)
+    if not inferred and source is None:
+        raise ValueError('Marker source is not registered observed bone')
     item.bone_status = 'reconstructed' if inferred else 'observed'
-    if item.bone_empty is not None and hit_object is not None:
-        item.bone_empty['gnm_bone_source'] = hit_object.name
+    if item.bone_empty is not None:
+        item.bone_empty['gnm_bone_source_id'] = source.uid if source else str(hit_object.get('gnm_region_patch', 'inferred'))
+        if source:
+            _, _, digest, _ = _core_module('blender_sources').source_geometry(hit_object, bpy.context.evaluated_depsgraph_get(), source.flip_normals)
+            item.bone_empty['gnm_source_sha256_at_placement'] = digest
     if inferred:
         item.use_for_fit = False
         item.use_for_plane = False
-        item.marker_notes = 'Placed on inferred bone; review before including in fit. ' + item.marker_notes
+        item.marker_notes = 'Placed on inferred bone; review before inclusion. ' + item.marker_notes
 
 
-def _ray_cast_skull(scene, depsgraph, origin, direction, max_hops=8, return_object=False):
-    """scene.ray_cast care ignora obiectele GNM-live.
-
-    Capul GNM (piele) invaluie craniul in aceeasi lume; fara filtrare,
-    clickul de plasare a markerilor ar lovi mereu mesh-ul GNM. Strategia:
-    ray-marching - dupa fiecare hit pe un obiect GNM, avansam originea cu
-    0.05 mm peste punctul de impact si relansam (max ~8 hopuri).
-    Returneaza (result, location, normal) ca scene.ray_cast.
-    """
-    excluded = _gnm_live_objects()
-    excluded.update(row.plane_object for row in scene.gnm_restoration_regions if row.plane_object)
-    if scene.gnm_settings.restoration_plane_object:
-        excluded.add(scene.gnm_settings.restoration_plane_object)
-    preview = bpy.data.objects.get('GNM_PLAN_PREVIEW')
-    if preview:
-        excluded.add(preview)
+def _ray_cast_skull(scene, depsgraph, origin, direction, max_hops=32, return_object=False):
+    """Ray-march through non-bone objects; accept explicitly registered surfaces."""
+    sources = {r.source_object: r for r in _bone_sources(scene)}
+    inferred = {r.result_object for r in scene.gnm_restoration_regions if r.enabled and r.result_object is not None}
     o = origin.copy()
     for _ in range(max_hops):
-        result, location, normal, _i, hit_obj, _m = scene.ray_cast(
-            depsgraph, o, direction)
-        if not result:
-            return (False, None, None, None) if return_object else (False, None, None)
-        if hit_obj not in excluded:
-            return (True, location, normal, hit_obj) if return_object else (True, location, normal)
-        o = location + direction * 0.05
+        hit, location, normal, _, obj, _ = scene.ray_cast(depsgraph, o, direction)
+        if not hit:
+            break
+        obj = getattr(obj, 'original', obj)
+        if obj in sources or obj in inferred:
+            if obj in sources and sources[obj].flip_normals:
+                normal = -normal
+            return (True, location, normal, obj) if return_object else (True, location, normal)
+        o = location + direction*.05
     return (False, None, None, None) if return_object else (False, None, None)
 
 
@@ -1802,9 +1910,8 @@ def _ray_cast_skull(scene, depsgraph, origin, direction, max_hops=8, return_obje
 #     importul V12; ipotezele sunt rotatii de yaw (0/90/180/270) aplicate
 #     peste rotatia cosmetica X+90 a template-ului. Cu >=3 markeri plasati,
 #     fitul pe markeri ofera o initializare mai buna decat multi-startul.
-#   * Corespondentele dense se recalculeaza la nivel de SNAPSHOT (outer
-#     ICP la ~rata timerului), nu la fiecare iteratie interna ca offline -
-#     convergenta vine progresiv, in 3-10 update-uri vizibile.
+#   * Marker-driven dense correspondences refresh inside the shared solver.
+#     Markerless ICP uses explicit outer pseudo-observation updates.
 #   * mathutils KDTree queries and previews run on Blender's main thread.
 #   * Deformarea generala trece prin beta (spatiul GNM + clip +-3 sigma +
 #     prior optional). Remaining in this parameterisation does not guarantee
@@ -1837,7 +1944,7 @@ def _nasal_rms(labels, res_m):
     ids = [i for i, lb in enumerate(labels) if lb in _NASAL_LABELS]
     if not ids:
         return None
-    return float(np.mean(np.asarray(res_m)[ids]))
+    return _core_module("validation").rmse(np.asarray(res_m)[ids])
 
 
 def _build_dense_set(model, scalp_only):
@@ -1870,37 +1977,6 @@ def _build_dense_set(model, scalp_only):
     return dense_idx, offsets, offsets + 12.0, region_of
 
 
-def _balanced_region_sel(regs, max_rows):
-    """Selectie determinista a randurilor dense cu buget 50/50 fata/scalp.
-
-    Scalpul domina numeric setul dens (~73% din vertecsi); lasata libera,
-    sub-esantionarea globala trimite ~3/4 din randuri pe bolta, care trage
-    scala/poza spre craniu si lasa mijlocul fetei sub-constrans (osul
-    zigomatic/nazal iese prin piele). Bugetul egal pastreaza toate
-    regiunile faciale in fit; bugetul nefolosit de un grup mic trece la
-    celalalt. Returneaza indici sortati (linspace per grup)."""
-    idx = np.arange(len(regs))
-    is_scalp = regs == "scalp"
-    groups = [idx[~is_scalp], idx[is_scalp]]          # fata, scalp
-    budgets = [max_rows // 2, max_rows - max_rows // 2]
-    take = [min(len(g), b) for g, b in zip(groups, budgets)]
-    slack = sum(b - t for b, t in zip(budgets, take))
-    for i, g in enumerate(groups):
-        if slack <= 0:
-            break
-        if take[i] == budgets[i] and len(g) > take[i]:
-            extra = min(len(g) - take[i], slack)
-            take[i] += extra
-            slack -= extra
-    sels = []
-    for g, n_take in zip(groups, take):
-        if len(g) <= n_take:
-            sels.append(g)
-        elif n_take > 0:
-            sels.append(
-                g[np.linspace(0, len(g) - 1, n_take).round().astype(np.int64)])
-    return np.sort(np.concatenate(sels)) if sels else np.zeros(0, np.int64)
-
 
 def _refresh_dense_set(scalp_only):
     """Alege setul dens activ (complet / doar-scalp), calculandu-l lenes."""
@@ -1923,78 +1999,22 @@ def _signed_volume(mu, triangles):
     return float(np.einsum("ij,ij->i", v0, np.cross(v1, v2)).sum() / 6.0)
 
 
-def _dense_rows(v_world, max_rows, dist_scale=1.0, use_normal=True,
-                region_balance=False, min_dot=0.2):
-    """Corespondente dense vertecsi-constransi -> craniu, cu respingere.
-
-    Port fidel al lui cranio.geometry.dense_correspondences, cu adaptari
-    Blender: KD-ul este mathutils.kdtree (interogat per punct, read-only);
-    normalele modelului pe v_world curent; pragul de distanta este scalat
-    cu dist_scale (ICP il lasa sa scada 4x -> 1x, largind bazinul de
-    atractie la poza initiala proasta); testul de normala se poate relaxa
-    cu min_dot < 0.2 (V13.5: in faza larga a jobului se resping doar
-    potrivirile pe fata OPUSA a osului, dot < -0.2, nu si cele tangentiale).
-    Cu region_balance=True (fituri, NU ICP) sub-esantionarea foloseste
-    bugetul 50/50 fata/scalp (vezi _balanced_region_sel).
-    Returneaza (sidx, targets_world, n_keep, mean_dist, info), unde
-    info["row_mult"] = multiplicatorii de pondere pe rand (puntea nazala
-    primeste dense_nose_weight din cfg - soft prior, V13.3),
-    info["dists"] = distantele la os ale randurilor returnate (post
-    sub-esantionare; pentru trim-ul V13.5), iar info["region_stats"] =
-    {nume: (pastrate, total, distanta medie)} pentru diagnosticele din UI."""
+def _live_dense_config(max_rows=None, dist_scale=1., use_normal=True, min_dot=.2):
     sk = _LIVE.skull
-    dense_idx, offsets, max_dists, region_of = _LIVE.dense_set
-    pts = v_world[dense_idx]
-    kd = sk["tree"]
-    n = len(pts)
-    dists = np.empty(n, dtype=np.float64)
-    nn = np.empty(n, dtype=np.int64)
-    find = kd.find
-    for i in range(n):
-        _co, idx, d = find(pts[i])
-        nn[i] = idx
-        dists[i] = d
-    closest = sk["points"][nn]
-    n_skull = sk["normals"][nn]
-    keep = dists < (max_dists * dist_scale)
-    if use_normal:
-        n_model = _CRANIO["compute_vertex_normals"](
-            v_world, _LIVE.model.triangles, flip=bool(_LIVE.flip))[dense_idx]
-        dots = np.einsum("ij,ij->i", n_model, n_skull)
-        keep &= dots > min_dot
-    # Plasa de siguranta: daca aproape nimic nu trece, probabil normalele
-    # craniului sunt INTOARSE - le inversam o singura data si reincercam.
-    if (not sk.get("flipped")) and keep.sum() < 0.1 * len(dists):
-        sk["normals"] = -sk["normals"]
-        sk["flipped"] = True
-        return _dense_rows(v_world, max_rows, dist_scale=dist_scale,
-                           use_normal=use_normal,
-                           region_balance=region_balance, min_dot=min_dot)
+    idx, offsets, limits, regions = _LIVE.dense_set
+    return dict(dense_idx=idx, offsets=offsets, max_dists=limits, regions=regions,
+        points=sk['points'], normals=sk['normals'], tree=_core_module('geometry').PointQueryAdapter(sk['tree'].find),
+        triangles=_LIVE.model.triangles, flip=_LIVE.flip, min_dot=min_dot, use_normal=use_normal,
+        distance_scale=dist_scale, weight_ratio=.5*float(_LIVE.cfg.get('dense_strength', 1.)),
+        nose_weight=float(_LIVE.cfg.get('dense_nose_weight', .7)),
+        max_rows=int(max_rows or _LIVE.cfg.get('dense_max_rows', 1500)))
 
-    sidx = dense_idx[keep]
-    targets_w = closest[keep] + offsets[keep, None] * n_skull[keep]
-    regs = region_of[keep]
-    mean_dist = float(dists[keep].mean()) if keep.any() else float("nan")
-    # Statistici per regiune (diagnostice; ex. keep-rate-ul nazal din UI).
-    d_keep = dists[keep]
-    rstats = {}
-    for name in np.unique(region_of):
-        kp = regs == name
-        rstats[name] = (int(kp.sum()), int((region_of == name).sum()),
-                        float(d_keep[kp].mean()) if kp.any() else float("nan"))
-    # Sub-esantionare determinista pentru viteza (max ~max_rows randuri).
-    if len(sidx) > max_rows:
-        sel = (_balanced_region_sel(regs, max_rows) if region_balance
-               else np.linspace(0, len(sidx) - 1, max_rows).round()
-               .astype(np.int64))
-        sidx = sidx[sel]
-        targets_w = targets_w[sel]
-        regs = regs[sel]
-        d_keep = d_keep[sel]
-    nose_w = float(_LIVE.cfg.get("dense_nose_weight", 0.7))
-    row_mult = np.where(regs == "punte_nazala", nose_w, 1.0)
-    info = {"row_mult": row_mult, "region_stats": rstats, "dists": d_keep}
-    return sidx, targets_w, int(keep.sum()), mean_dist, info
+
+def _dense_rows(v_world, max_rows, dist_scale=1., use_normal=True, region_balance=False, min_dot=.2):
+    dense = _live_dense_config(max_rows, dist_scale, use_normal, min_dot)
+    idx, targets, keep, distance = _core_module('geometry').dense_correspondences(v_world, dense)
+    return idx, targets, int(keep.sum()), distance, dict(row_mult=dense['last_relative_weights'],
+        dists=dense['last_distances'], region_stats=dense['last_region_stats'])
 
 
 def _multi_start_icp(n_coarse=8, n_refine=20, max_rows=2000):
@@ -2070,7 +2090,7 @@ def _multi_start_icp(n_coarse=8, n_refine=20, max_rows=2000):
         keep_rate = nk / n_total
         score = cost / max(keep_rate, 1e-6)
         if (np.isfinite(cost) and keep_rate >= 0.15
-                and (best is None or score < best[3])):
+                and (best is None or score < best[6])):
             best = (s, R, t, float(cost), int(nk), f"yaw{90 * k}",
                     float(score))
     if best is None:
@@ -2089,196 +2109,70 @@ def _push_worker_result(res):
 
 
 def _icp_deform_job(snap):
-    """Serialized preview job: ICP multi-start and several dense fits.
-
-    Nu atinge bpy. Impinge rezultate intermediare pe canalul normal (vezi
-    deformarea progresiv in viewport), apoi un rezultat final 'icp_done'.
-    """
-    model = _LIVE.model
+    """Coarse pose search followed by the shared dense identity objective."""
     best = _multi_start_icp()
     if best is None:
-        return {"status": "error",
-                "error": "ICP failed: too few valid correspondences "
-                         "(check skull preparation and normals)."}
-    s, R, t, cost, n_keep, hyp = best
-    c = np.zeros(model.identity_dim)
-    _LIVE.last_c = c
-    v0 = np.ascontiguousarray(model.mu, dtype=np.float32)
-    _push_worker_result({
-        "status": "ok", "n": 0, "scale": float(s), "rot": R, "trans": t,
-        "v_model": v0, "rms": 0.0, "max_res": 0.0, "max_label": "-",
-        "lam": 0.0, "lam_src": "icp", "beta_norm": 0.0, "n_clip": 0,
-        "note": f"ICP {hyp}: cost {cost:.1f} mm, {n_keep} correspondences",
-    })
-    # Auto-dense scurt: fituri consecutive cu corespondente reimprospatate.
-    n_markers = len(snap["labels"])
-    lam, lam_src = _live_lambda(n_markers, snap)
-    prior_kwargs = {}
-    if _LIVE.prior is not None:
-        prior_kwargs = {
-            "prior_mean": _LIVE.prior["mean"],
-            "prior_scale": _LIVE.prior["scale"],
-            "prior_weight": float(_LIVE.cfg.get("prior_weight", 1.0)),
-        }
-    max_rows = int(_LIVE.cfg.get("dense_max_rows", 1500))
-    strength = float(_LIVE.cfg.get("dense_strength", 1.0))
-    clip_sigma = float(_LIVE.cfg.get("clip_sigma", 3.0))
-    final = None
-    n_outer = 6
-    for k in range(n_outer):
-        v = model.generate(c.astype(np.float32)).astype(np.float64)
-        vw = s * (v @ R.T) + t
-        # V13.3: schedule de respingere 2.0 -> 1.0 peste iteratii. La
-        # inceput (cap inca departe de craniu) pragul largit pastreaza in
-        # set si zonele departate - altfel ele erau respinse DEFINITIV si
-        # ramaneau neacoperite (craniul iesea prin piele); spre final
-        # pragul revine la regula stricta (zonele lipsa reale, ex.
-        # mandibula absenta, sunt din nou respinse).
-        # V13.5: testul de normala ramane ACTIV tot timpul, dar relaxat
-        # (min_dot=-0.2): respinge doar potrivirile pe fata OPUSA a osului
-        # (tabla interna, marginea aperturii), nu si cele tangentiale.
-        f = 2.0 - k * (1.0 / max(n_outer - 1, 1))
-        sidx, dt_w, nkeep, md, dinfo = _dense_rows(
-            vw, max_rows, dist_scale=f, use_normal=True, min_dot=-0.2,
-            region_balance=True)
-        if len(sidx) < 10:
-            break
-        # V13.5: trim 10% - elimina cele mai DEPARTATE corespondente la
-        # fiecare iteratie. Coada distributiei e dominata de potriviri
-        # gresite (tabla interna, margini de apertura, muchii), care -
-        # fara frana Huber pe dense (V13.3) - trageau beta in saturatie
-        # ("fata exagerata"); fara ele, setul ramas converge la o
-        # morfologie plauzibila cu acoperire MAI BUNA (masurat pe
-        # v13-test: clip 30->23, expunere 4.8->2.0%).
-        row_mult = dinfo["row_mult"]
-        if len(sidx) > 20:
-            thr = np.quantile(dinfo["dists"], 0.90)
-            keep2 = dinfo["dists"] <= thr
-            sidx = sidx[keep2]
-            dt_w = dt_w[keep2]
-            row_mult = row_mult[keep2]
-        wm = snap["weights"]
-        # V13.3: multiplicatorul de putere din UI (dense_strength) si
-        # ponderile per regiune (puntea nazala = soft prior).
-        wd = strength * 0.5 * (float(wm.mean()) if len(wm) else 0.7)
-        verts = np.concatenate([snap["verts"], sidx])
-        tg = np.concatenate([snap["targets"], dt_w])
-        ws = np.concatenate([wm, wd * row_mult])
-        try:
-            c_new, s, R, t, lam_u, _i, res = _CRANIO["fit_identity"](
-                model.mu, model.basis, verts, tg, ws, lam=lam,
-                max_iter=int(_LIVE.cfg.get("max_iter", 8)), tol=1e-4,
-                loss_cfg=_CRANIO["LossConfig"](clip_sigma=clip_sigma),
-                huber_rows=n_markers,
-                pose_rows=n_markers if n_markers >= 3 else None,
-                **prior_kwargs)
-        except ValueError as exc:
-            # Reflexie ceruta de un set de corespondente prost (ex. ICP cazut
-            # in minim local) - pastram ultima stare buna si oprim jobul.
-            if final is None:
-                return {"status": "error",
-                        "error": f"Dense fit failed ({exc})"}
-            break
-        dc = float(np.linalg.norm(c_new - c))
-        c = c_new
-        _LIVE.last_c = c
-        v_model = np.ascontiguousarray(
-            model.generate(c.astype(np.float32)), dtype=np.float32)
-        res_m = res[:n_markers] if n_markers else np.array([np.nan])
-        final = {
-            "status": "ok", "n": n_markers,
-            "scale": float(s), "rot": R, "trans": t, "v_model": v_model,
-            "c": c,
-            "rms": float(np.sqrt(np.nanmean(res_m ** 2))) if n_markers else 0.0,
-            "max_res": float(np.nanmax(res_m)) if n_markers else 0.0,
-            "max_label": (snap["labels"][int(np.nanargmax(res_m))]
-                          if n_markers else "-"),
-            "lam": float(lam_u), "lam_src": lam_src,
-            "beta_norm": float(np.linalg.norm(c)),
-            "n_clip": int((np.abs(c) >= clip_sigma - 1e-3).sum()),
-            "dense_keep": nkeep, "dense_mean": md,
-            "dense_rstats": dinfo["region_stats"],
-            "rms_nasal": _nasal_rms(snap["labels"], res_m) if n_markers else None,
-        }
-        _push_worker_result(final)
-        if dc < 1e-3:
-            break
-    if final is None:
-        return {"status": "error",
-                "error": "Dense deformation produced no valid correspondences."}
-    final["status"] = "icp_done"
-    final["note"] = f"ICP {hyp} + dense deformation finished"
-    return final
+        return {'status': 'error', 'error': 'ICP failed: review orientation or place preserved markers'}
+    scale, rot, trans, cost, count, hypothesis = best
+    _LIVE.last_c = np.zeros(_LIVE.model.identity_dim)
+    pose = np.eye(4)
+    pose[:3, :3], pose[:3, 3] = scale*rot, trans
+    current = dict(snap, dense=True, m_world=pose)
+    sweeps = 1 if len(snap['labels']) >= 3 else 6
+    for iteration in range(sweeps):
+        current['dense_distance_scale'] = 1. if sweeps == 1 else 2.-iteration/max(sweeps-1, 1)
+        result = _compute_fit(current)
+        if result.get('status') != 'ok':
+            return result
+        current['m_world'][:3, :3], current['m_world'][:3, 3] = result['scale']*result['rot'], result['trans']
+    result.update(status='icp_done', note=f'ICP {hypothesis}: cost {cost:.1f} mm, {count} matches; shared dense fit')
+    return result
 
 
 class GNM_OT_prepare_skull(Operator):
-    """Esantioneaza craniul (obiectul mesh ACTIV) pentru aliniere/deformare:
-    ~60k puncte world + normale (numpy) + KD-tree (mathutils)."""
-    bl_idname = "gnm.prepare_skull"
-    bl_label = "Prepare Skull for Alignment"
-    bl_description = (
-        "Select the skull object first. Samples its surface (points + "
-        "normals) and builds the KD-tree used by ICP and the dense "
-        "constraints")
-    bl_options = {"REGISTER", "UNDO"}
-
-    MAX_POINTS = 60000
-
-    @classmethod
-    def poll(cls, context):
-        return (context.active_object is not None
-                and context.active_object.type == 'MESH')
+    """Prepare all enabled preserved sources, including visible modifiers."""
+    bl_idname = 'gnm.prepare_skull'
+    bl_label = 'Prepare Registered Bones'
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         scene = context.scene
-        st = scene.gnm_live
-        obj = context.active_object
-        if obj.name == GNM_MESH_NAME or obj.name.startswith(GNM_GHOST_PREFIX):
-            self.report({"ERROR"}, "The active object is a GNM live object, "
-                                   "not the skull. Select the skull.")
-            return {"CANCELLED"}
-        ok, msg = _ensure_cranio(st.npz_path)
-        if not ok:
-            self.report({"ERROR"}, msg)
-            return {"CANCELLED"}
-        t0 = time.perf_counter()
-        me = obj.data
-        n_v = len(me.vertices)
-        verts = np.empty(n_v * 3, dtype=np.float32)
-        me.vertices.foreach_get("co", verts)
-        verts = verts.reshape(-1, 3).astype(np.float64)
-        mw = np.array(obj.matrix_world, dtype=np.float64)
-        pts_all = verts @ mw[:3, :3].T + mw[:3, 3]
-        # Sub-esantionare determinista (craniile au ~265k+ vertecsi).
-        if len(pts_all) > self.MAX_POINTS:
-            rng = np.random.default_rng(42)
-            sel = np.sort(rng.choice(len(pts_all), self.MAX_POINTS,
-                                     replace=False))
-        else:
-            sel = np.arange(len(pts_all))
-        pts = np.ascontiguousarray(pts_all[sel])
-        # Normale per-vertex din triunghiuri (numpy; winding-ul a fost
-        # corectat la importul V12, deci sunt orientate spre exterior).
-        me.calc_loop_triangles()
-        n_t = len(me.loop_triangles)
-        tris = np.empty(n_t * 3, dtype=np.int32)
-        me.loop_triangles.foreach_get("vertices", tris)
-        tris = tris.reshape(-1, 3)
-        nrm_all = _CRANIO["compute_vertex_normals"](pts_all, tris)
-        nrm = np.ascontiguousarray(nrm_all[sel])
-        kd = kdtree.KDTree(len(pts))
-        for i in range(len(pts)):
-            kd.insert(pts[i], i)  # semnatura: insert(co, index)
-        kd.balance()
-        _LIVE.skull = {
-            "points": pts, "normals": nrm, "tree": kd,
-            "source": obj.name, "flipped": False,
-        }
-        st.skull_status = f"{len(pts)}p ({obj.name})"
-        self.report({"INFO"},
-                    f"Skull prepared: {len(pts)} points from '{obj.name}' "
-                    f"({time.perf_counter() - t0:.1f}s).")
-        return {"FINISHED"}
+        try:
+            if not _is_mm_scene(scene):
+                raise ValueError('Scene must use world-mm coordinates (metric scale .001)')
+            _bind_case(scene)
+            sources = _bone_sources(scene, True)
+            if not sources:
+                raise ValueError('Register preserved bone sources first')
+            data, areas = [], []
+            for row in sources:
+                if not row.normals_reviewed:
+                    raise ValueError('Review exterior normals for every dense source')
+                if row.anatomy in ('MANDIBLE', 'MIXED') and not scene.gnm_settings.mandible_aligned:
+                    raise ValueError('Classify bones and review mandibular articulation before dense fitting')
+                points, triangles, _, _ = _core_module('blender_sources').source_geometry(row.source_object, context.evaluated_depsgraph_get(), row.flip_normals)
+                tri = points[triangles]
+                areas.append(np.linalg.norm(np.cross(tri[:, 1]-tri[:, 0], tri[:, 2]-tri[:, 0]), axis=1).sum())
+                data.append((points, triangles))
+            rng, samples, normals = np.random.default_rng(42), [], []
+            for (points, triangles), area in zip(data, areas):
+                count = max(32, int(60000*area/max(sum(areas), 1e-12)))
+                sampled, normal = _core_module('blender_sources').sample_surface(points, triangles, count, rng)
+                samples.append(sampled)
+                normals.append(normal)
+            points, normals = np.concatenate(samples), np.concatenate(normals)
+            kd = kdtree.KDTree(len(points))
+            for i, point in enumerate(points):
+                kd.insert(point, i)
+            kd.balance()
+            _LIVE.geometry_epoch += 1
+            _LIVE.skull = dict(points=points, normals=normals, tree=kd, seed=42,
+                sources=[r for r in _source_manifest(scene, context.evaluated_depsgraph_get()) if r['use_dense']])
+            scene.gnm_live.skull_status = f'{len(points)} points from {len(sources)} observed objects'
+            return {'FINISHED'}
+        except ValueError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
 
 
 class GNM_OT_icp_deform(Operator):
@@ -2345,10 +2239,14 @@ def _build_snapshot(scene):
         verts.append(vid)
         tgts.append((p.x, p.y, p.z))
         ws.append(_weight_of(item.label, item))
+    if not scene.gnm_settings.mandible_aligned and any(label in _MARKER_DATA.MANDIBULAR_LANDMARKS for label in labels):
+        raise ValueError('Review mandibular articulation before using mandibular landmarks')
+    if scene.gnm_live.dense_enabled and _LIVE.skull is None:
+        raise ValueError('Dense preview requires prepared registered bones')
     _core_module('marker_audit').require_unique_landmarks(labels, verts, tgts)
     # V13.2: modul dense continuu + poza curenta a obiectului GNM (necesara
     # pentru calculul corespondentelor in worker; citita aici, pe main thread).
-    gnm_obj = bpy.data.objects.get(GNM_MESH_NAME)
+    gnm_obj = bpy.context.scene.objects.get(_case_name(GNM_MESH_NAME))
     # V13.6: pozitiile PE OS ale landmark-urilor nazale (Gerasimov lucreaza
     # pe craniu, nu pe tintele de piele).
     bone = {}
@@ -2358,6 +2256,7 @@ def _build_snapshot(scene):
             p = item.bone_empty.matrix_world.translation
             bone[item.label] = (p.x, p.y, p.z)
     return {
+        "case_token": _case_token(scene), "geometry_epoch": _LIVE.geometry_epoch,
         "labels": labels,
         "verts": np.asarray(verts, dtype=np.int64),
         "targets": np.asarray(tgts, dtype=np.float64).reshape(-1, 3),
@@ -2389,22 +2288,10 @@ def _adaptive_lambda(n_markers, base, lam_min, lam_max):
 
 
 def _live_lambda(n, snap):
-    """Actual included count; conditional LOO is cached by data, not count."""
+    """Count-based fixed penalty; conditional LOO is run by the shared solver."""
     cfg = _LIVE.cfg
-    base = float(cfg.get('lambda_base', 1.0))
-    minimum, maximum = float(cfg.get('lambda_min', 0.3)), float(cfg.get('lambda_max', 1000.0))
-    lam_formula = _adaptive_lambda(n, base, minimum, maximum)
-    if not cfg.get('loo_auto', False) or n < 4:
-        return lam_formula, 'adaptive' if n else 'no landmarks: maximum'
-    module = _core_module('regularization')
-    key = module.tuning_key(snap['verts'], snap['targets'], snap['weights'], id(_LIVE.model))
-    cache = _LIVE.loo_cache
-    if cache.get('key') != key:
-        _c, _s, _r, _t, value, _info, _res = _CRANIO['fit_identity'](
-            _LIVE.model.mu, _LIVE.model.basis, snap['verts'], snap['targets'],
-            snap['weights'], lam='auto', loss_cfg=_CRANIO['LossConfig']())
-        cache.update(key=key, lam=float(value))
-    return float(cache['lam']), 'conditional LOO'
+    return (_adaptive_lambda(n, float(cfg.get('lambda_base', 1.)), float(cfg.get('lambda_min', .3)),
+                             float(cfg.get('lambda_max', 1000.))), 'adaptive' if n else 'no landmarks: maximum')
 
 
 def _on_fit_settings_update(self, context):
@@ -2447,93 +2334,40 @@ def _gerasimov_worker(snap, scale, rot, trans, v_model):
 
 
 def _compute_fit(snap):
-    """Numerical preview fit, called serially by the Blender main-thread timer.
-
-    Refoloseste cranio.optimize.fit_identity (aceeasi matematica ca
-    pipeline-ul offline): alternare Umeyama ponderat <-> ridge LSQ
-    augmentat (forma primala; vezi nota din antet), Huber IRLS, clip +-3
-    sigma. Fitting partial: lucreaza pe orice subset (L,).
-    Priorul demografic (daca e incarcat) inlocuieste shrink-ul la beta=0
-    cu shrink spre media demografica (vezi ipoteza 8 din antet)."""
-    n = len(snap["labels"])
-    if _LIVE.model is None:
-        return {"status": "error", "error": "model not loaded"}
-    dense_on = bool(snap.get("dense")) and _LIVE.skull is not None
+    """Serialize preview through cranio.preview and cranio.optimize.fit_identity."""
+    n, model = len(snap['labels']), _LIVE.model
+    if model is None:
+        return {'status': 'error', 'error': 'model not loaded'}
+    dense_on = bool(snap.get('dense')) and _LIVE.skull is not None
     if n < 3 and not dense_on:
-        # Sub 3 puncte, rotatia din Umeyama e subdeterminata - nu fitam.
-        return {"status": "min3", "n": n}
-    fit_identity = _CRANIO["fit_identity"]
-    LossConfig = _CRANIO["LossConfig"]
-    model = _LIVE.model
-    # V13.2: randuri "pseudo-marker" din constrangerile dense de craniu.
-    # Lambda se calculeaza DOAR pe markeri (randurile dense nu schimba
-    # schedule-ul); ponderile dense = 0.5 x media ponderilor markerilor
-    # (echivalentul lui dense_weight=0.5 din offline). V13.3: x multiplicatorul
-    # din UI (dense_strength), x ponderile per regiune (nas = soft prior).
-    verts_all, tgts_all = snap["verts"], snap["targets"]
-    ws_all = snap["weights"]
-    dense_keep = dense_mean = dense_rstats = None
-    if dense_on and _LIVE.dense_set is not None:
-        c_prev = _LIVE.last_c
-        if c_prev is None:
-            c_prev = np.zeros(model.identity_dim, dtype=np.float32)
-        v_prev = model.generate(c_prev.astype(np.float32)).astype(np.float64)
-        mw = snap.get("m_world", np.eye(4))
-        vw = v_prev @ mw[:3, :3].T + mw[:3, 3]
-        max_rows = int(_LIVE.cfg.get("dense_max_rows", 1500))
-        sidx, dt_w, dense_keep, dense_mean, dinfo = _dense_rows(
-            vw, max_rows, region_balance=True)
-        if len(sidx) >= 10:
-            strength = float(_LIVE.cfg.get("dense_strength", 1.0))
-            wd = strength * 0.5 * (
-                float(snap["weights"].mean()) if n else 0.7)
-            verts_all = np.concatenate([snap["verts"], sidx])
-            tgts_all = np.concatenate([snap["targets"], dt_w])
-            ws_all = np.concatenate(
-                [snap["weights"], wd * dinfo["row_mult"]])
-            dense_rstats = dinfo["region_stats"]
-        else:
-            dense_keep = 0
-    # Dense samples never inflate the anatomical landmark count.
-    lam, lam_src = _live_lambda(n, snap)
-    prior_kwargs = {}
-    if _LIVE.prior is not None:
-        prior_kwargs = {
-            "prior_mean": _LIVE.prior["mean"],
-            "prior_scale": _LIVE.prior["scale"],
-            "prior_weight": float(_LIVE.cfg.get("prior_weight", 1.0)),
-        }
-    clip_sigma = float(_LIVE.cfg.get("clip_sigma", 3.0))
-    c, scale, rot, trans, lam_used, _info, residuals = fit_identity(
-        model.mu, model.basis, verts_all, tgts_all, ws_all,
-        lam=lam, max_iter=int(_LIVE.cfg.get("max_iter", 8)), tol=1e-4,
-        loss_cfg=LossConfig(clip_sigma=clip_sigma),
-        huber_rows=n, pose_rows=n if n >= 3 else None, **prior_kwargs)
-    # float32 pentru generare: ~2x mai rapid, eroare sub-micron.
-    v_model = np.ascontiguousarray(
-        model.generate(c.astype(np.float32)), dtype=np.float32)
-    _LIVE.last_c = c
-    res_m = residuals[:n] if n else np.array([np.nan])
-    return {
-        "status": "ok", "n": n,
-        "scale": float(scale), "rot": rot, "trans": trans,
-        "v_model": v_model,
-        "c": c,
-        "rms": float(np.sqrt(np.nanmean(res_m ** 2))) if n else 0.0,
-        "max_res": float(np.nanmax(res_m)) if n else 0.0,
-        "max_label": (snap["labels"][int(np.nanargmax(res_m))] if n else "-"),
-        "lam": float(lam_used), "lam_src": lam_src,
-        "beta_norm": float(np.linalg.norm(c)),
-        "n_clip": int((np.abs(c) >= clip_sigma - 1e-3).sum()),
-        "dense_keep": dense_keep, "dense_mean": dense_mean,
-        "dense_rstats": dense_rstats,
-        "rms_nasal": _nasal_rms(snap["labels"], res_m) if n else None,
-        "gerasimov": _gerasimov_worker(snap, scale, rot, trans, v_model),
-    }
+        return {'status': 'min3', 'n': n}
+    dense = _live_dense_config(dist_scale=snap.get('dense_distance_scale', 1.)) if dense_on else None
+    if _LIVE.cfg.get('loo_auto', False) and n >= 4:
+        lam, source = 'auto', 'conditional LOO'
+    else:
+        lam, source = _live_lambda(n, snap)
+    snap = dict(snap, initial_coefficients=np.zeros(model.identity_dim) if _LIVE.last_c is None else _LIVE.last_c)
+    c, scale, rot, trans, lam_used, info, residuals = _core_module('preview').fit_preview(model, snap, lam, _LIVE.cfg, dense, _LIVE.prior)
+    vertices = np.ascontiguousarray(model.generate(c.astype(np.float32)), dtype=np.float32)
+    _LIVE.last_c = c.copy()
+    res = residuals[:n]
+    return dict(status='ok', n=n, scale=float(scale), rot=rot, trans=trans, v_model=vertices, c=c,
+        rms=_core_module('validation').rmse(res), max_res=float(res.max()) if n else 0.,
+        max_label=snap['labels'][int(res.argmax())] if n else '-', lam=lam_used, lam_src=source,
+        beta_norm=float(np.linalg.norm(c)), n_clip=int(np.sum(np.abs(c) >= _LIVE.cfg.get('clip_sigma', 3.)-1e-6)),
+        solver=info.diagnostics, converged=info.diagnostics['converged'],
+        dense_keep=dense.get('last_diagnostics', {}).get('accepted_count', 0) if dense else None,
+        dense_mean=float(np.mean(dense['last_distances'])) if dense and len(dense.get('last_distances', [])) else float('nan'),
+        dense_rstats=dense.get('last_region_stats') if dense else None,
+        rms_nasal=_nasal_rms(snap['labels'], res) if n else None,
+        gerasimov=_gerasimov_worker(snap, scale, rot, trans, vertices),
+        case_token=snap.get('case_token'), geometry_epoch=snap.get('geometry_epoch'))
 
 
 def _apply_result(scene, res):
     """Aplica un rezultat de fit pe obiectele scenei. MAIN thread only."""
+    if res.get('case_token') is not None and (res['case_token'] != _case_token(scene) or res.get('geometry_epoch') != _LIVE.geometry_epoch):
+        return
     st = scene.gnm_live
     st.last_fit_ms = res.get("ms", 0.0)
     status = res.get("status")
@@ -2553,7 +2387,7 @@ def _apply_result(scene, res):
         _update_gerasimov_ghost(scene, None)
         st.gerasimov_status = ""
         return
-    obj = bpy.data.objects.get(GNM_MESH_NAME)
+    obj = bpy.context.scene.objects.get(_case_name(GNM_MESH_NAME))
     if obj is not None:
         me = obj.data
         me.vertices.foreach_set("co", res["v_model"].ravel())
@@ -2577,6 +2411,8 @@ def _apply_result(scene, res):
         f"{prefix}{n} markers, lambda={res['lam']:.2g}({res.get('lam_src', '?')}), "
         f"RMS={res['rms']:.2f} mm, max={res['max_res']:.1f} ({res['max_label']}) "
         f"| |beta|={res.get('beta_norm', 0.0):.1f}, clip {res.get('n_clip', 0)}")
+    if res.get('converged') is False:
+        st.status_text += ' | solver not converged; review offline diagnostics'
     if res.get("note"):
         st.status_text = f"{res['note']} | " + st.status_text
     if res.get("dense_keep") is not None:
@@ -2626,6 +2462,9 @@ def _live_timer_tick():
     scene = bpy.data.scenes.get(getattr(_LIVE, "scene_name", ""))
     if scene is None or not hasattr(scene, "gnm_live"):
         return 0.5
+    if _LIVE.case_token != _case_token(scene) or bpy.context.scene != scene:
+        _stop_live()
+        return None
     st = scene.gnm_live
     _LIVE.cfg.update({
         "lambda_base": float(st.lambda_base),
@@ -2667,6 +2506,12 @@ def _gnm_live_on_depsgraph(scene, depsgraph):
     fingerprint pe pozitiile empty-urilor; ignora orice alta schimbare."""
     if not _LIVE.enabled or _LIVE.model is None:
         return
+    if _LIVE.case_token != _case_token(scene):
+        return
+    sources = {row.source_object for row in _bone_sources(scene)}
+    ids = {obj.as_pointer() for obj in sources} | {obj.data.as_pointer() for obj in sources}
+    if any(getattr(update.id, 'original', update.id).as_pointer() in ids for update in depsgraph.updates):
+        _source_changed(None, bpy.context)
     try:
         fp = _fingerprint(scene)
     except Exception:
@@ -2683,7 +2528,7 @@ def _gnm_live_on_load_post(_dummy):
     sens; modelul numpy si firul de lucru raman valabile."""
     _stop_live()
     _stop_offline()
-    _LIVE.fingerprints.clear()
+    _LIVE.__init__()
 
 
 def _add_live_handler():
@@ -2699,6 +2544,8 @@ def _remove_live_handler():
 
 def _start_live(scene):
     """Start the serial preview timer and handler (idempotent)."""
+    _bind_case(scene)
+    _assert_prepared_current(scene, bpy.context.evaluated_depsgraph_get())
     _LIVE.scene_name = scene.name
     _LIVE.stop_event = threading.Event()
     with _LIVE.result_lock:
@@ -2715,6 +2562,7 @@ def _start_live(scene):
 def _stop_live():
     """Opreste toate serviciile live (sigur la unregister/reload F8)."""
     _LIVE.enabled = False
+    _LIVE.pending, _LIVE.result = None, None
     _LIVE.stop_event.set()
     w = _LIVE.worker
     if w is not None and w.is_alive():
@@ -2972,15 +2820,8 @@ def _load_prior(scene):
         st.prior_status = "missing (run make_demographic_prior.py)"
         return
     try:
-        d = np.load(path, allow_pickle=False)
-        mean = np.ascontiguousarray(d["mean"], dtype=np.float64).ravel()
-        scale = np.clip(
-            np.ascontiguousarray(d["scale"], dtype=np.float64).ravel(),
-            0.25, 4.0)
-        if mean.shape != (253,) or scale.shape != (253,):
-            raise ValueError(f"unexpected dimensions: {mean.shape}")
-        _LIVE.prior = {"mean": mean, "scale": scale}
-        n_sam = int(d["n_samples"]) if "n_samples" in d else 0
+        _LIVE.prior = _core_module('prior').load_prior(path)
+        n_sam = _LIVE.prior['n_samples']
         st.prior_status = (
             f"{st.prior_sex}/{st.prior_ethnicity}"
             + (f" (n={n_sam})" if n_sam else ""))
@@ -3023,6 +2864,7 @@ class GNM_OT_load_live_model(Operator):
 
     def execute(self, context):
         scene = context.scene
+        _bind_case(scene)
         st = scene.gnm_live
         _autodetect_paths(scene)
         st.npz_path = bpy.path.abspath(st.npz_path)
@@ -3037,6 +2879,7 @@ class GNM_OT_load_live_model(Operator):
         t0 = time.perf_counter()
         try:
             _LIVE.model = _load_gnm_model(st.npz_path)
+            _LIVE.model_hash = _core_module('validation').sha256_file(st.npz_path)
         except Exception as exc:
             self.report({"ERROR"}, f"Cannot load the npz: {exc}")
             return {"CANCELLED"}
@@ -3053,13 +2896,14 @@ class GNM_OT_load_live_model(Operator):
             try:
                 with open(st.json_path, "r", encoding="utf-8") as f:
                     _LIVE.json_map = json.load(f)
+                _LIVE.reviewed_map = _core_module('mapping').reviewed_vertices(_LIVE.json_map, _LIVE.model_hash, _LIVE.model.vertex_count)
             except Exception as exc:
-                _LIVE.json_map = None
-                self.report({"WARNING"},
-                            f"Could not read the JSON ({exc}); "
-                            f"continuing without confidence colors.")
+                _LIVE.json_map, _LIVE.reviewed_map = None, {}
+                self.report({'ERROR'}, f'Map rejected: {exc}')
+                return {'CANCELLED'}
         else:
-            _LIVE.json_map = None
+            _LIVE.json_map, _LIVE.reviewed_map = None, {}
+        _load_prior(scene)
 
         _ensure_gnm_mesh_object(context)
         _ensure_ghosts(context)
@@ -3082,6 +2926,7 @@ class GNM_OT_toggle_live(Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
+        _bind_case(context.scene)
         st = context.scene.gnm_live
         if _LIVE.enabled:
             _stop_live()
@@ -3093,7 +2938,11 @@ class GNM_OT_toggle_live(Operator):
                 self.report({"ERROR"},
                             "Load the GNM model first (button above).")
                 return {"CANCELLED"}
-            _start_live(context.scene)
+            try:
+                _start_live(context.scene)
+            except ValueError as exc:
+                self.report({'ERROR'}, str(exc))
+                return {'CANCELLED'}
             st.live_active = True
             st.status_text = "Live started - move/add markers on the left."
             self.report({"INFO"}, "Live fitting started.")
@@ -3143,14 +2992,14 @@ class GNM_OT_pick_gnm_vertex(Operator):
     @classmethod
     def poll(cls, context):
         return (_LIVE.model is not None
-                and bpy.data.objects.get(GNM_MESH_NAME) is not None
+                and bpy.context.scene.objects.get(_case_name(GNM_MESH_NAME)) is not None
                 and bool(context.scene.gnm_markers))
 
     def invoke(self, context, event):
         scene = context.scene
         item = scene.gnm_markers[scene.gnm_marker_active_index]
         self._label = item.label
-        self._gnm = bpy.data.objects.get(GNM_MESH_NAME)
+        self._gnm = bpy.context.scene.objects.get(_case_name(GNM_MESH_NAME))
         scene.gnm_live.status_text = (
             f"Picking '{item.label}': click on the GNM head (right); "
             f"ESC cancels.")
@@ -3258,38 +3107,27 @@ class GNM_OT_export_landmark_json(Operator):
         if not st.json_path:
             self.report({"ERROR"}, "The JSON path is not set.")
             return {"CANCELLED"}
-        try:
-            with open(st.json_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            data = {}
         model = _LIVE.model
-        stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        n_merged = 0
+        data = dict(schema_version=1, model_sha256=_LIVE.model_hash, landmarks={})
         for item in scene.gnm_markers:
-            if item.gnm_vertex_override < 0:
-                continue
-            vid = int(item.gnm_vertex_override)
-            key = ADDON_TO_JSON_KEY.get(item.label) or item.label.lower()
-            data[key] = {
-                "vertex_index": vid,
-                "position": (model.mu[vid].astype(np.float64) / 1000.0).tolist(),
-                "source": "manual_picked_blender",
-                "confidence": "manual",
-                "note": (f"Manually picked in Blender (addon {bl_info['version'][0]}) on {stamp}; "
-                         f"addon label: {item.label}"),
-            }
-            n_merged += 1
-        if not n_merged:
-            self.report({"WARNING"},
-                        "No manual override to export (use 'Pick GNM Vertex' "
-                        "first).")
-            return {"CANCELLED"}
-        if os.path.isfile(st.json_path):
-            shutil.copy2(st.json_path, st.json_path + ".bak")
-        with open(st.json_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        _LIVE.json_map = data
+            vertex = _resolve_vertex(item)
+            if vertex is not None and (item.mapping_reviewed or item.gnm_vertex_override >= 0):
+                data['landmarks'][item.label] = dict(vertex_index=vertex, reviewed=True,
+                    position_mm=model.mu[vertex].astype(float).tolist(), source='operator-reviewed-blender',
+                    observer_id=scene.gnm_settings.observer_id)
+        n_merged = len(data['landmarks'])
+        try:
+            reviewed = _core_module('mapping').reviewed_vertices(data, _LIVE.model_hash, model.vertex_count)
+            if not reviewed:
+                raise ValueError('Review correspondences or pick model vertices before export')
+            if os.path.isfile(st.json_path):
+                shutil.copy2(st.json_path, st.json_path+'.bak')
+            with _core_module('export').atomic_text(st.json_path) as stream:
+                json.dump(data, stream, indent=2, ensure_ascii=False, allow_nan=False)
+        except (ValueError, OSError) as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        _LIVE.json_map, _LIVE.reviewed_map = data, reviewed
         _refresh_ghosts(scene)
         self.report({"INFO"},
                     f"{n_merged} manual picks saved to "
@@ -3361,7 +3199,7 @@ class GNMLiveSettings(PropertyGroup):
     prior_weight: FloatProperty(
         name="Prior Strength", default=1.0, min=0.1, max=4.0,
         description="Multiplier of the demographic prior precision "
-                    "(1.0 = exact Gaussian MAP; >1 = stronger shrinkage "
+                    "(1.0 = specified diagonal penalty; >1 = stronger shrinkage "
                     "towards the demographic mean)")
     prior_dir: StringProperty(
         name="Priors Folder", subtype="DIR_PATH", default="",
@@ -3369,7 +3207,7 @@ class GNMLiveSettings(PropertyGroup):
                     "(generated with make_demographic_prior.py)")
     prior_status: StringProperty(default="inactive")
     dense_enabled: BoolProperty(
-        name="Continuous Dense", default=False,
+        name="Dense on each refit", default=False,
         update=_on_dense_toggle_update,
         description="Dense skull constraints at every fit (scalp + thin-"
                     "tissue regions, like --skull offline). The general "
@@ -3385,7 +3223,7 @@ class GNMLiveSettings(PropertyGroup):
         name="Dense Strength", default=1.0, min=0.1, max=10.0,
         update=_on_dense_param_update,
         description="Multiplier of the ICP/dense attraction force "
-                    "(1.0 = calibrated default). Increase if skull areas "
+                    "(1.0 = dense/marker weight ratio 0.5). Increase if skull areas "
                     "remain uncovered after alignment; decrease if the head "
                     "sticks too aggressively to the bone")
     dense_nose_weight: FloatProperty(
@@ -3424,6 +3262,19 @@ def _draw_live_section(layout, context):
     """Sectiunea V13 din panoul principal (apelata la finalul lui draw)."""
     scene = context.scene
     st = scene.gnm_live
+    bones = layout.box()
+    bones.label(text='Observed bone sources')
+    bones.operator('gnm.register_bone_sources')
+    for source in scene.gnm_bone_sources:
+        row = bones.row(align=True)
+        row.prop(source, 'enabled', text='')
+        row.prop(source, 'source_object', text='')
+        row.prop(source, 'anatomy', text='')
+        row = bones.row(align=True)
+        row.prop(source, 'normals_reviewed')
+        row.prop(source, 'flip_normals')
+        row.prop(source, 'use_dense')
+    bones.prop(scene.gnm_settings, 'mandible_aligned')
     layout.separator()
     box = layout.box()
     box.label(text="GNM Live Reconstruction (V13):")
@@ -3529,6 +3380,7 @@ def _is_mm_scene(scene):
 
 
 def _export_markers(scene, path):
+    _bind_case(scene)
     if not _is_mm_scene(scene):
         raise ValueError("Expected metric scene scale 0.001: 1 Blender coordinate = 1 mm")
     ok, message = _ensure_cranio(scene.gnm_live.npz_path)
@@ -3540,6 +3392,10 @@ def _export_markers(scene, path):
     model_digest = _core_module('validation').sha256_file(model_path)
     if model_digest != _core_module('backend.gnm_backend').OFFICIAL_V3_SHA256:
         raise ValueError("The built-in marker map requires the reviewed GNM v3 asset")
+    if scene.gnm_live.json_path and os.path.isfile(bpy.path.abspath(scene.gnm_live.json_path)):
+        _LIVE.reviewed_map = _core_module('mapping').read_reviewed_map(bpy.path.abspath(scene.gnm_live.json_path), model_digest, 17821)
+    manifest = _source_manifest(scene, bpy.context.evaluated_depsgraph_get())
+    sources = {row['id']: row for row in manifest}
     rows = []
     for item in scene.gnm_markers:
         vid = _resolve_vertex(item)
@@ -3552,6 +3408,9 @@ def _export_markers(scene, path):
         if item.is_placed:
             if vid is None:
                 raise ValueError(f"No model correspondence: {item.label}")
+            source_id = item.bone_empty.get('gnm_bone_source_id', '')
+            row.update(bone_source_id=source_id, bone_source_geometry_sha256=item.bone_empty.get('gnm_source_sha256_at_placement', ''),
+                       bone_anatomy=sources.get(source_id, {}).get('anatomy', ''), articulation_reviewed=int(scene.gnm_settings.mandible_aligned))
             bone = item.bone_empty.matrix_world.translation
             target = item.target_empty.matrix_world.translation
             if abs((target - bone).length - item.tissue_depth_mm) > 0.05:
@@ -3560,7 +3419,10 @@ def _export_markers(scene, path):
                        bone_x=bone.x, bone_y=bone.y, bone_z=bone.z,
                        tissue_depth_mm=item.tissue_depth_mm)
         rows.append(row)
-    meta = {"addon_version": '.'.join(map(str, bl_info['version'])),
+    _case_token(scene)
+    meta = {'case_id': scene.gnm_settings.case_id, 'observer_id': scene.gnm_settings.observer_id,
+            'protocol_id': scene.gnm_settings.protocol_id, 'bone_sources': manifest,
+            'mandible_articulation_reviewed': scene.gnm_settings.mandible_aligned, "addon_version": '.'.join(map(str, bl_info['version'])),
             "blender_version": bpy.app.version_string,
             "model_sha256": model_digest,
             "skull_source": scene.gnm_settings.sursa_fisier,
@@ -3692,6 +3554,7 @@ class GNM_OT_run_offline(Operator):
             # Fail before creating a case folder or launching the fit. In
             # particular, .py/ELF files cannot be executed by Windows.
             info = _check_external_python(scene)
+            _build_snapshot(scene)
             root = Path(__file__).resolve().parent
             folder = Path(bpy.path.abspath(settings.case_directory)) / (
                 datetime.datetime.now().strftime('%Y%m%dT%H%M%S') + '_' + uuid.uuid4().hex[:8])
@@ -3704,6 +3567,23 @@ class GNM_OT_run_offline(Operator):
                        '--lambda-base', str(scene.gnm_live.lambda_base),
                        '--lambda-min', str(scene.gnm_live.lambda_min),
                        '--lambda-max', str(scene.gnm_live.lambda_max)]
+            arguments += ['--clip-sigma', str(scene.gnm_live.clip_sigma)]
+            if settings.local_correction:
+                arguments.append('--local-correction')
+            if settings.offline_dense:
+                bone_path = folder / 'observed_bones.obj'
+                _export_registered_bones(scene, str(bone_path), context.evaluated_depsgraph_get())
+                arguments += ['--skull', str(bone_path), '--skull-normals-reviewed', '--dense-weight', str(.5*scene.gnm_live.dense_strength),
+                              '--dense-nose-weight', str(scene.gnm_live.dense_nose_weight), '--dense-max-rows', str(scene.gnm_live.dense_max_rows)]
+                if scene.gnm_live.dense_scalp_only:
+                    arguments.append('--no-face-dense')
+            _load_prior(scene)
+            if scene.gnm_live.prior_sex != 'NONE' and scene.gnm_live.prior_ethnicity != 'NONE' and _LIVE.prior is None:
+                raise ValueError('Selected prior unavailable: ' + scene.gnm_live.prior_status)
+            if _LIVE.prior is not None:
+                prior_path = folder / 'selected_prior.npz'
+                shutil.copy2(_LIVE.prior['path'], prior_path)
+                arguments += ['--prior', str(prior_path), '--prior-weight', str(scene.gnm_live.prior_weight)]
             log = (folder / 'run.log').open('w', encoding='utf-8')
             try:
                 process = _core_module('external_python').start_pipeline(
@@ -3736,7 +3616,7 @@ class GNM_OT_cancel_offline(Operator):
 
 
 _classes = (
-    GNMSettings, GNMMarkerItem, GNMRestorationRegion,
+    GNMSettings, GNMMarkerItem, GNMRestorationRegion, GNMBoneSource, GNM_OT_register_bone_sources,
     GNM_OT_region_add, GNM_OT_region_remove, GNM_UL_restoration_regions, GNM_OT_audit_landmarks,
     GNM_OT_import_setup, GNM_OT_init_markers,
     GNM_OT_place_marker, GNM_OT_next_unplaced, GNM_OT_toggle_plane_preview,
@@ -3759,6 +3639,7 @@ def register():
     bpy.types.Scene.gnm_markers = CollectionProperty(type=GNMMarkerItem)
     bpy.types.Scene.gnm_marker_active_index = IntProperty(default=0)
     bpy.types.Scene.gnm_live = PointerProperty(type=GNMLiveSettings)
+    bpy.types.Scene.gnm_bone_sources = CollectionProperty(type=GNMBoneSource)
     bpy.types.Scene.gnm_restoration_regions = CollectionProperty(type=GNMRestorationRegion)
     bpy.types.Scene.gnm_restoration_active_index = IntProperty(default=0)
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
@@ -3780,6 +3661,8 @@ def unregister():
             bpy.app.handlers.load_post.remove(h)
     if hasattr(bpy.types.Scene, "gnm_live"):
         del bpy.types.Scene.gnm_live
+    _LIVE.__init__()
+    del bpy.types.Scene.gnm_bone_sources
     del bpy.types.Scene.gnm_restoration_regions
     del bpy.types.Scene.gnm_restoration_active_index
     for cls in reversed(_classes): bpy.utils.unregister_class(cls)

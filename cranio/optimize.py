@@ -100,7 +100,7 @@ def huber_downweight(residuals, weights, k_mm=10.0):
 
 
 def robust_alignment(model_lm, targets_xyz, weights, n_iter=30):
-    """Umeyama ponderat cu down-ponderare Huber a outlierilor (2 re-fitari)."""
+    """Iterate a single Huber layer from the original confidence weights."""
     w = np.asarray(weights, dtype=np.float64)
     scale, rot, trans = None, None, None
     for _ in range(n_iter):
@@ -257,8 +257,8 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
     if (np.ndim(mu) != 2 or np.shape(mu)[1] != 3 or np.ndim(basis) != 3
             or np.shape(basis)[1:] != np.shape(mu)):
         raise ValueError("Invalid mean/basis shapes")
-    finite_array(mu, 'model mean')
-    finite_array(basis, 'identity basis')
+    if not np.isfinite(mu).all() or not np.isfinite(basis).all():
+        raise ValueError('Model mean/basis contains NaN or infinity')
     if len(basis) == 0:
         raise ValueError('Identity basis is empty')
     lm_idx = np.asarray(lm_idx)
@@ -277,7 +277,7 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
             raise ValueError(f"Invalid loss setting: {name}")
     if loss_cfg.clip_sigma == 0 or not isinstance(max_iter, (int, np.integer)) or max_iter < 1 or not np.isfinite(tol) or tol <= 0:
         raise ValueError("clip_sigma, max_iter and tol must be positive")
-    if pose_rows is not None and not 3 <= pose_rows <= len(targets_xyz):
+    if pose_rows is not None and not (isinstance(pose_rows, (int, np.integer)) and 3 <= pose_rows <= len(targets_xyz)):
         raise ValueError("pose_rows must select at least 3 valid landmarks")
     if prior_mean is not None:
         prior_mean = finite_array(prior_mean, "prior mean", (basis.shape[0],))
@@ -355,8 +355,7 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
         if prior_mean is not None:
             # Prior demografic (V13.1): shrink spre media demografica, cu
             # precizie per-componenta (inlocuieste shrink-ul isotropic la 0).
-            # prior_scale clipat defensiv la [0.25, 4.0]: componentele cu
-            # dispersie demografica foarte mica nu trebuie sa inghete fitul.
+            # Use the recorded prior scales exactly; generation-time clipping is explicit metadata.
             ps = np.asarray(prior_scale, dtype=np.float64)
             pm = np.asarray(prior_mean, dtype=np.float64)
             prec = np.sqrt(lam_used * prior_weight) / ps

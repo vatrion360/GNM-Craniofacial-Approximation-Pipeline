@@ -12,7 +12,8 @@ python -m venv .venv
 source .venv/bin/activate
 # Windows PowerShell alternative:
 # .venv\Scripts\Activate.ps1
-python -m pip install .
+python -m pip install --require-hashes --only-binary=:all: -r requirements-tested-py312.txt  # Python 3.12
+python -m pip install --no-deps .
 ```
 
 No TensorFlow, PyTorch, CUDA, GNMImporter purchase or complete GNM Python installation is needed for neutral identity fitting. The optional legacy demographic-prior generator has separate dependencies and is outside the tested fitting workflow.
@@ -42,7 +43,7 @@ Use `--npz` for every command, or set `GNM_MODEL_PATH` to an absolute filename. 
 python tools/build_addon.py
 ```
 
-In Blender: Preferences → Add-ons → Install from Disk → select `dist/gnm_cranio-5.0.0rc3.zip` → enable **GNM Scientific Markers**. The sidebar is **GNM Markers**. Disable previous copies to avoid duplicate operator registrations.
+In Blender: Preferences → Add-ons → Install from Disk → select `dist/gnm_cranio-5.0.0rc4.zip` → enable **GNM Scientific Markers**. The sidebar is **GNM Markers**. Disable previous copies to avoid duplicate operator registrations.
 
 Select `gnm_head.npz`. Import a skull and explicitly select mm/cm/m according to the source file. The resulting scene uses **one Blender coordinate = one millimetre**, represented by metric scale `0.001`. Check a known anatomical/scanner measurement after import; STL/OBJ do not reliably carry physical units.
 
@@ -86,7 +87,7 @@ Copy the project wheel, wheelhouse, model + upstream notices, add-on ZIP and thi
 On the offline workstation, create/activate a fresh virtualenv, then:
 
 ```bash
-python -m pip install --no-index --find-links wheelhouse dist/gnm_craniofacial-5.0.0rc3-py3-none-any.whl
+python -m pip install --no-index --find-links wheelhouse dist/gnm_craniofacial-5.0.0rc4-py3-none-any.whl
 python -m cranio.doctor --npz models/gnm_head.npz
 ```
 
@@ -115,3 +116,7 @@ Set `GNM_MODEL_PATH` for both commands to exercise real asset integration. The B
 | Output exists | Choose a new case folder, or deliberately use `--overwrite` |
 | Offline fit failed in Blender | Read the case's `run.log`; verify external interpreter dependencies |
 | Preview pauses the UI | Stop preview and use the external offline fit button |
+
+The Python 3.12 file now contains wheel hashes for all published platforms. For Python 3.10 compatibility, use `pip install .`; it selects versions in the declared ranges and does not reproduce the 3.12 runtime. For an air-gapped 3.12 workstation, download the locked wheels on the same OS/architecture/Python, then install with `--no-index --find-links wheelhouse --require-hashes --only-binary=:all: -r requirements-tested-py312.txt` and install the project wheel with `--no-deps`. Build tools and development dependencies are separate from this runtime lock.
+
+For experimental prior generation, create a separate environment and explicitly select a trusted local decoder with `--decoder path/to/identity_decoder.h5`. The generator records decoder/generator hashes and TensorFlow/NumPy/Python versions. The core runtime lock and its security audit do not cover TensorFlow; archive and audit that entire environment separately. Generation has not been executed as a release gate. Never load an untrusted Keras decoder.
