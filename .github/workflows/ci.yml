@@ -22,7 +22,8 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install reviewed Python 3.12 runtime
         if: matrix.python == '3.12'
-        run: python -m pip install --require-hashes --only-binary=:all: -r requirements-tested-py312.txt
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: -r requirements-tested-py312.txt
       - run: python -m pip install '.[dev]'
       - run: python -m ruff check cranio addon_v13.py gnm_reconstruct.py tools tests
       - run: python -m pytest -q
