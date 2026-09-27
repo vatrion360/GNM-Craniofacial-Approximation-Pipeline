@@ -80,6 +80,32 @@ def test_report_replay_and_protocol_freeze(tmp_path, model_file, marker_file):
     for record in meta['marker_records'].values():
         record.update(mapping_reviewed=True, bone_status='observed', bone_source_id='source', bone_source_geometry_sha256='e'*64)
     assert validate_protocol(cfg, meta, targets, sha256_file(model_file))['status'] == 'freeze_matched'
+    # Malformed provenance must fail explicitly, never overwrite duplicate
+    # sources or escape the CLI's validation boundary with TypeError/KeyError.
+    from copy import deepcopy
+    malformed = [
+        ('case_metadata', []),
+        ('bone_sources', {}),
+        ('bone_sources', [None]),
+        ('bone_sources', [{}]),
+        ('bone_sources', [dict(id=[], geometry_sha256='e'*64)]),
+        ('bone_sources', [dict(id='source', geometry_sha256='not-a-hash')]),
+        ('bone_sources', meta['bone_sources']*2),
+        ('marker_records', []),
+        ('marker_records', {targets[0].label: None}),
+    ]
+    for key, value in malformed:
+        invalid = deepcopy(meta)
+        invalid[key] = value
+        with pytest.raises(ValueError):
+            validate_protocol(cfg, invalid, targets, sha256_file(model_file))
+    invalid = deepcopy(meta)
+    invalid['marker_records'][targets[0].label]['bone_source_id'] = []
+    with pytest.raises(ValueError, match='ID must be a string'):
+        validate_protocol(cfg, invalid, targets, sha256_file(model_file))
+    for split_hash in ('g'*64, None, 'c'*63):
+        with pytest.raises(ValueError, match='SHA-256'):
+            frozen_from_report(report, 'ct-study/r1', split_hash)
     cfg.dense_weight = .6
     with pytest.raises(ValueError, match='settings'):
         validate_protocol(cfg, meta, targets, sha256_file(model_file))
