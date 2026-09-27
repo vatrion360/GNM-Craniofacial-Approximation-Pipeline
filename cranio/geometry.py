@@ -110,7 +110,7 @@ def build_protected_mask(vertex_groups, vertex_group_names):
     return np.where(mask)[0]
 
 
-def load_skull_samples(skull_path, n_samples=200000, seed=42):
+def load_skull_samples(skull_path, n_samples=200000, seed=42, flip_normals=False):
     """Incarca craniul si esantioneaza puncte + normale pe suprafata lui.
 
     Se asteapta coordonate in milimetri, in acelasi spatiu world Blender ca
@@ -127,41 +127,65 @@ def load_skull_samples(skull_path, n_samples=200000, seed=42):
             or not np.isfinite(mesh.area) or mesh.area <= 0):
         raise ValueError("Skull requires finite vertices and nonzero surface area")
     points, face_idx = trimesh.sample.sample_surface(mesh, n_samples, seed=seed)
-    normals = mesh.face_normals[face_idx]
+    normals = mesh.face_normals[face_idx] * (-1 if flip_normals else 1)
     return mesh, np.asarray(points), np.asarray(normals)
 
 
 def dense_correspondences(v_world, dense):
-    """Corespondente vertecsi-constransi->craniu, cu respingerea celor invalide.
+    """Shared sampled correspondences, using explicitly reviewed outward normals.
 
-    Pentru fiecare vertex din dense["dense_idx"] (scalp + regiuni faciale):
-    cel mai apropiat punct esantionat pe craniu. Se resping corespondentele
-    cu distanta > max_dist_mm (craniu partial / zona lipsa, ex. mandibula
-    lipsa) sau cu normala craniului aproape opusa celei a modelului (tablita
-    interna, muchii taiate). Tintele = punct + offset_regiune * normala.
-    Returneaza (idx_pastrati, tinte_world, masca_keep, distanta_medie).
+    No orientation is inferred from coverage. The full geometric keep mask and
+    the actual sampled rows are distinct; diagnostics record both for replay.
     """
-    dense_idx = dense["dense_idx"]
-    pts = v_world[dense_idx]
-    dists, nn = dense["tree"].query(pts)
-    closest = dense["points"][nn]
-    n_skull = dense["normals"][nn]
-    n_model = compute_vertex_normals(v_world, dense["triangles"],
-                                     flip=dense.get("flip", False))[dense_idx]
-    dots = np.einsum("ij,ij->i", n_model, n_skull)
+    from .fit_contract import balanced_indices, DENSE_MAX_ROWS
+    from .validation import finite_array
+    idx = dense['dense_idx']
+    distances, nearest = dense['tree'].query(v_world[idx])
+    normals = finite_array(dense['normals'][nearest], 'bone normals')
+    length = np.linalg.norm(normals, axis=1)
+    normals = normals/np.maximum(length[:, None], 1e-12)
+    distance_ok = distances < dense['max_dists']*dense.get('distance_scale', 1.)
+    normal_ok = length > 1e-12
+    if dense.get('use_normal', True):
+        model_normals = compute_vertex_normals(v_world, dense['triangles'], bool(dense.get('flip')))[idx]
+        normal_ok &= np.einsum('ij,ij->i', model_normals, normals) > dense['min_dot']
+    keep = distance_ok & normal_ok
+    regions = np.asarray(dense.get('regions', np.full(len(idx), 'scalp')))
+    nose_weight = float(dense.get('nose_weight', .7))
+    if not np.isfinite(nose_weight) or nose_weight < 0:
+        raise ValueError('Nasal dense weight must be finite and nonnegative')
+    relative = np.where(regions == 'punte_nazala', nose_weight, 1.)
+    candidates = np.flatnonzero(keep & (relative > 0))
+    selected = candidates[balanced_indices(regions[candidates], dense.get('max_rows', DENSE_MAX_ROWS))]
+    targets = dense['points'][nearest[selected]] + dense['offsets'][selected, None]*normals[selected]
+    dense['last_relative_weights'] = relative[selected]
+    dense['last_distances'] = distances[selected]
+    dense['last_region_stats'] = {str(name): (int(np.sum(keep & (regions == name))), int(np.sum(regions == name)),
+        float(np.mean(distances[keep & (regions == name)])) if np.any(keep & (regions == name)) else float('nan'))
+        for name in np.unique(regions)}
+    dense['last_diagnostics'] = {'candidate_count': len(idx), 'accepted_count': int(keep.sum()),
+        'rejected_distance_count': int((~distance_ok).sum()),
+        'rejected_normal_within_distance_count': int((distance_ok & ~normal_ok).sum()),
+        'sampled_vertex_indices': idx[selected].tolist(), 'bone_sample_indices': nearest[selected].tolist(),
+        'regions': regions[selected].tolist(), 'distances_mm': distances[selected].tolist(),
+        'normal_policy': 'explicit outward bone normals; never auto-flipped', 'model_winding_flip': bool(dense.get('flip'))}
+    return idx[selected], targets, keep, float(distances[keep].mean()) if keep.any() else float('nan')
 
-    # La primul apel: detecteaza daca orientarea fetelor GNM e inversa fata
-    # de conventia craniului si corecteaza global (o singura data).
-    if dense.get("flip") is None:
-        dense["flip"] = bool(np.median(dots) < 0)
-        if dense["flip"]:
-            return dense_correspondences(v_world, dense)
 
-    keep = (dists < dense["max_dists"]) & (dots > dense["min_dot"])
-    sidx = dense_idx[keep]
-    targets_w = closest[keep] + dense["offsets"][keep, None] * n_skull[keep]
-    mean_dist = float(dists[keep].mean()) if keep.any() else float("nan")
-    return sidx, targets_w, keep, mean_dist
+def model_winding_flip(vertices, triangles):
+    """Choose the model winding once from the posed-independent neutral asset."""
+    tri = (np.asarray(vertices)-np.mean(vertices, axis=0))[triangles]
+    return bool(np.einsum('ij,ij->i', tri[:, 0], np.cross(tri[:, 1], tri[:, 2])).sum() < 0)
+
+
+class PointQueryAdapter:
+    """Adapt Blender KDTree.find to the same query API used offline."""
+    def __init__(self, find):
+        self.find = find
+
+    def query(self, points):
+        values = [self.find(point) for point in points]
+        return np.array([v[2] for v in values]), np.array([v[1] for v in values], dtype=int)
 
 
 # ---------------------------------------------------------------------------

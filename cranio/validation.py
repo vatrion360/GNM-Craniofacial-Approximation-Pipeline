@@ -56,3 +56,20 @@ def residual_metrics(residuals):
     return {"count": int(r.size), "rmse_mm": rmse(r),
             "mean_mm": float(r.mean()), "median_mm": float(np.median(r)),
             "p95_mm": float(np.percentile(r, 95)), "max_mm": float(r.max())}
+
+
+def weighted_geometry(points, weights, name='weighted geometry'):
+    """Check effective rank, allowing planar but rejecting collinear geometry."""
+    points = validate_points(points, name)
+    w = finite_array(weights, name+' weights', (len(points),))
+    if np.any(w <= 0):
+        raise ValueError('Weights must be positive')
+    w = w/w.max()
+    w /= w.sum()
+    center = (w[:, None]*points).sum(axis=0)
+    singular = np.linalg.svd(np.sqrt(w[:, None])*(points-center), compute_uv=False)
+    ratio = float(singular[1]/singular[0]) if singular[0] > 0 else 0.
+    if ratio <= 1e-7:
+        raise ValueError(f'{name}: degenerate weighted geometry (rank below 2)')
+    return {'singular_values_mm': singular.tolist(), 'second_to_first_ratio': ratio,
+            'effective_point_count': float(1/(w@w)), 'poorly_conditioned': ratio < 1e-3}
