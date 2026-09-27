@@ -4,7 +4,7 @@
 
 1. Keep the unedited scan and acquisition metadata. Work on a copy. Record scan modality/resolution, surface extraction threshold if known, source units and repairs. This software begins with an existing skull mesh; it does not validate segmentation.
 2. Import into Blender with explicit mm/cm/m. Check at least one known length and the right/left labels. The scene contract is metric scale 0.001, with world coordinates in millimetres.
-3. Preserve true asymmetry. If a partial skull is mirrored, mark the repaired regions and distinguish measured landmarks from inferred ones. Do not treat both mirrored sides as independent observations. Keep an original scan copy: the inherited reconstruction tool can remove the selected half.
+3. Preserve true asymmetry. If a partial skull is mirrored, mark the repaired regions and distinguish measured landmarks from inferred ones. Do not treat both mirrored sides as independent observations. Selective restoration creates separate inferred patches and preserves the observed sources. Register each donor/central fragment explicitly; see [mixed fragments](FRAGMENT_RESTORATION.md).
 4. Load the reviewed GNM model. Check correspondence positions on the neutral skin mesh. A topology hash verifies model identity, not anatomical homology.
 
 ## Marker and tissue review
@@ -27,7 +27,7 @@ python gnm_reconstruct.py --input case/markers.csv --npz models/gnm_head.npz --o
 
 The strict option checks provenance fields only. It cannot determine whether the cited tissue values, anatomy or case protocol are sound.
 
-Inspect the fit in frontal, lateral and three-quarter views, together with the skull. Check laterality, scale, chin/mandibular angle, nasal bridge, orbital region, lips, ears, internal anatomy and exposed bone. The solver does not provide a complete collision/self-intersection check. Compare the mesh with the actual markers; do not use the colour of confidence ghosts as an empirical confidence interval.
+Inspect the fit in frontal, lateral and three-quarter views, together with the skull. Check laterality, scale, chin/mandibular angle, nasal bridge, orbital region, lips, ears, internal anatomy and exposed bone. Run `--geometry-qc full` for nonadjacent exterior contact checks and sampled bone clearance; inspect its stated scope and warnings. These checks do not prove anatomical validity or complete solid containment. Compare the mesh with the actual markers; do not use the colour of confidence ghosts as an empirical confidence interval.
 
 ## Diagnose before adding flexibility
 

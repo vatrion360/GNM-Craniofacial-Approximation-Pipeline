@@ -44,3 +44,7 @@ No calibrated uncertainty surface is provided. To establish uncertainty, use rep
 9. *Validation of the New Interpretation of Gerasimov's Nasal Projection Method for Forensic Facial Approximation Using CT Data*. PubMed PMID 26271796. https://pubmed.ncbi.nlm.nih.gov/26271796/
 
 Primary source review date: 2026-09-25. The references motivate methods and review criteria; they do not constitute validation of this software.
+
+## Numerical contract update
+
+Release 5.0.0rc4 uses a single Huber IRLS layer, weighted observability checks and a shared preview/offline dense objective. Dense total weight is independent of sampling count. Geometry checks and frozen-study metadata are engineering controls with explicit limits, described in [SCIENTIFIC_HARDENING](SCIENTIFIC_HARDENING.md). They add no empirical validation of tissue depths, medieval cohorts or subject identity.

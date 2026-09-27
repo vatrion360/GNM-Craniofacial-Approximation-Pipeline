@@ -36,7 +36,7 @@ for i in range(68):
     pos = (V[idx] * w[:, None]).sum(axis=0)
     lm68_positions[i] = pos
     # vertex cel mai apropiat de punctul baricentric, pt un index "simplu" utilizabil
-    lm68_nearest_vertex[i] = idx[np.argmax(w)]
+    lm68_nearest_vertex[i] = idx[np.argmin(np.linalg.norm(V[idx] - pos, axis=1))]
 
 # Subset iBUG-68 -> nume craniometric echivalent de tesut moale (indici 0-based)
 IBUG68_TO_FORENSIC = {
@@ -61,7 +61,8 @@ landmark_map = {}
 for ibug_idx, name in IBUG68_TO_FORENSIC.items():
     landmark_map[name] = {
         "vertex_index": int(lm68_nearest_vertex[ibug_idx]),
-        "position": lm68_positions[ibug_idx].tolist(),
+        "position": V[lm68_nearest_vertex[ibug_idx]].tolist(),
+        "barycentric_position": lm68_positions[ibug_idx].tolist(),
         "source": "official_gnm_68_barycentric",
         "ibug68_index": ibug_idx,
         "confidence": "medium-high" if ibug_idx not in (0, 16) else "low",

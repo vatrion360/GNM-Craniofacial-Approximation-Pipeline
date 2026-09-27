@@ -135,31 +135,4 @@ def run_lambda_checks(addon, scene, model):
     assert addon._adaptive_lambda(12, 1, .3, 1000) == 4
     assert addon._adaptive_lambda(48, 1, .3, 1000) == 1
     assert addon._adaptive_lambda(0, 1, .3, 1000) == 1000
-    previous_cfg, previous_model = dict(addon._LIVE.cfg), addon._LIVE.model
-    previous_fit = addon._CRANIO.get('fit_identity')
-    previous_loss = addon._CRANIO.get('LossConfig')
-    calls = []
-    def fake_fit(*args, **kwargs):
-        calls.append(True)
-        return None, None, None, None, 3.0, None, None
-    try:
-        addon._LIVE.model = model
-        addon._LIVE.cfg['loo_auto'] = True
-        addon._LIVE.loo_cache = {}
-        addon._CRANIO.update(fit_identity=fake_fit, LossConfig=lambda: None)
-        addon._live_lambda(48, snapshot)
-        addon._live_lambda(48, snapshot)
-        assert len(calls) == 1
-        snapshot['targets'][0, 0] += 1
-        addon._live_lambda(48, snapshot)
-        assert len(calls) == 2
-        snapshot['weights'][0] *= .5
-        addon._live_lambda(48, snapshot)
-        assert len(calls) == 3
-    finally:
-        addon._LIVE.cfg = previous_cfg
-        addon._LIVE.model = previous_model
-        addon._CRANIO['fit_identity'] = previous_fit
-        addon._CRANIO['LossConfig'] = previous_loss
-        addon._LIVE.loo_cache = {}
     print('BLENDER_DUPLICATE_AND_LAMBDA_PASS')

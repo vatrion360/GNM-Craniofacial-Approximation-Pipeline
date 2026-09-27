@@ -11,7 +11,11 @@ addon-ul Blender. Nu depinde de argparse si nu stie nimic de bpy.
 import os
 from pathlib import Path
 
+import logging
+
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from .backend import GNMBackend
 from .checks import (check_landmark_consistency, check_side_swap,
@@ -21,7 +25,7 @@ from .export import export_heatmap_ply, export_obj
 from .geometry import (build_face_dense_regions, build_protected_mask,
                        build_scalp_mask, build_vertex_region_map,
                        dense_correspondences, gerasimov_pronasale,
-                       load_skull_samples)
+                       load_skull_samples, model_winding_flip)
 from .io_csv import read_marker_csv
 from .landmarks import (CONSISTENCY_PAIRS, PLACEMENT_HINTS,
                         REGION_OFFSETS_MM)
@@ -87,7 +91,7 @@ def run_pipeline(cfg: PipelineConfig) -> int:
     try:
         return _run_pipeline(cfg)
     except (ValueError, OSError, ImportError, np.linalg.LinAlgError) as exc:
-        print(f"[FATAL ERROR] {exc}")
+        logger.error(f"[FATAL ERROR] {exc}")
         return 2
 
 
@@ -95,7 +99,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     """Ruleaza pipeline-ul complet. Returneaza 0 (succes) sau 2 (fatal)."""
     cfg.fill_default_outputs()
     cfg.validate()
-    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull) if path}
+    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.protocol, cfg.case_metadata) if path}
     warnings_list = []
 
     backend = GNMBackend(cfg.npz)
@@ -105,13 +109,29 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         symmetry_weight=cfg.symmetry_weight,
         distance_weight=cfg.distance_weight,
         prior_soft_sigma=cfg.prior_soft_sigma,
-        prior_soft_weight=cfg.prior_soft_weight,
+        prior_soft_weight=cfg.prior_soft_weight, clip_sigma=cfg.clip_sigma,
     )
 
+    prior_options = {}
+    if cfg.prior:
+        from .prior import load_prior
+        prior = load_prior(cfg.prior, backend.load().identity_dim)
+        prior_options = dict(prior_mean=prior['mean'], prior_scale=prior['scale'], prior_weight=cfg.prior_weight)
+    if cfg.landmark_map:
+        from .mapping import read_reviewed_map
+        label_to_vertex = dict(label_to_vertex, **read_reviewed_map(cfg.landmark_map, input_hashes[cfg.npz], backend.load().vertex_count))
     # --- Etapa 0: incarcare si verificari ---------------------------------
-    print(f"[0] Loading CSV: {cfg.input}")
+    logger.info(f"[0] Loading CSV: {cfg.input}")
     targets, skipped, _csv_meta = read_marker_csv(
         cfg.input, backend.index_to_label, label_to_vertex)
+    label_to_vertex = dict(label_to_vertex, **{target.label: target.vertex for target in targets})
+    if cfg.case_metadata:
+        import json
+        with open(cfg.case_metadata, encoding='utf-8') as stream:
+            case = json.load(stream)
+        if not isinstance(case, dict):
+            raise ValueError('Case metadata must be a JSON object')
+        _csv_meta['case_metadata'] = case
     model_hash = input_hashes[cfg.npz]
     recorded_hash = _csv_meta.get("model_sha256")
     if recorded_hash and recorded_hash != model_hash:
@@ -148,9 +168,9 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     if cfg.strict and (_csv_meta["version"] < 3 or not recorded_hash or unreviewed or unreviewed_map):
         raise ValueError("Strict preflight requires v3, matching model hash, recorded tissue sources and no explicitly unreviewed skin correspondences")
     for label, reason in skipped:
-        print(f"    - excluded {label}: {reason}")
+        logger.info(f"    - excluded {label}: {reason}")
     if len(targets) < 4:
-        print(f"[FATAL ERROR] Too few valid markers ({len(targets)}). "
+        logger.error(f"[FATAL ERROR] Too few valid markers ({len(targets)}). "
               f"At least 4 are required (>=10 recommended).")
         return 2
     if len(targets) < 10:
@@ -159,7 +179,10 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
             f"will be weakly constrained and dominated by the statistical "
             f"mean.")
 
-    print(f"[0] Loading GNM model: {cfg.npz}")
+    logger.info(f"[0] Loading GNM model: {cfg.npz}")
+    if cfg.protocol:
+        from .protocol import validate_protocol
+        _csv_meta['protocol_review'] = validate_protocol(cfg, _csv_meta, targets, model_hash)
     model = backend.load()
     mu, basis = model.mu, model.basis
     triangles = model.triangles
@@ -181,11 +204,11 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         targets, mu, label_to_vertex)
     if cons_rows:
         n_flag = sum(1 for r in cons_rows if r[5])
-        print(f"[0] Placement consistency check: {len(cons_rows)} pairs, "
+        logger.info(f"[0] Placement consistency check: {len(cons_rows)} pairs, "
               f"{n_flag} suspect")
         for a, b, dc, dg, dev, flag in cons_rows:
             if flag:
-                print(f"    [!] {a} - {b}: {dc:.1f} mm vs {dg:.1f} mm "
+                logger.info(f"    [!] {a} - {b}: {dc:.1f} mm vs {dg:.1f} mm "
                       f"expected ({dev:+.0%})")
         for label in sorted(cons_suspect):
             hint = PLACEMENT_HINTS.get(label)
@@ -200,12 +223,12 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     sk_points = None  # folosit si de diagnosticul nazal V13.6 (profilul oaselor)
     if cfg.skull:
         if not os.path.exists(cfg.skull):
-            print(f"[FATAL ERROR] The skull file does not exist: {cfg.skull}")
+            logger.error(f"[FATAL ERROR] The skull file does not exist: {cfg.skull}")
             return 2
-        print(f"[0] Loading skull: {cfg.skull}")
+        logger.info(f"[0] Loading skull: {cfg.skull}")
         from scipy.spatial import cKDTree
         skull_mesh, sk_points, sk_normals = load_skull_samples(
-            cfg.skull, cfg.dense_samples, seed=cfg.seed)
+            cfg.skull, cfg.dense_samples, seed=cfg.seed, flip_normals=cfg.skull_flip_normals)
         tree = cKDTree(sk_points)
         scalp_idx = build_scalp_mask(mu, vertex_groups, vertex_group_names)
         face_regions = ([] if cfg.no_face_dense else
@@ -227,7 +250,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         offsets = offsets_all[first]
         region_of_vertex = region_of_all[first]
         scalp_region_id = region_names.index("scalp")
-        print(f"    {len(sk_points)} skull samples; dense constraints: "
+        logger.info(f"    {len(sk_points)} skull samples; dense constraints: "
               f"{len(scalp_idx)} scalp + "
               f"{len(dense_idx) - len(scalp_idx)} face "
               f"({', '.join(f'{r[0]}:{len(r[1])}' for r in face_regions)})")
@@ -249,8 +272,9 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
             # de os; peste offset+12 mm e sigur o zona lipsa (ex. mandibula
             # absenta -> barbia nu se lipeste de maxilar).
             "max_dists": offsets + 12.0,
-            "min_dot": 0.2, "triangles": triangles, "flip": None,
+            "min_dot": 0.2, "triangles": triangles, "flip": model_winding_flip(mu, triangles),
             "in_fit": not cfg.no_dense_fit,
+            "regions": np.asarray(region_names)[region_of_vertex], "max_rows": cfg.dense_max_rows, "nose_weight": cfg.dense_nose_weight,
         }
         # Harta vertex->regiune pentru coloana "Regiune" din tabelul markeri.
         vertex_region = build_vertex_region_map(len(mu), scalp_idx,
@@ -259,13 +283,13 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         vertex_region = None
 
     # --- Etapa 1: aliniere initiala (pentru raportare) --------------------
-    print("[1] Weighted Umeyama alignment (robust)...")
+    logger.info("[1] Weighted Umeyama alignment (robust)...")
     try:
         s1, r1, t1, res_align = robust_alignment(mu[lm_idx], targets_xyz, weights)
     except ValueError as e:
-        print(f"[FATAL ERROR] {e}")
+        logger.error(f"[FATAL ERROR] {e}")
         return 2
-    print(f"    scale = {s1:.4f}, RMS = {rmse(res_align):.2f} mm "
+    logger.info(f"    scale = {s1:.4f}, RMS = {rmse(res_align):.2f} mm "
           f"(max {res_align.max():.2f} mm)")
 
     swapped = check_side_swap(targets, r1, t1, s1)
@@ -294,17 +318,17 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         active_terms.append("+ distances")
     if loss_cfg.prior_soft_sigma > 0.0:
         active_terms.append("+ soft prior")
-    print(f"[2] Statistical fit (regularization: {cfg.regularization}"
+    logger.info(f"[2] Statistical fit (regularization: {cfg.regularization}"
           f"{''.join(', ' + t for t in active_terms)})...")
     c, scale, rot, trans, lam_used, fit_info, res_fit = fit_identity(
         mu, basis, lm_idx, targets_xyz, weights, lam=lam_arg, dense=dense,
         mirror_indices=model.mirror_indices, distance_pairs=distance_pairs,
-        loss_cfg=loss_cfg)
-    print(f"    lambda = {lam_used:g}, |c|max = {np.abs(c).max():.2f} sigma, "
+        loss_cfg=loss_cfg, max_iter=cfg.max_iter, tol=cfg.tolerance, **prior_options)
+    logger.info(f"    lambda = {lam_used:g}, |c|max = {np.abs(c).max():.2f} sigma, "
           f"RMS = {rmse(res_fit):.2f} mm (max {res_fit.max():.2f} mm)")
     stab = stability_warnings(lam_used, fit_info[0], c, loss_cfg.clip_sigma)
     for w in stab:
-        print(f"    [!] {w}")
+        logger.info(f"    [!] {w}")
     warnings_list.extend(stab)
 
     # Excludere automata a outlierilor (optional): markerii cu reziduu mare
@@ -326,7 +350,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
             targets_xyz = targets_xyz[keep]
             weights = weights[keep]
             res_align = res_align[keep]
-            print(f"    [!] Auto-excluded {len(excluded_auto)} markers "
+            logger.info(f"    [!] Auto-excluded {len(excluded_auto)} markers "
                   f"(residual > {thresh_ex:.1f} mm): "
                   + ", ".join(f"{l} ({r:.1f} mm)" for l, r in excluded_auto))
             warnings_list.append(
@@ -335,26 +359,26 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                 + ", ".join(f"{l} ({r:.1f} mm)" for l, r in excluded_auto)
                 + ". Check their placement in Blender.")
             if len(targets) < 4:
-                print(f"[FATAL ERROR] After outlier exclusion only "
+                logger.error(f"[FATAL ERROR] After outlier exclusion only "
                       f"{len(targets)} markers remain (minimum 4).")
                 return 2
             if len(targets) < 10:
                 warnings_list.append(
                     f"After outlier exclusion {len(targets)} markers "
                     f"remain (<10) - weakly constrained reconstruction.")
-            print("    Re-running the statistical fit without outliers...")
+            logger.info("    Re-running the statistical fit without outliers...")
             lam_arg = selected_lambda(len(targets))
             c, scale, rot, trans, lam_used, fit_info, res_fit = fit_identity(
                 mu, basis, lm_idx, targets_xyz, weights, lam=lam_arg,
                 dense=dense, mirror_indices=model.mirror_indices,
-                distance_pairs=distance_pairs, loss_cfg=loss_cfg)
-            print(f"    refit: lambda = {lam_used:g}, |c|max = "
+                distance_pairs=distance_pairs, loss_cfg=loss_cfg, max_iter=cfg.max_iter, tol=cfg.tolerance, **prior_options)
+            logger.info(f"    refit: lambda = {lam_used:g}, |c|max = "
                   f"{np.abs(c).max():.2f} sigma, RMS = {rmse(res_fit):.2f} mm "
                   f"(max {res_fit.max():.2f} mm)")
             stab = stability_warnings(lam_used, fit_info[0], c,
                                       loss_cfg.clip_sigma)
             for w in stab:
-                print(f"    [!] {w}")
+                logger.info(f"    [!] {w}")
             warnings_list.extend(stab)
 
     outliers, thresh = flag_outliers(labels, res_fit)
@@ -414,7 +438,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         if dense is not None and not cfg.no_dense_tps:
             from scipy.spatial import cKDTree
             sidx, dt_w, keep, _ = dense_correspondences(v_world, dense)
-            kept_regions = dense["region_of_vertex"][keep]
+            kept_regions = np.asarray(dense['last_diagnostics']['regions'])
             if keep.sum() > 0:
                 # Deduplicare: centrele dense aflate aproape de un marker
                 # (ex. Vertex/Eurion sunt in masca de scalp) ar face matricea
@@ -426,7 +450,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                 kept_regions = kept_regions[far]
             rng = np.random.default_rng(cfg.seed)
             # Centre scalp si faciale, sub-esantionate separat.
-            scalp_id = dense["scalp_region_id"]
+            scalp_id = 'scalp'
             for is_scalp, cap_n in ((True, cfg.tps_scalp_centres),
                                     (False, cfg.tps_face_centres)):
                 sel_mask = (kept_regions == scalp_id) if is_scalp else (
@@ -446,7 +470,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         centers = np.vstack(centers)
         res_vecs = np.vstack(res_vecs)
 
-        print(f"[3] Local TPS correction (face cap {cfg.face_cap_mm:g} mm / "
+        logger.info(f"[3] Local TPS correction (face cap {cfg.face_cap_mm:g} mm / "
               f"scalp {cfg.max_correction_mm:g} mm, "
               f"protected-zone damping x{cfg.protect_damping:g}, "
               f"{len(targets)} markers + {n_scalp_centres} scalp + "
@@ -457,7 +481,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
             protect_damping=cfg.protect_damping)
         mean_corr = float(np.linalg.norm(field, axis=1).mean())
         max_corr = float(np.linalg.norm(field, axis=1).max())
-        print(f"    correction: mean {mean_corr:.2f} mm, max {max_corr:.2f} mm")
+        logger.info(f"    correction: mean {mean_corr:.2f} mm, max {max_corr:.2f} mm")
         if mean_corr > 5.0:
             warnings_list.append(
                 f"Mean local correction is large ({mean_corr:.1f} mm) - "
@@ -470,25 +494,39 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     if dense is not None:
         field_mag = np.linalg.norm(field, axis=1)
         sidx_f, _, keep_f, _ = dense_correspondences(v_final, dense)
-        reg_f = dense["region_of_vertex"][keep_f]
+        reg_f = np.asarray(dense['last_diagnostics']['regions'])
         dense_report.append("  Per region (final): kept, mean distance to "
                             "skull [target], mean correction:")
         off_all = dense["offsets"]
         for rid, rname in enumerate(dense["region_names"]):
-            m = reg_f == rid
+            m = reg_f == rname
             if not m.any():
                 dense_report.append(f"    {rname:14s}: 0 correspondences")
                 continue
             vids = sidx_f[m]
             d_r, _ = dense["tree"].query(v_final[vids])
             d_r = np.minimum(d_r, 60.0)  # taie cozile (zone fara os)
-            target_off = off_all[keep_f][m].mean()
+            target_off = off_all[np.searchsorted(dense['dense_idx'], sidx_f[m])].mean()
             dense_report.append(
                 f"    {rname:14s}: {m.sum():5d} | {d_r.mean():6.2f} mm "
                 f"[{target_off:4.1f}] | {field_mag[vids].mean():5.2f} mm")
-            print(f"    {rname:14s}: dist. to skull {d_r.mean():6.2f} mm "
+            logger.info(f"    {rname:14s}: dist. to skull {d_r.mean():6.2f} mm "
                   f"(target {target_off:4.1f})")
 
+    from .quality import geometry_quality
+    quality = geometry_quality(scale*(mu @ rot.T)+trans, v_world, v_final, triangles, cfg.geometry_qc,
+        skin_mask=model.group_mask('skin_exterior') if 'skin_exterior' in model.vertex_group_names else None,
+        skull_points=sk_points, skull_normals=sk_normals if cfg.skull else None)
+    quality['solver_converged'] = fit_info.diagnostics['converged']
+    if not quality['solver_converged']:
+        quality['status'] = 'needs_review'
+        warnings_list.append('Solver did not meet pose/coefficient/IRLS convergence tolerances')
+    if quality['status'] == 'needs_review':
+        warnings_list.append('Geometry/solver QC requires review; inspect the JSON diagnostics')
+    _csv_meta['geometry_quality'] = quality
+    if not cfg.skip_tps:
+        _csv_meta['local_correction_centres_world_mm'] = centers.tolist()
+        _csv_meta['local_correction_prescribed_vectors_mm'] = res_vecs.tolist()
     # --- Etapa 4: export ---------------------------------------------------
     if any(sha256_file(path) != digest for path, digest in input_hashes.items()):
         raise ValueError("An input changed during fitting; no outputs have been published")
@@ -497,11 +535,11 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     # Invalidate an older completion record before replacing any of its outputs.
     if cfg.overwrite and Path(cfg.output_json).exists():
         Path(cfg.output_json).unlink()
-    print(f"[4] Export statistical OBJ: {cfg.output_statistical}")
+    logger.info(f"[4] Export statistical OBJ: {cfg.output_statistical}")
     export_obj(cfg.output_statistical, v_world, triangles)
-    print(f"[4] Export OBJ: {cfg.output}")
+    logger.info(f"[4] Export OBJ: {cfg.output}")
     export_obj(cfg.output, v_final, triangles)
-    print(f"    Export heatmap PLY: {cfg.output_error_mesh}")
+    logger.info(f"    Export heatmap PLY: {cfg.output_error_mesh}")
     export_heatmap_ply(cfg.output_error_mesh, v_final, triangles,
                        np.linalg.norm(field, axis=1))
 
@@ -526,7 +564,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                 f"(distance to Rhinion {d_ger:.1f} mm, outside "
                 f"[{lo:g}..{hi:g}]) - check the placement of the nasal "
                 f"landmarks (Acanthion/Piriform/Nasion/Rhinion).")
-        print(f"[3] Gerasimov diagnostic: estimate->Rhinion dist "
+        logger.info(f"[3] Gerasimov diagnostic: estimate->Rhinion dist "
               f"{d_ger:.1f} mm, deviation vs final fit "
               f"{np.linalg.norm(gerasimov_res['pronasale_xyz'] - final_aligned[_PRONASALE_VID]):.1f} mm")
 
@@ -559,10 +597,10 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                 dense_report=dense_report, lm_regions=lm_regions,
                 consistency=cons_rows, excluded_auto=excluded_auto,
                 nasal_report=nasal_report)
-    print(f"    Statistics: {cfg.output_stats}")
+    logger.info(f"    Statistics: {cfg.output_stats}")
     write_run_json(cfg, _csv_meta, model_hash, targets, skipped, excluded_auto,
                    scale, rot, trans, c, lam_used, fit_info, res_align,
                    res_fit, res_final, field, warnings_list)
-    print(f"    Reproducibility report: {cfg.output_json}")
-    print("Done.")
-    return 0
+    logger.info(f"    Reproducibility report: {cfg.output_json}")
+    logger.info("Done.")
+    return 3 if (cfg.require_qc or cfg.protocol) and quality['status'] != 'passed_full_checks' else 0

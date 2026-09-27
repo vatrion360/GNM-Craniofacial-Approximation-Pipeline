@@ -24,7 +24,8 @@ Optimizorul nu stie nimic despre Blender sau despre addon.
 from dataclasses import dataclass
 
 import numpy as np
-from .validation import finite_array, validate_points, rmse
+from .validation import finite_array, validate_points, rmse, weighted_geometry
+from .fit_contract import FitInfo, FitResult, DEFAULT_MAX_ITER, DEFAULT_TOL, normalized_dense_weights
 
 
 @dataclass
@@ -67,6 +68,9 @@ def weighted_umeyama(src, dst, weights):
     w = finite_array(weights, "weights", (len(src),))
     if np.any(w <= 0):
         raise ValueError("Alignment weights must be positive")
+    weighted_geometry(src, w, "source landmarks")
+    weighted_geometry(dst, w, "target landmarks")
+    w = w / w.max()
     w = w / w.sum()
     ms = (w[:, None] * src).sum(axis=0)
     md = (w[:, None] * dst).sum(axis=0)
@@ -95,15 +99,18 @@ def huber_downweight(residuals, weights, k_mm=10.0):
     return w
 
 
-def robust_alignment(model_lm, targets_xyz, weights, n_iter=3):
-    """Umeyama ponderat cu down-ponderare Huber a outlierilor (2 re-fitari)."""
+def robust_alignment(model_lm, targets_xyz, weights, n_iter=30):
+    """Iterate a single Huber layer from the original confidence weights."""
     w = np.asarray(weights, dtype=np.float64)
     scale, rot, trans = None, None, None
     for _ in range(n_iter):
         scale, rot, trans = weighted_umeyama(model_lm, targets_xyz, w)
         pred = scale * (model_lm @ rot.T) + trans
         res = np.linalg.norm(pred - targets_xyz, axis=1)
-        w = huber_downweight(res, weights)
+        updated = huber_downweight(res, weights)
+        if np.max(np.abs((updated-w)/weights)) < 1e-7:
+            break
+        w = updated
     return scale, rot, trans, res
 
 
@@ -166,7 +173,7 @@ def _symmetry_rows(basis, mirror_indices, eig_floor=1e-12):
 
     Asimetria mesh-ului generat este liniara in coeficienti:
         V - reflect_x(V[mirror]); basis rows use B_i - reflect_x(B_i[mirror]).
-    (template-ul mu are doar o micro-asimetrie constanta, < 0.05 mm, deci
+    (template-ul mu are o micro-asimetrie constanta; aceasta
     nu intra in penalizare). Penalizarea ||sum_i c_i D_i||^2 este
     forma patratica c^T G c; returnam R cu R^T R = G_normalizat (medie
     diagonala 1), ca sa fie ponderata intuitiv cu lambda.
@@ -232,53 +239,17 @@ def _per_component_lambda(c, lam, sigma0, weight):
 
 
 def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
-                 default_lambda=30.0, max_iter=20, tol=1e-5, dense=None,
+                 default_lambda=30.0, max_iter=DEFAULT_MAX_ITER, tol=DEFAULT_TOL, dense=None,
                  mirror_indices=None, distance_pairs=None, loss_cfg=None,
                  prior_mean=None, prior_scale=None, prior_weight=1.0,
                  huber_rows=None, pose_rows=None):
-    """Fit alternativ: coeficienti identitate <-> transformare similaritate.
+    """Alternate weighted pose and ridge identity with one Huber IRLS layer.
 
-    Cu ``dense`` (dict produs de pipeline cand exista --skull), fiecare
-    iteratie adauga randuri dense scalp->craniu in rezolvarea ridge (tip
-    ICP: corespondentele sunt recalculate pe mesh-ul curent, cu respingere
-    de outlieri). Transformarea de similaritate ramane pilotata NUMAI de
-    markeri (stabilitate). Ponderile dense sunt normalizate: suma lor =
-    dense["weight_ratio"] * suma ponderilor markerilor.
-
-    Termenii optionali din ``loss_cfg`` (simetrie / distante / prior
-    moale) sunt implicit dezactivati (0) - comportament identic cu v3.1.
-
-    Prior demografic optional (adaugat in V13.1 pentru preview-ul live din
-    addon): daca ``prior_mean`` este dat (vector (I,) in unitati sigma, ex.
-    media esantioanelor IdentitySampler pentru un sex x etnie), blocul de
-    regularizare isotropic sqrt(lam)*I -> 0 este INLOCUIT cu shrink spre
-    media demografica, cu precizie per-componenta:
-        min ||W(Ac - b)||^2 + lam*prior_weight*sum_i ((c_i - mu_i)/s_i)^2
-    adica estimarea MAP pentru priorul Gaussian N(mu, diag(s^2)).
-    ``prior_scale`` (vector (I,)) este clipat defensiv la [0.25, 4.0] si
-    ar trebui sa provina din acelasi esantion ca si media. Fara acesti
-    parametri (toti None), rezultatul este neschimbat fata de V4.0.
-
-    ``huber_rows`` (optional, V13.3): daca este setat, down-ponderarea
-    Huber IRLS se aplica NUMAI primelor ``huber_rows`` randuri (markerii
-    anatomici); randurile de dupa (ex. constrangeri dense adaugate ca
-    pseudo-markeri de addon-ul live) pastreaza ponderea fixa. Motivatie:
-    corespondentele dense sunt deja robustizate prin respingerea pe
-    distanta/normale, iar Huber ar down-pondera exact punctele cele mai
-    departate - cele care au cea mai mare nevoie de tragere (aceeasi
-    semantica ca randurile dense offline, care intra cu pondere fixa).
-
-    ``pose_rows`` (optional, V13.3): daca este setat, transformarea de
-    similaritate (scala/rotatie/translatie) este re-estimata la fiecare
-    iteratie NUMAI din primele ``pose_rows`` randuri (markerii anatomici);
-    randurile dense participa doar la rezolvarea ridge pentru coeficienti.
-    Aceeasi separare ca in pipeline-ul offline (acolo transformarea este
-    "pilotata NUMAI de markeri (stabilitate)"): fara el, masa mare de
-    randuri dense trage scala spre votul lor agregat si distorsioneaza
-    poza globala (ex. cap prea mic -> osul zigomatic/nazal iese prin piele).
-
-    Returneaza (c, scale, rot, trans, lam_folosit, fit_info, reziduuri_fit),
-    unde fit_info = (loo_table, history, dense_stats).
+    Huber uses world-mm residuals and original confidence weights. Effective
+    weights are frozen for both blocks in a sweep; the ridge block is in model
+    mm. Clipping and changing correspondences make this a block-coordinate
+    heuristic, not a globally optimal joint MAP estimator. Conditional LOO tunes
+    marker rows only and is not independent validation. Returns FitResult.
     """
     if loss_cfg is None:
         loss_cfg = LossConfig()
@@ -286,6 +257,10 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
     if (np.ndim(mu) != 2 or np.shape(mu)[1] != 3 or np.ndim(basis) != 3
             or np.shape(basis)[1:] != np.shape(mu)):
         raise ValueError("Invalid mean/basis shapes")
+    if not np.isfinite(mu).all() or not np.isfinite(basis).all():
+        raise ValueError('Model mean/basis contains NaN or infinity')
+    if len(basis) == 0:
+        raise ValueError('Identity basis is empty')
     lm_idx = np.asarray(lm_idx)
     if (lm_idx.shape != (len(targets_xyz),) or lm_idx.dtype.kind not in "iu"
             or np.any(lm_idx < 0) or np.any(lm_idx >= len(mu))):
@@ -300,15 +275,17 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
         value = getattr(loss_cfg, name)
         if not np.isfinite(value) or value < 0:
             raise ValueError(f"Invalid loss setting: {name}")
-    if loss_cfg.clip_sigma == 0 or max_iter < 1 or tol <= 0:
+    if loss_cfg.clip_sigma == 0 or not isinstance(max_iter, (int, np.integer)) or max_iter < 1 or not np.isfinite(tol) or tol <= 0:
         raise ValueError("clip_sigma, max_iter and tol must be positive")
-    if pose_rows is not None and not 3 <= pose_rows <= len(targets_xyz):
+    if pose_rows is not None and not (isinstance(pose_rows, (int, np.integer)) and 3 <= pose_rows <= len(targets_xyz)):
         raise ValueError("pose_rows must select at least 3 valid landmarks")
     if prior_mean is not None:
         prior_mean = finite_array(prior_mean, "prior mean", (basis.shape[0],))
         prior_scale = finite_array(prior_scale, "prior scale", (basis.shape[0],))
         if np.any(prior_scale <= 0) or not np.isfinite(prior_weight) or prior_weight <= 0:
             raise ValueError("Prior scale and weight must be positive")
+    if huber_rows is not None and not (isinstance(huber_rows, (int, np.integer)) and 0 <= huber_rows <= len(weights)):
+        raise ValueError('Invalid huber_rows')
     identity_dim = basis.shape[0]
     mu_lm = mu[lm_idx]
     basis_lm = basis[:, lm_idx, :]                      # (I, L, 3)
@@ -316,6 +293,7 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
     weights = np.asarray(weights, dtype=np.float64)
     use_dense = dense is not None and dense.get("in_fit", True)
     dense_stats = []
+    last_solve, last_dense = {}, {}
 
     def robust_w(residuals_all):
         """Ponderi IRLS; cu huber_rows, Huber numai pe primele huber_rows."""
@@ -336,15 +314,8 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
     def solve(c, w_eff, lam_used):
         """O iteratie completa: aliniere + (dense) + rezolvare ridge."""
         model_lm = mu_lm + np.einsum("i,ilk->lk", c, basis_lm)
-        if pose_rows is None:
-            scale, rot, trans, _ = robust_alignment(
-                model_lm, targets_xyz, w_eff)
-        else:
-            # Poza pilotata NUMAI de primele pose_rows randuri (markeri);
-            # randurile dense intra doar in ridge-ul de mai jos.
-            kp = min(int(pose_rows), len(w_eff))
-            scale, rot, trans, _ = robust_alignment(
-                model_lm[:kp], targets_xyz[:kp], w_eff[:kp])
+        kp = len(w_eff) if pose_rows is None else pose_rows
+        scale, rot, trans = weighted_umeyama(model_lm[:kp], targets_xyz[:kp], w_eff[:kp])
         targets_model = (targets_xyz - trans) @ (scale * rot) / (scale ** 2)
 
         parts_a = [basis_lm_flat * np.sqrt(np.repeat(w_eff, 3))[:, None]]
@@ -356,13 +327,16 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
             v_world = scale * ((mu + np.einsum("i,ivk->vk", c, basis)) @ rot.T) + trans
             sidx, dt_w, keep, mean_dist = dense_correspondences(v_world, dense)
             dense_stats.append((int(keep.sum()), mean_dist))
-            if keep.sum() >= 10:
-                dt_m = (dt_w - trans) @ (scale * rot) / (scale ** 2)
-                w_d = dense["weight_ratio"] * weights.sum() / keep.sum()
-                a_extra = basis[:, sidx, :].reshape(identity_dim, -1).T
-                parts_a.append(a_extra * np.sqrt(w_d))
-                parts_b.append(((dt_m - mu[sidx]).reshape(-1)
-                                * np.sqrt(w_d)))
+            selected, w_d = normalized_dense_weights(weights, dense['last_relative_weights'], dense['weight_ratio'])
+            sidx, dt_w = sidx[selected], dt_w[selected]
+            last_dense.clear()
+            last_dense.update(dense['last_diagnostics'], used_vertex_indices=sidx.tolist(),
+                              weights=w_d.tolist(), targets_world_mm=dt_w.tolist(), used_in_identity_solve=len(sidx) >= 10)
+            if len(sidx) >= 10:
+                dt_m = ((dt_w-trans) @ rot)/scale
+                sw = np.sqrt(np.repeat(w_d, 3))
+                parts_a.append(basis[:, sidx, :].reshape(identity_dim, -1).T*sw[:, None])
+                parts_b.append((dt_m-mu[sidx]).reshape(-1)*sw)
 
         if use_dist:
             drows = _distance_rows(c, mu, basis, distance_pairs)
@@ -381,9 +355,8 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
         if prior_mean is not None:
             # Prior demografic (V13.1): shrink spre media demografica, cu
             # precizie per-componenta (inlocuieste shrink-ul isotropic la 0).
-            # prior_scale clipat defensiv la [0.25, 4.0]: componentele cu
-            # dispersie demografica foarte mica nu trebuie sa inghete fitul.
-            ps = np.clip(np.asarray(prior_scale, dtype=np.float64), 0.25, 4.0)
+            # Use the recorded prior scales exactly; generation-time clipping is explicit metadata.
+            ps = np.asarray(prior_scale, dtype=np.float64)
             pm = np.asarray(prior_mean, dtype=np.float64)
             prec = np.sqrt(lam_used * prior_weight) / ps
             parts_a.append(np.diag(prec))
@@ -400,65 +373,67 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
 
         a_all = np.vstack(parts_a)
         b_all = np.concatenate(parts_b)
-        c_new, *_ = np.linalg.lstsq(a_all, b_all, rcond=None)
+        finite_array(a_all, 'augmented design')
+        finite_array(b_all, 'augmented target')
+        c_new, _, rank, singular = np.linalg.lstsq(a_all, b_all, rcond=None)
+        finite_array(c_new, 'identity solution')
+        condition = singular[0]/singular[-1] if singular[-1] > 0 else np.inf
+        last_solve.update(rank=int(rank), singular_values=singular.tolist(), condition_number=float(condition) if np.isfinite(condition) else None)
         # Proiectie pe domeniul plauzibil al modelului (+-clip sigma):
         # fara aceasta, constrangerile dense pe un craniu PARTIAL pot
         # produce coeficienti explozivi in zonele neconstranse.
         np.clip(c_new, -loss_cfg.clip_sigma, loss_cfg.clip_sigma, out=c_new)
         return c_new, scale, rot, trans
 
-    # Prima trecere cu lambda initial (default sau cerut), ca sa stabilim
-    # transformarea pentru LOO.
-    lam0 = default_lambda if lam == "auto" else float(lam)
+    kp = len(weights) if pose_rows is None else pose_rows
     c = np.zeros(identity_dim)
+    scale, rot, trans = weighted_umeyama(mu_lm[:kp], targets_xyz[:kp], weights[:kp])
+    def residuals():
+        points = mu_lm + np.einsum('i,ilk->lk', c, basis_lm)
+        return np.linalg.norm(scale*(points @ rot.T)+trans-targets_xyz, axis=1)
     w_eff = weights.copy()
-    scale, rot, trans = None, None, None
-    for _ in range(4):
-        model_lm = mu_lm + np.einsum("i,ilk->lk", c, basis_lm)
-        pred = scale * (model_lm @ rot.T) + trans if scale is not None else None
-        if pred is not None:
-            w_eff = robust_w(np.linalg.norm(pred - targets_xyz, axis=1))
-        c, scale, rot, trans = solve(c, w_eff, lam0)
-
-    loo_table = None
-    lam_used = lam0
-    if lam == "auto":
-        model_lm = mu_lm + np.einsum("i,ilk->lk", c, basis_lm)
-        kp = len(model_lm) if pose_rows is None else pose_rows
-        scale, rot, trans, _ = robust_alignment(model_lm[:kp], targets_xyz[:kp], w_eff[:kp])
-        targets_model = (targets_xyz - trans) @ (scale * rot) / (scale ** 2)
-        grid = [0.3, 1.0, 3.0, 10.0, 30.0, 100.0, 300.0, 1000.0]
-        # Conditional CV is for tuning, not a validation score. Exclude dense
-        # pseudo-landmarks from folds when the caller supplies pose_rows.
-        lam_used, loo_table = loo_select_lambda(
-            basis_lm[:, :kp], mu_lm[:kp], targets_model[:kp], w_eff[:kp], grid, identity_dim)
-
-    # Fit final alternativ cu lambda ales (IRLS: ponderi robuste actualizate).
-    c = np.zeros(identity_dim)
-    w_eff = weights.copy()
-    history = []
+    loo_table, lam_used = None, lam0
+    if lam == 'auto':
+        for _ in range(min(8, max_iter)):
+            c, scale, rot, trans = solve(c, w_eff, lam0)
+            w_eff = robust_w(residuals())
+        targets_model = ((targets_xyz-trans) @ rot)/scale
+        lam_used, loo_table = loo_select_lambda(basis_lm[:, :kp], mu_lm[:kp], targets_model[:kp],
+            w_eff[:kp], [.3, 1., 3., 10., 30., 100., 300., 1000.], identity_dim)
+    history, records, converged = [], [], False
+    dense_stats.clear()
     for it in range(max_iter):
-        model_lm = mu_lm + np.einsum("i,ilk->lk", c, basis_lm)
-        if scale is not None:
-            pred = scale * (model_lm @ rot.T) + trans
-            w_eff = robust_w(np.linalg.norm(pred - targets_xyz, axis=1))
-        c_new, scale, rot, trans = solve(c, w_eff, lam_used)
-        delta = np.linalg.norm(c_new - c)
-        c = c_new
-        model_lm = mu_lm + np.einsum("i,ilk->lk", c, basis_lm)
-        pred = scale * (model_lm @ rot.T) + trans
-        rms = rmse(np.linalg.norm(pred - targets_xyz, axis=1))
-        history.append((it, float(scale), rms, float(np.abs(c).max())))
-        if delta < tol:
+        previous_c, previous_scale, previous_rot, previous_trans = c, scale, rot, trans
+        c, scale, rot, trans = solve(c, w_eff, lam_used)
+        res = residuals()
+        updated = robust_w(res)
+        delta_c = float(np.linalg.norm(c-previous_c))
+        angle = float(np.degrees(np.arccos(np.clip((np.trace(rot @ previous_rot.T)-1)/2, -1, 1))))
+        delta_t = float(np.linalg.norm(trans-previous_trans))
+        delta_s = float(abs(scale-previous_scale))
+        delta_w = float(np.max(np.abs((updated-w_eff)/weights)))
+        w_eff = updated
+        history.append((it, float(scale), rmse(res), float(np.abs(c).max())))
+        records.append(dict(iteration=it, coefficient_delta=delta_c, rotation_delta_deg=angle,
+                            translation_delta_mm=delta_t, scale_delta=delta_s, irls_factor_delta=delta_w))
+        converged = (delta_c <= tol*(1+np.linalg.norm(c)) and angle <= 1e-4 and delta_t <= 1e-4
+                     and delta_s <= 1e-7*max(1., scale) and delta_w <= tol)
+        if converged:
             break
-
-    model_lm = mu_lm + np.einsum("i,ilk->lk", c, basis_lm)
-    kp = len(model_lm) if pose_rows is None else pose_rows
-    scale, rot, trans, _ = robust_alignment(model_lm[:kp], targets_xyz[:kp], w_eff[:kp])
-    pred = scale * (model_lm @ rot.T) + trans
-    residuals_fit = np.linalg.norm(pred - targets_xyz, axis=1)
-    return (c, scale, rot, trans, lam_used,
-            (loo_table, history, dense_stats), residuals_fit)
+    points = mu_lm + np.einsum('i,ilk->lk', c, basis_lm)
+    scale, rot, trans = weighted_umeyama(points[:kp], targets_xyz[:kp], w_eff[:kp])
+    res = residuals()
+    final_weights = robust_w(res)
+    diagnostics = dict(converged=bool(converged), stop_reason='tolerances_met' if converged else 'max_iterations',
+        iterations=len(history), max_iterations=max_iter, coefficient_tolerance=tol,
+        pose_translation_tolerance_mm=1e-4, pose_rotation_tolerance_deg=1e-4, pose_scale_relative_tolerance=1e-7,
+        irls_layers=1, huber_k_world_mm=10., final_irls_weights=final_weights.tolist(), iteration_records=records,
+        ridge_coordinate_space='model_mm', clip_sigma=loss_cfg.clip_sigma, least_squares=last_solve,
+        observability=dict(source=weighted_geometry(points[:kp], final_weights[:kp]),
+                           target=weighted_geometry(targets_xyz[:kp], final_weights[:kp])),
+        dense=last_dense if use_dense else None,
+        objective_note='Block-coordinate surrogate with clipping; not joint MAP or independent validation')
+    return FitResult(c, scale, rot, trans, float(lam_used), FitInfo(loo_table, history, dense_stats, diagnostics), res)
 
 
 # ---------------------------------------------------------------------------

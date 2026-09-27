@@ -31,5 +31,10 @@ def test_official_asset_end_to_end(tmp_path):
     assert model.group_mask('lower_lip')[mapping['Infradentale_BuzaInf']]
     for label, index in mapping.items():
         assert model.group_mask('skin_exterior')[index]
-        if label.endswith('_Dr'):
-            assert model.mirror_indices[index] == mapping[label[:-3] + '_St']
+    from cranio.landmarks import bilateral_pairs
+    import numpy as np
+    assert len(bilateral_pairs()) == 17
+    for right, left in bilateral_pairs():
+        assert model.mirror_indices[mapping[right]] == mapping[left]
+        # Pinned asset: max bilateral landmark deviation is 0.2341 mm.
+        assert np.linalg.norm(model.mu[mapping[right]]*[-1, 1, 1]-model.mu[mapping[left]]) < .25

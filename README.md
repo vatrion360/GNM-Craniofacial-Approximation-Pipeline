@@ -2,7 +2,7 @@
 
 A Blender marker add-on and an offline, auditable fitting pipeline for **supervised craniofacial approximation research**. Fits a neutral GNM Head identity model to operator-defined skin targets derived from a scanned skull.
 
-**Software 5.0.0rc3 / add-on 16.0.0.** This revision adds duplicate audits, count-based regularization and selective restoration of mixed-side fragments to the 48-marker workflow and Windows-safe offline launcher. It does **not** establish forensic accuracy or recover a uniquely determined face. Tissue applicability and GNM correspondences require anatomical review. See the [PDF-based protocol](docs/PDF_PROTOCOL.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
+**Software 5.0.0rc4 / add-on 17.0.0.** This revision unifies live/offline dense fitting, fixes robust weighting and ICP selection, introduces observed fragment sources and adds convergence, geometry QC and protocol traceability. It does **not** establish forensic accuracy or recover a uniquely determined face. Tissue applicability and GNM correspondences require anatomical review. See the [PDF-based protocol](docs/PDF_PROTOCOL.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
 
 ## Start here
 
@@ -14,6 +14,8 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Scientific rationale and primary references](docs/SCIENCE.md)
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
+- [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
+- [Contributing and CI](CONTRIBUTING.md)
 - [Change log](CHANGELOG.md)
 
 ## Quick start
@@ -24,10 +26,11 @@ Python 3.10+; the current local test environment is Python 3.12 on Linux.
 python -m venv .venv
 # Linux/macOS: source .venv/bin/activate
 # Windows PowerShell: .venv\Scripts\Activate.ps1
-python -m pip install .
+python -m pip install --require-hashes --only-binary=:all: -r requirements-tested-py312.txt  # Python 3.12
+python -m pip install --no-deps .
 ```
 
-Obtain `gnm_head.npz` from the official Google GNM repository using the pinned instructions in [INSTALL](docs/INSTALL.md). The weights are **not included** in this repository, wheel or add-on ZIP. They are local files at reconstruction time; there is no runtime download, cloud inference or telemetry.
+Obtain `gnm_head.npz` from the official Google GNM repository using the pinned instructions in [INSTALL](docs/INSTALL.md). The full GNM model weights are **not included** in this repository, wheel or add-on ZIP. Eight small legacy experimental demographic-prior NPZs are tracked under `priors/`; they are excluded from the wheel and ZIP and have no independent cohort validation. They are local files at reconstruction time; there is no runtime download, cloud inference or telemetry.
 
 ```bash
 python -m cranio.doctor --npz models/gnm_head.npz
@@ -46,7 +49,7 @@ Outputs:
 
 All exported coordinates are **world millimetres**. Existing outputs are refused unless `--overwrite` is explicit. `--strict` requires v3 markers, matching model checksum, non-default tissue source notes and no explicitly unreviewed skin correspondences among included targets; it is a provenance check, not scientific approval.
 
-Local correction is opt-in (`--local-correction`). Dense skull constraints are experimental and require a skull exported in the **same world-mm frame** (`--skull skull.obj`). Read the workflow before enabling either.
+Local correction is opt-in (`--local-correction`). Dense skull constraints are experimental and require a skull exported in the **same world-mm frame** (`--skull skull.obj --skull-normals-reviewed`). Read the workflow before enabling either.
 
 ## Blender
 
@@ -54,9 +57,9 @@ Local correction is opt-in (`--local-correction`). Dense skull constraints are e
 python tools/build_addon.py
 ```
 
-Install `dist/gnm_cranio-5.0.0rc3.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender 4.5.0 headless integration runs on Windows and Linux; see [revision-specific results](docs/VALIDATION.md). Blender **4.2+ remains the broader target**; interactive and other version checks remain pending.
+Install `dist/gnm_cranio-5.0.0rc4.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender 4.5.0 headless integration runs on Windows and Linux; see [revision-specific results](docs/VALIDATION.md). Blender **4.2+ remains the broader target**; interactive and other version checks remain pending.
 
-Select the local model, import the skull with explicit source units, place/review markers, and export v3 CSV. For **Run Offline Fit and Import**, select the external Python executable from the environment above and a case output folder. The add-on runs the CLI in a separate process, records a log, then imports the completed world-mm OBJ. Each run gets a new case subfolder. The default button uses marker-only statistical fitting with lambda based on the actual included marker count; advanced dense/correction options are available through the CLI.
+Select the local model, import the skull with explicit source units, place/review markers, and export v3 CSV. For **Run Offline Fit and Import**, select the external Python executable from the environment above and a case output folder. The add-on runs the CLI in a separate process, records a log, then imports the completed world-mm OBJ. Each run gets a new case subfolder. The default button uses marker-only statistical fitting with lambda based on the actual included marker count; explicit dense and local-correction switches are available in the panel and CLI. Register all preserved bone sources, review their normals and confirm mandibular articulation before including mandibular constraints.
 
 Use **Extended 48**, **Paper 32** or **Legacy 27**, then **Add Missing Markers**. Existing placements, tissue values and manual picks are retained. The paper's normal-female reference can be applied explicitly with **Apply Table 2 Tissue Depths**; review applicability before case use. Sites marked **Include in fit = off** remain documented but do not affect pose or identity fitting. The default Pogonion candidate is corrected from lower-lip vertex 12284 to chin candidate 12261; review previous cases.
 

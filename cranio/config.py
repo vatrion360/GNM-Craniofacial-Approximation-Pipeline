@@ -16,7 +16,7 @@ from .backend import default_npz_path
 
 @dataclass
 class PipelineConfig:
-    """Toate optiunile pipeline-ului, cu implicitele din v3.1."""
+    """Validated inputs and settings exported verbatim in each run report."""
 
     # Intrari/iesiri
     input: str = ""
@@ -60,6 +60,21 @@ class PipelineConfig:
     seed: int = 42
     overwrite: bool = False
     strict: bool = False
+    prior: Optional[str] = None
+    landmark_map: Optional[str] = None
+    protocol: Optional[str] = None
+    case_metadata: Optional[str] = None
+    max_iter: int = 30
+    tolerance: float = 1e-5
+    clip_sigma: float = 3.0
+    prior_weight: float = 1.0
+    dense_max_rows: int = 1500
+    dense_nose_weight: float = 0.7
+    skull_normals_reviewed: bool = False
+    skull_flip_normals: bool = False
+    geometry_qc: str = 'basic'
+    require_qc: bool = False
+
 
     def validate(self):
         if not self.input or not os.path.isfile(self.input):
@@ -68,11 +83,23 @@ class PipelineConfig:
             raise ValueError(f"Model not found: {self.npz}; see docs/INSTALL.md")
         if self.skull and not os.path.isfile(self.skull):
             raise ValueError(f"Skull not found: {self.skull}")
-        for name in ("max_correction_mm", "face_cap_mm", "scalp_offset_mm"):
+        for name in ('prior', 'landmark_map', 'protocol', 'case_metadata'):
+            if getattr(self, name) and not os.path.isfile(getattr(self, name)):
+                raise ValueError(f'{name} not found: {getattr(self, name)}')
+        if self.skull and not self.skull_normals_reviewed:
+            raise ValueError('Review exterior bone normals and supply --skull-normals-reviewed')
+        if self.skull_flip_normals and not self.skull:
+            raise ValueError('--skull-flip-normals requires --skull')
+        if self.geometry_qc not in ('basic', 'full') or ((self.protocol or self.require_qc) and self.geometry_qc != 'full'):
+            raise ValueError('Protocol/required QC needs --geometry-qc full')
+        for name in ('max_iter', 'dense_max_rows'):
+            if not isinstance(getattr(self, name), int) or getattr(self, name) < 1:
+                raise ValueError(f'{name} must be a positive integer')
+        for name in ("max_correction_mm", "face_cap_mm", "scalp_offset_mm", 'clip_sigma', 'prior_weight', 'tolerance'):
             value = getattr(self, name)
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
-        for name in ("dense_weight", "symmetry_weight", "distance_weight", "prior_soft_sigma", "prior_soft_weight"):
+        for name in ("dense_weight", "symmetry_weight", "distance_weight", "prior_soft_sigma", "prior_soft_weight", "dense_nose_weight"):
             value = getattr(self, name)
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and nonnegative")
@@ -91,14 +118,14 @@ class PipelineConfig:
             if not math.isfinite(value) or value <= 0:
                 raise ValueError("regularization must be 'auto', 'adaptive' or finite and positive")
         from .validation import validate_outputs
-        validate_outputs([self.input, self.npz, self.skull],
+        validate_outputs([self.input, self.npz, self.skull, self.prior, self.landmark_map, self.protocol, self.case_metadata],
                          [self.output, self.output_error_mesh, self.output_stats,
                           self.output_json, self.output_statistical], self.overwrite)
 
     def fill_default_outputs(self):
         """Completeaza caile de iesire implicite din numele intrarii."""
         for name in ("input", "npz", "skull", "output", "output_stats", "output_error_mesh",
-                     "output_json", "output_statistical"):
+                     "output_json", "output_statistical", "prior", "landmark_map", "protocol", "case_metadata"):
             value = getattr(self, name)
             if value is not None:
                 setattr(self, name, os.fspath(value))

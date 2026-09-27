@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Genereaza priors/prior_<SEX>_<ETNIE>.npz pentru priorul demografic (V13.1).
 
-Ruleaza in venv-ul repo-ului (contine TensorFlow, necesar lui IdentitySampler;
+Ruleaza intr-un mediu separat cu TensorFlow si GNM IdentitySampler;
 NU poate rula in Blender):
 
     .venv/Scripts/python.exe make_demographic_prior.py
@@ -18,11 +18,15 @@ vezi cranio.optimize.fit_identity: prior_mean/prior_scale/prior_weight).
 
 sigma este clipat la [SIGMA_CLIP_MIN, SIGMA_CLIP_MAX]: componentele cu
 dispersie demografica foarte mica (ex. 0.01 sigma) nu trebuie sa inghete
-fitul la media demografica. Acelasi clip este aplicat defensiv si la
-incarcare (addon) si la fit (cranio.optimize).
+fitul la media demografica. Clip-ul este aplicat numai la generare si
+inregistrat in arhiva; solverul foloseste exact scalele salvate.
 """
 
 import argparse
+import json
+import platform
+from importlib.metadata import version
+from pathlib import Path
 import os
 import sys
 import time
@@ -55,7 +59,12 @@ def main() -> int:
                         help="genereaza un singur combo, ex. --only MALE WHITE")
     parser.add_argument("--seed", type=int, default=42,
                         help="seed RNG (reproductibilitate; implicit 42)")
+    parser.add_argument('--decoder', required=True, help='Explicit trusted local GNM identity decoder file (H5/Keras)')
     args = parser.parse_args()
+    if args.samples < 2 or args.seed < 0 or not Path(args.decoder).is_file():
+        parser.error('Need samples >= 2, seed >= 0 and an existing local decoder')
+    if args.only and (args.only[0].upper() not in GENDERS or args.only[1].upper() not in ETHNICITIES):
+        parser.error('Unknown sex/ethnicity category')
 
     os.makedirs(args.out, exist_ok=True)
 
@@ -63,7 +72,12 @@ def main() -> int:
     t0 = time.perf_counter()
     from gnm.shape.semantic_sampler import (
         Ethnicity, Gender, IdentitySampler)
-    sampler = IdentitySampler(verbose=False)
+    sampler = IdentitySampler(decoder_model_path=args.decoder, verbose=False)
+    from cranio.validation import sha256_file
+    from cranio.provenance import implementation_manifest
+    manifest = dict(python=platform.python_version(), numpy=np.__version__, tensorflow=version('tensorflow'),
+                    decoder_sha256=sha256_file(args.decoder), generator_sha256=sha256_file(__file__),
+                    implementation=implementation_manifest(), scientific_status='experimental, not validated on paired CT subjects')
     print(f"IdentitySampler incarcat ({time.perf_counter() - t0:.1f}s).")
 
     combos = ([(args.only[0].upper(), args.only[1].upper())] if args.only
@@ -78,6 +92,8 @@ def main() -> int:
             Gender[g_name], Ethnicity[e_name],
             num_samples=args.samples, rng=rng)
         sam = np.asarray(sam, dtype=np.float64)
+        if not np.isfinite(sam).all():
+            raise ValueError("Sampler produced NaN/Inf")
         if sam.shape != (args.samples, 253):
             print(f"ATENTIE: forma neasteptata {sam.shape} pentru "
                   f"{g_name}/{e_name} - sarit.")
@@ -90,7 +106,7 @@ def main() -> int:
             gender=g_name, ethnicity=e_name,
             sigma_clip=np.array([SIGMA_CLIP_MIN, SIGMA_CLIP_MAX]),
             source="gnm.shape.semantic_sampler.IdentitySampler (CVAE, GNM v3.0)",
-            seed=args.seed)
+            seed=args.seed, provenance_json=json.dumps(manifest, sort_keys=True))
         print(f"{g_name:7s}/{e_name:14s} |mu|={np.linalg.norm(mean):5.2f} "
               f"max|mu|={np.abs(mean).max():4.2f} "
               f"sigma[med]={np.median(scale):.2f} -> {path} "

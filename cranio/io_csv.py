@@ -1,5 +1,6 @@
 """Explicit v3 marker interchange in world millimetres; legacy v1/v2 readable."""
 import csv
+import io
 import json
 from typing import NamedTuple
 
@@ -11,7 +12,7 @@ V2_MAGIC = "# gnm-marker-csv v2"
 V3_MAGIC = "# gnm-marker-csv v3"
 V3_FIELDS = ["label", "vertex", "placed", "x", "y", "z", "weight",
              "bone_x", "bone_y", "bone_z", "tissue_depth_mm", "tissue_source",
-             "use_for_fit", "bone_status", "mapping_reviewed", "mapping_source", "marker_notes"]
+             "use_for_fit", "bone_status", "mapping_reviewed", "mapping_source", "marker_notes", "bone_source_id", "bone_source_geometry_sha256", "bone_anatomy", "articulation_reviewed"]
 
 
 class MarkerTarget(NamedTuple):
@@ -23,7 +24,7 @@ class MarkerTarget(NamedTuple):
 
 def read_marker_csv(csv_path, index_to_label, label_to_vertex):
     with open(csv_path, encoding="utf-8-sig", newline="") as stream:
-        lines = stream.read().splitlines()
+        lines = stream.read().splitlines(keepends=True)
     if not lines:
         raise ValueError("Marker CSV is empty")
     version = {V2_MAGIC: 2, V3_MAGIC: 3}.get(lines[0].strip(), 1)
@@ -44,14 +45,24 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
         raise ValueError("v3 requires units='mm' and coordinate_space='world'")
     if metadata.get("units", "mm") != "mm":
         raise ValueError("Marker units must be mm; explicitly convert before fitting")
-    reader = csv.DictReader(ln for ln in lines if not ln.lstrip().startswith("#"))
+    start = 2 if version > 1 else 0
+    while start < len(lines) and (lines[start].lstrip().startswith('#') or not lines[start].strip()):
+        start += 1
+    reader = csv.DictReader(io.StringIO(''.join(lines[start:])), strict=True)
+    try:
+        fields = reader.fieldnames or []
+        parsed = list(reader)
+    except csv.Error as exc:
+        raise ValueError(f'Malformed CSV: {exc}') from exc
+    if len(fields) != len(set(fields)):
+        raise ValueError('CSV has duplicate column headers')
     required = {"label", "vertex", "placed", "x", "y", "z", "weight"} if version == 3 else {
         "gnm_landmark_index", "x", "y", "z"}
     if not required.issubset(reader.fieldnames or []):
         raise ValueError(f"CSV is missing required columns: {sorted(required)}")
     targets, skipped, seen_labels, seen_vertices = [], [], set(), set()
     bones, records = {}, {}
-    for line_number, row in enumerate(reader, 1):
+    for line_number, row in enumerate(parsed, 1):
         try:
             use_for_fit = True
             if None in row:
@@ -119,6 +130,12 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
                                                          atol=0.05, rtol=0):
                         raise ValueError("bone-to-target distance differs from tissue_depth_mm")
                 record["tissue_source"] = row.get("tissue_source", "") or "unspecified"
+                for name in ('bone_source_id', 'bone_source_geometry_sha256', 'bone_anatomy'):
+                    record[name] = row.get(name) or ''
+                articulation = row.get('articulation_reviewed') or ''
+                if articulation not in ('', '0', '1'):
+                    raise ValueError('articulation_reviewed must be 0 or 1')
+                record['articulation_reviewed'] = None if articulation == '' else articulation == '1'
                 records[label] = record
             if not use_for_fit:
                 skipped.append((label, 'documentation only (use_for_fit=0)'))
