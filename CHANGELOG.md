@@ -1,3 +1,11 @@
+# 5.0.0rc5 / add-on 17.1.0
+
+- Stabilized local tangent normals from connected, area-weighted surface patches; configurable radius and explicit face-normal alternative.
+- Preview arrow/tangent circle and selective reorientation preserve bone point, tissue depth and source mesh.
+- Evaluated geometry, winding/transform handling, fragment/edge guards and explicit insufficient-support errors.
+- Per-marker direction provenance in CSV v3 and offline JSON, including detection of later manual direction changes.
+- Numeric and actual Blender regressions added to existing Windows/Linux CI.
+
 # 5.0.0rc4 / add-on 17.0.0
 
 - Shared live/offline dense objective, single Huber layer, pose-aware convergence and weighted-rank diagnostics.

@@ -34,6 +34,22 @@ def test_local_correction_pipeline(tmp_path, model_file, marker_file):
     assert report['metrics']['local_displacement']['max_mm'] <= cfg.max_correction_mm
 
 
+def test_orientation_provenance_survives_offline_report(tmp_path, model_file, marker_file):
+    lines = marker_file.read_text().splitlines()
+    metadata = json.loads(lines[1][1:])
+    orientation = {'Nasion': {'matches_current_marker': False, 'current_direction': [0., 0., 1.],
+        'applied_estimate': {'method_version': 'connected-area-pca-v1', 'radius_mm': 3.,
+                            'warnings': ['Boundary needs review'], 'normal': [.6, 0., .8]}}}
+    metadata['marker_orientation'] = orientation
+    lines[1] = '# '+json.dumps(metadata)
+    marker_file.write_text('\n'.join(lines)+'\n')
+    cfg = PipelineConfig(input=str(marker_file), npz=str(model_file),
+                         output=str(tmp_path/'orientation.obj'), regularization='30')
+    assert run_pipeline(cfg) == 0
+    report = json.loads(open(cfg.output_json).read())
+    assert report['marker_metadata']['marker_orientation'] == orientation
+
+
 @pytest.mark.parametrize('setting,value', [('face_cap_mm', 0), ('dense_weight', -1), ('protect_damping', 2),
                                           ('regularization', 'nan'), ('seed', -2), ('dense_samples', 0)])
 def test_config_failures_are_actionable(tmp_path, model_file, marker_file, setting, value):
