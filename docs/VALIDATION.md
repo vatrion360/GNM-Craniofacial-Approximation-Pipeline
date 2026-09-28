@@ -1,5 +1,25 @@
 # Validation and release gates
 
+## Evidence for 5.0.0rc5 / add-on 17.1
+
+Local execution on 2026-09-28, Linux x86_64, Python 3.12, with the pinned official
+GNM asset: **139 passed, 1 native-Windows test skipped**. Ruff, wheel/source and
+add-on ZIP builds passed. The 19 added numeric/provenance regressions cover local
+normal geometry and preservation of orientation records through the offline report.
+
+Actual Blender 4.5.0 Linux (official build `8cb6b388974a`) passed the packaged
+ZIP suite, including new marker placement, preview without target movement,
+reorientation, peg endpoints, zero-depth edits, nonuniform/negative transforms,
+explicit normal flips, evaluated modifiers, unchanged source vertices, CSV
+orientation records, stale-source rejection, inferred-bone exclusions and cleanup.
+The existing official-model/live-fit/external-fit/import/cancellation tests also
+passed. The new milestone is `GNM NORMAL CHECKS PASSED`.
+
+These are software checks. The new estimator's thresholds/radius are engineering
+defaults, not CT-calibrated anatomical parameters. Interactive acceptance, macOS,
+other Blender versions and independent CT validation remain unverified. See
+[method, controls and limitations](MARKER_NORMALS.md).
+
 ## Evidence for 5.0.0rc4 / add-on 17
 
 Local execution on 2026-09-27, Linux x86_64, Python 3.12.14, NumPy 2.3.5, SciPy 1.17.0, trimesh 5.1.0: **120 passed, 1 native-Windows test skipped**, including the pinned official model. Ruff passed. The 17 topological bilateral pairs, including both orbital pairs, are tested separately from the template's small spatial asymmetry.

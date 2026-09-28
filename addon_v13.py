@@ -1,4 +1,4 @@
-"""GNM Craniofacial Markers 17.0 / software package 5.0.0rc4.
+"""GNM Craniofacial Markers 17.1 / software package 5.0.0rc5.
 
 Install the complete ZIP built with tools/build_addon.py. The bundled numerical
 core is imported under the add-on namespace. Optional previews run serially in
@@ -35,7 +35,7 @@ from bpy_extras import view3d_utils
 bl_info = {
     "name": "GNM Scientific Markers",
     "author": "VATRION",
-    "version": (17, 0, 0),
+    "version": (17, 1, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > GNM Markers",
     "category": "3D View",
@@ -294,6 +294,12 @@ def _export_registered_bones(scene, path, depsgraph):
     _core_module('export').export_obj(path, np.concatenate(vertices), np.concatenate(faces))
 
 
+def _normal_settings_changed(self, context):
+    if context and context.scene:
+        _core_module('blender_marker_normals').clear_preview(context.scene)
+        context.scene.gnm_settings.normal_status = 'Preview the selected marker before reorienting'
+
+
 class GNMSettings(PropertyGroup):
     case_id: StringProperty(name='Pseudonymous case ID')
     observer_id: StringProperty(name='Observer ID')
@@ -316,6 +322,14 @@ class GNMSettings(PropertyGroup):
     offline_status: StringProperty(default="Ready")
     marker_size_mm: FloatProperty(name="Marker Radius (mm)", default=1.5, min=0.1)
     peg_thickness_mm: FloatProperty(name="Peg Thickness (mm)", default=0.5, min=0.1)
+    normal_mode: EnumProperty(name='Marker direction', items=[
+        ('LOCAL_PLANE', 'Stabilized local normal', 'Area-weighted plane on a connected surface patch; review edges and anatomical direction'),
+        ('FACE', 'Face normal', 'Perpendicular to the single evaluated triangle')],
+        default='LOCAL_PLANE', update=_normal_settings_changed)
+    normal_radius_mm: FloatProperty(name='Local radius (mm)', default=3., min=.25, max=20.,
+        description='Engineering scale, not a tissue-table standard; smaller near anatomical features',
+        update=_normal_settings_changed)
+    normal_status: StringProperty(default='Existing markers change only with Reorient Selected')
 
     restoration_plane_object: PointerProperty(
         name="Cranial reference plane", type=bpy.types.Object,
@@ -339,12 +353,10 @@ def _update_tissue_depth(self, context):
     direction = self.target_empty.matrix_world.translation - bone
     if direction.length < 1e-9:
         direction = Vector(self.bone_empty.get("gnm_normal", (0, 0, 1)))
-    direction.normalize()
-    self.target_empty.matrix_world.translation = bone + direction * self.tissue_depth_mm
-    if self.peg_object is not None:
-        self.peg_object.location = bone + direction * self.tissue_depth_mm / 2
-        self.peg_object.scale.z = self.tissue_depth_mm
-        self.peg_object.rotation_quaternion = direction.to_track_quat("Z", "Y")
+    _core_module('blender_marker_normals').set_direction(
+        self, direction, context.scene.gnm_settings.peg_thickness_mm)
+    _core_module('blender_marker_normals').clear_preview(context.scene)
+    _request_refit(context.scene)
 
 
 def _marker_fit_changed(self, context):
@@ -580,58 +592,106 @@ class GNM_OT_place_marker(Operator):
         # V13: in workflow-ul live, capul GNM (piele) coexista cu craniul in
         # aceeasi lume si il invaluie; sarim peste obiectele GNM live ca sa
         # lovim intotdeauna craniul (ray-marching, vezi _ray_cast_skull).
-        result, location, normal, hit_object = _ray_cast_skull(
-            scene, depsgraph, ray_origin, ray_dir, return_object=True)
+        result, location, normal, hit_object, face_index = _ray_cast_skull(
+            scene, depsgraph, ray_origin, ray_dir, return_face=True)
 
         if not result: return {"RUNNING_MODAL"}
 
-        depth = item.tissue_depth_mm
-        target_location = location + normal.normalized() * depth
-        m_size = scene.gnm_settings.marker_size_mm
-        p_thick = scene.gnm_settings.peg_thickness_mm
-
-        for old_obj in [item.bone_empty, item.target_empty, item.peg_object]:
-            if old_obj: bpy.data.objects.remove(old_obj, do_unlink=True)
-        
-        bone = bpy.data.objects.new(f"GNM_OS_{item.label}", None)
-        bone.empty_display_type = 'SPHERE'
-        bone.empty_display_size = m_size
-        bone.location = location
-        bone["gnm_normal"] = tuple(normal.normalized())
-        context.collection.objects.link(bone)
-        item.bone_empty = bone
-        _record_marker_surface(item, hit_object)
-
-        tinta = bpy.data.objects.new(f"GNM_PIELE_{item.label}", None)
-        tinta.empty_display_type = 'SPHERE'
-        tinta.empty_display_size = m_size
-        tinta.location = target_location
-        context.collection.objects.link(tinta)
-        item.target_empty = tinta
-
-        direction = target_location - location
-        mesh = bpy.data.meshes.new("Peg")
-        bm = bmesh.new()
-        bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=12, radius1=1.0, radius2=1.0, depth=1.0)
-        bm.to_mesh(mesh)
-        bm.free()
-        
-        peg = bpy.data.objects.new(f"GNM_BAT_{item.label}", mesh)
-        peg.location = (location + target_location) / 2
-        peg.rotation_mode = "QUATERNION"
-        peg.rotation_quaternion = direction.to_track_quat("Z", "Y")
-        peg.scale = (p_thick, p_thick, direction.length)
-        context.collection.objects.link(peg)
-        item.peg_object = peg
-
-        # V13.7: coloreaza os/piele/bat dupa schema ghost-urilor (verde/
-        # portocaliu/mov/rosu - vezi legenda din panou).
-        _refresh_marker_objects(scene)
-
-        # V13: declansam un refit live (no-op daca modul live e oprit).
-        _request_refit(scene)
+        try:
+            record = _place_marker_at(context, item, location, hit_object, face_index)
+        except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
+            scene.gnm_settings.normal_status = str(exc)
+            self.report({'WARNING'}, str(exc))
+            return {'RUNNING_MODAL'}
+        self.report({'WARNING'} if record['warnings'] else {'INFO'}, scene.gnm_settings.normal_status)
         scene.gnm_marker_active_index = (idx + 1) % len(scene.gnm_markers)
         return {"FINISHED"}
+
+
+def _place_marker_at(context, item, location, hit_object, face_index=None):
+    """Calculate before replacing a placement; no mesh modification or vertex snap."""
+    scene = context.scene
+    if not _is_mm_scene(scene):
+        raise ValueError('Marker placement requires Metric scale 0.001')
+    module = _core_module('blender_marker_normals')
+    record = module.calculate(scene, hit_object, location, context.evaluated_depsgraph_get(),
+                              seed_polygon=face_index)
+    for obj in (item.bone_empty, item.target_empty, item.peg_object):
+        if obj:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    for attr, prefix in (('bone_empty', 'GNM_OS_'), ('target_empty', 'GNM_PIELE_')):
+        obj = bpy.data.objects.new(prefix+item.label, None)
+        obj.empty_display_type, obj.empty_display_size = 'SPHERE', scene.gnm_settings.marker_size_mm
+        obj.location = location
+        scene.collection.objects.link(obj)
+        setattr(item, attr, obj)
+    _record_marker_surface(item, hit_object, geometry_digest=record['source_geometry_sha256'])
+    mesh = bpy.data.meshes.new('Peg')
+    bm = bmesh.new()
+    try:
+        bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=12, radius1=1., radius2=1., depth=1.)
+        bm.to_mesh(mesh)
+    finally:
+        bm.free()
+    peg = bpy.data.objects.new('GNM_BAT_'+item.label, mesh)
+    scene.collection.objects.link(peg)
+    item.peg_object = peg
+    # Update newly created world matrices before setting the peg and skin target.
+    context.view_layer.update()
+    module.set_direction(item, record['normal'], scene.gnm_settings.peg_thickness_mm)
+    module.record_application(item, record)
+    module.clear_preview(scene)
+    scene.gnm_settings.normal_status = module.status(record)
+    _refresh_marker_objects(scene)
+    _request_refit(scene)
+    return record
+
+
+class GNM_OT_marker_normal(Operator):
+    bl_idname = 'gnm.marker_normal'
+    bl_label = 'Marker Normal'
+    bl_description = 'Preview or apply the selected normal, preserving bone point and tissue depth; never modifies skull geometry'
+    bl_options = {'REGISTER', 'UNDO'}
+    action: EnumProperty(items=[('PREVIEW', 'Preview', ''), ('APPLY', 'Reorient Selected', ''),
+                               ('CLEAR', 'Hide Preview', '')], default='PREVIEW')
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (context.mode == 'OBJECT' and bool(scene.gnm_markers)
+                and 0 <= scene.gnm_marker_active_index < len(scene.gnm_markers)
+                and scene.gnm_markers[scene.gnm_marker_active_index].is_placed)
+
+    def execute(self, context):
+        scene = context.scene
+        module = _core_module('blender_marker_normals')
+        module.clear_preview(scene)
+        if self.action == 'CLEAR':
+            scene.gnm_settings.normal_status = 'Preview hidden'
+            return {'FINISHED'}
+        try:
+            if not _is_mm_scene(scene):
+                raise ValueError('Marker orientation requires Metric scale 0.001')
+            item = scene.gnm_markers[scene.gnm_marker_active_index]
+            source = module.marker_source(scene, item)
+            record = module.calculate(scene, source, item.bone_empty.matrix_world.translation,
+                                      context.evaluated_depsgraph_get(), previous=item.bone_empty)
+            if self.action == 'PREVIEW':
+                module.show_preview(scene, item, record)
+            else:
+                module.set_direction(item, record['normal'], scene.gnm_settings.peg_thickness_mm)
+                module.record_application(item, record)
+                _refresh_marker_objects(scene)
+                _request_refit(scene)
+            prefix = 'Preview snapshot. ' if self.action == 'PREVIEW' else 'Applied. '
+            scene.gnm_settings.normal_status = prefix+module.status(record)
+            self.report({'WARNING'} if record['warnings'] else {'INFO'}, scene.gnm_settings.normal_status)
+            return {'FINISHED'}
+        except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
+            scene.gnm_settings.normal_status = str(exc)
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+
 
 class GNM_OT_next_unplaced(Operator):
     bl_idname = "gnm.next_unplaced"
@@ -1332,6 +1392,19 @@ class GNM_PT_panel(Panel):
         row.operator("gnm.place_marker", icon="RESTRICT_SELECT_OFF")
         row.operator("gnm.next_unplaced", icon="FRAME_NEXT", text="")
 
+        normal_box = layout.box()
+        normal_box.label(text='Perpendicular marker placement')
+        normal_box.prop(settings, 'normal_mode')
+        if settings.normal_mode == 'LOCAL_PLANE':
+            normal_box.prop(settings, 'normal_radius_mm')
+        row = normal_box.row(align=True)
+        row.operator('gnm.marker_normal', text='Preview Normal', icon='HIDE_OFF').action = 'PREVIEW'
+        row.operator('gnm.marker_normal', text='Hide', icon='HIDE_ON').action = 'CLEAR'
+        normal_box.operator('gnm.marker_normal', text='Reorient Selected', icon='ORIENTATION_NORMAL').action = 'APPLY'
+        normal_box.label(text='Arrow + tangent circle; preview is a snapshot')
+        for line in textwrap.wrap(settings.normal_status, width=48):
+            normal_box.label(text=line)
+
         layout.operator("gnm.recenter_on_plane", icon="OBJECT_ORIGIN")
 
         layout.separator()
@@ -1866,7 +1939,7 @@ def _update_gerasimov_ghost(scene, ger):
 # -----------------------------------------------------------------------
 # V13: raycast filtrat (craniul sta "in interiorul" capului GNM)
 # -----------------------------------------------------------------------
-def _record_marker_surface(item, hit_object):
+def _record_marker_surface(item, hit_object, geometry_digest=None):
     scene = bpy.context.scene
     inferred = hit_object is not None and bool(hit_object.get('gnm_reconstructed_via_mirroring'))
     source = next((r for r in _bone_sources(scene) if r.source_object == hit_object), None)
@@ -1875,7 +1948,9 @@ def _record_marker_surface(item, hit_object):
     item.bone_status = 'reconstructed' if inferred else 'observed'
     if item.bone_empty is not None:
         item.bone_empty['gnm_bone_source_id'] = source.uid if source else str(hit_object.get('gnm_region_patch', 'inferred'))
-        if source:
+        if geometry_digest:
+            item.bone_empty['gnm_source_sha256_at_placement'] = geometry_digest
+        elif source:
             _, _, digest, _ = _core_module('blender_sources').source_geometry(hit_object, bpy.context.evaluated_depsgraph_get(), source.flip_normals)
             item.bone_empty['gnm_source_sha256_at_placement'] = digest
     if inferred:
@@ -1884,21 +1959,25 @@ def _record_marker_surface(item, hit_object):
         item.marker_notes = 'Placed on inferred bone; review before inclusion. ' + item.marker_notes
 
 
-def _ray_cast_skull(scene, depsgraph, origin, direction, max_hops=32, return_object=False):
+def _ray_cast_skull(scene, depsgraph, origin, direction, max_hops=32, return_object=False, return_face=False):
     """Ray-march through non-bone objects; accept explicitly registered surfaces."""
     sources = {r.source_object: r for r in _bone_sources(scene)}
     inferred = {r.result_object for r in scene.gnm_restoration_regions if r.enabled and r.result_object is not None}
     o = origin.copy()
     for _ in range(max_hops):
-        hit, location, normal, _, obj, _ = scene.ray_cast(depsgraph, o, direction)
+        hit, location, normal, face_index, obj, _ = scene.ray_cast(depsgraph, o, direction)
         if not hit:
             break
         obj = getattr(obj, 'original', obj)
         if obj in sources or obj in inferred:
             if obj in sources and sources[obj].flip_normals:
                 normal = -normal
+            if return_face:
+                return True, location, normal, obj, face_index
             return (True, location, normal, obj) if return_object else (True, location, normal)
         o = location + direction*.05
+    if return_face:
+        return False, None, None, None, None
     return (False, None, None, None) if return_object else (False, None, None)
 
 
@@ -2529,6 +2608,7 @@ def _gnm_live_on_load_post(_dummy):
     _stop_live()
     _stop_offline()
     _LIVE.__init__()
+    _core_module('blender_marker_normals').clear_preview()
 
 
 def _add_live_handler():
@@ -2966,6 +3046,7 @@ class GNM_OT_delete_marker(Operator):
     def execute(self, context):
         scene = context.scene
         item = scene.gnm_markers[scene.gnm_marker_active_index]
+        _core_module('blender_marker_normals').clear_preview(scene)
         for old in (item.bone_empty, item.target_empty, item.peg_object):
             if old is not None:
                 bpy.data.objects.remove(old, do_unlink=True)
@@ -3429,6 +3510,8 @@ def _export_markers(scene, path):
             "scene_scale_length": scene.unit_settings.scale_length,
             "requested_marker_set": scene.gnm_settings.marker_set,
             "marker_count": len(scene.gnm_markers),
+            "marker_orientation": {item.label: _core_module('blender_marker_normals').export_record(item)
+                                   for item in scene.gnm_markers if item.is_placed},
             "mapping_revision": _VERTEX_DATA.MAPPING_REVISION,
             "tissue_reference": _core_module('paper_reference').reference_metadata(),
             "cranial_modification": scene.gnm_settings.cranial_modification,
@@ -3619,7 +3702,7 @@ _classes = (
     GNMSettings, GNMMarkerItem, GNMRestorationRegion, GNMBoneSource, GNM_OT_register_bone_sources,
     GNM_OT_region_add, GNM_OT_region_remove, GNM_UL_restoration_regions, GNM_OT_audit_landmarks,
     GNM_OT_import_setup, GNM_OT_init_markers,
-    GNM_OT_place_marker, GNM_OT_next_unplaced, GNM_OT_toggle_plane_preview,
+    GNM_OT_place_marker, GNM_OT_marker_normal, GNM_OT_next_unplaced, GNM_OT_toggle_plane_preview,
     GNM_OT_recenter_on_plane, GNM_OT_asymmetry_report, GNM_OT_session_report,
     GNM_OT_capturi_standardizate, GNM_OT_mirror_reconstruct, GNM_OT_export_csv,
     GNM_UL_markers, GNM_PT_panel, GNM_OT_run_offline, GNM_OT_cancel_offline,
@@ -3637,7 +3720,7 @@ def register():
     for cls in _classes: bpy.utils.register_class(cls)
     bpy.types.Scene.gnm_settings = PointerProperty(type=GNMSettings)
     bpy.types.Scene.gnm_markers = CollectionProperty(type=GNMMarkerItem)
-    bpy.types.Scene.gnm_marker_active_index = IntProperty(default=0)
+    bpy.types.Scene.gnm_marker_active_index = IntProperty(default=0, update=_normal_settings_changed)
     bpy.types.Scene.gnm_live = PointerProperty(type=GNMLiveSettings)
     bpy.types.Scene.gnm_bone_sources = CollectionProperty(type=GNMBoneSource)
     bpy.types.Scene.gnm_restoration_regions = CollectionProperty(type=GNMRestorationRegion)
@@ -3652,6 +3735,7 @@ def register():
 def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
+    _core_module('blender_marker_normals').clear_preview()
     try:
         _stop_live()
     except Exception:

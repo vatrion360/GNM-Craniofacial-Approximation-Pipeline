@@ -13,6 +13,17 @@ def source_geometry(obj, depsgraph, flip_normals=False):
     """Return evaluated world-mm triangles, including modifiers and determinant parity."""
     if obj.type != 'MESH' or generated_surface(obj) or obj.mode != 'OBJECT':
         raise ValueError('Use preserved bone meshes in Object Mode')
+    return evaluated_geometry(obj, depsgraph, flip_normals)[:4]
+
+
+def evaluated_geometry(obj, depsgraph, flip_normals=False):
+    """World surface plus evaluated polygon IDs, also usable on inferred patches.
+
+    This does not authorize an object as observed bone; source_geometry retains
+    that guard. Callers inspecting inferred surfaces must check their registry.
+    """
+    if obj.type != 'MESH' or obj.mode != 'OBJECT':
+        raise ValueError('Use a mesh in Object Mode')
     evaluated = obj.evaluated_get(depsgraph)
     mesh = evaluated.to_mesh()
     try:
@@ -24,12 +35,14 @@ def source_geometry(obj, depsgraph, flip_normals=False):
         triangles = np.empty(len(mesh.loop_triangles)*3, dtype=np.int32)
         mesh.loop_triangles.foreach_get('vertices', triangles)
         triangles = triangles.reshape(-1, 3)
+        polygons = np.empty(len(mesh.loop_triangles), dtype=np.int32)
+        mesh.loop_triangles.foreach_get('polygon_index', polygons)
         if (np.linalg.det(transform[:3, :3]) < 0) != bool(flip_normals):
             triangles = triangles[:, ::-1].copy()
         if not len(points) or not len(triangles) or not np.isfinite(points).all():
             raise ValueError('Bone source has empty or invalid geometry')
         digest = hashlib.sha256(points.astype('<f8').tobytes()+triangles.astype('<i8').tobytes()).hexdigest()
-        return points, triangles, digest, transform.tolist()
+        return points, triangles, digest, transform.tolist(), polygons
     finally:
         evaluated.to_mesh_clear()
 

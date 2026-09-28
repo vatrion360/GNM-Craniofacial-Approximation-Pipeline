@@ -9,7 +9,7 @@
 
 ## Marker and tissue review
 
-Place well-distributed midline and bilateral landmarks on stable, preserved bone. The automatic normal-based offset is an initial construction, not an anatomical rule. Review local normals around sharp ridges, orbital margins, thin nasal bones and openings. Local curvature or reversed normals can send the target in the wrong direction.
+Place well-distributed midline and bilateral landmarks on stable, preserved bone. The automatic normal-based offset is an initial construction, not an anatomical rule. Review local normals around sharp ridges, orbital margins, thin nasal bones and openings. Use **Preview Normal** and **Reorient Selected** for existing markers; see [local-normal method and limits](MARKER_NORMALS.md). Local curvature or reversed normals can send the target in the wrong direction.
 
 For each placed marker, document the tissue source/table/definition and why it applies. Adjust the tissue distance and inspect the resulting target. Depth edits update existing target/peg geometry; manually moving the target inconsistently with the recorded depth prevents export. The active marker's **Tissue source / method** field is exported. The defaults remain explicitly unvalidated until reviewed.
 

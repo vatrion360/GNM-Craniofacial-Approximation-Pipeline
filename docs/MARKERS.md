@@ -50,3 +50,7 @@ In add-on 15, **Add Missing Markers** preserves placed objects, manually entered
 ## Additional v3 provenance fields in 5.0.0rc4
 
 Optional `bone_source_id`, `bone_source_geometry_sha256`, `bone_anatomy` and `articulation_reviewed` (0/1) link each placement to an evaluated observed source. CSV metadata contains the source manifest, raw file hashes, transforms and case/observer/protocol IDs. Missing fields remain readable for migration; frozen protocols require complete provenance. Quoted multiline notes are retained; duplicate headers are rejected. Reviewed reusable JSON maps and precedence are specified in [SCIENTIFIC_HARDENING](SCIENTIFIC_HARDENING.md).
+
+## Direction provenance in 5.0.0rc5
+
+The optional `marker_orientation` metadata preserves the applied local-normal estimate and current direction for each placed marker, with source hash, radius, diagnostics and UTC time. Manual point/direction edits are flagged by `matches_current_marker=false`. It survives offline report export without changing CSV coordinate fields or the fitter. See [MARKER_NORMALS](MARKER_NORMALS.md).
