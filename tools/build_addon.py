@@ -5,14 +5,16 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 def build(destination=None):
     root = Path(__file__).resolve().parents[1]
-    destination = Path(destination or root / 'dist' / 'gnm_cranio-5.0.0rc5.zip')
+    destination = Path(destination or root / 'dist' / 'gnm_cranio-5.0.0rc6.zip')
     destination.parent.mkdir(parents=True, exist_ok=True)
     files = [(root / 'addon_v13.py', 'gnm_cranio/__init__.py'),
              (root / 'gnm_reconstruct.py', 'gnm_cranio/gnm_reconstruct.py'),
              (root / 'landmark_vertex_map.json', 'gnm_cranio/landmark_vertex_map.json'),
              (root / 'LICENSE', 'gnm_cranio/LICENSE'),
-             (root / 'NOTICE', 'gnm_cranio/NOTICE')]
+             (root / 'NOTICE', 'gnm_cranio/NOTICE'),
+             (root / 'README.md', 'gnm_cranio/README.md')]
     files += [(p, 'gnm_cranio/' + p.relative_to(root).as_posix()) for p in sorted((root / 'cranio').rglob('*.py'))]
+    files += [(p, 'gnm_cranio/' + p.relative_to(root).as_posix()) for p in sorted((root / 'docs').glob('*.md'))]
     with ZipFile(destination, 'w', ZIP_DEFLATED) as archive:
         for source, name in files:
             archive.writestr(name, source.read_bytes())

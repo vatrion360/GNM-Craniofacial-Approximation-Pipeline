@@ -7,7 +7,7 @@ from .provenance import implementation_manifest
 from .validation import sha256_file, validate_outputs
 
 CASE_FIELDS = {'input', 'output', 'output_error_mesh', 'output_stats', 'output_json',
-    'output_statistical', 'npz', 'skull', 'prior', 'landmark_map', 'protocol', 'case_metadata', 'overwrite', 'require_qc'}
+    'output_statistical', 'npz', 'skull', 'prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'overwrite', 'require_qc'}
 
 
 def scientific_settings(config):
@@ -24,7 +24,9 @@ def frozen_from_report(report, protocol_id, split_sha256):
         raise ValueError('Protocol ID and immutable subject-split SHA-256 required')
     if report['config']['geometry_qc'] != 'full':
         raise ValueError('Development run must use full geometry QC')
+    from .craniometry import control_protocol
     return dict(schema_version=1, protocol_id=protocol_id, split_sha256=split_sha256,
+        craniometry_policy=control_protocol(report['marker_metadata']['craniometry']) if report['config'].get('measurement_weight', 0) > 0 else None,
         model_sha256=report['inputs']['model']['sha256'], source_sha256=report['software']['implementation']['source_sha256'],
         runtime_versions={key: report['software'][key] for key in ('numpy', 'scipy', 'trimesh')},
         settings=scientific_settings(report['config']), skull_required='skull' in report['inputs'],
@@ -43,6 +45,8 @@ def validate_protocol(cfg, metadata, targets, model_hash):
         runtime_versions={key: version(key) for key in ('numpy', 'scipy', 'trimesh')},
         settings=scientific_settings(cfg), skull_required=bool(cfg.skull),
         optional_inputs={key: sha256_file(getattr(cfg, key)) if getattr(cfg, key) else None for key in ('prior', 'landmark_map')})
+    from .craniometry import control_protocol
+    expected['craniometry_policy'] = control_protocol(metadata.get('craniometry')) if cfg.measurement_weight > 0 else None
     for name, value in expected.items():
         if protocol.get(name) != value:
             raise ValueError(f'Frozen protocol mismatch: {name}')

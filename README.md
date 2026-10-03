@@ -2,7 +2,7 @@
 
 A Blender marker add-on and an offline, auditable fitting pipeline for **supervised craniofacial approximation research**. Fits a neutral GNM Head identity model to operator-defined skin targets derived from a scanned skull.
 
-**Software 5.0.0rc5 / add-on 17.1.0.** This revision adds stabilized local surface normals, direction preview and selective marker reorientation, with orientation provenance in CSV/offline reports. It retains shared live/offline fitting and observed-fragment safeguards. It does **not** establish forensic accuracy or recover a uniquely determined face. Tissue applicability and GNM correspondences require anatomical review. See the [PDF-based protocol](docs/PDF_PROTOCOL.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
+**Software 5.0.0rc6 / add-on 18.0.0.** This revision adds 22 dedicated bone references and the 14 cranial measurements from Table 3, with optional reviewed skin-distance controls shared by live and offline fitting. Missing/reconstructed anatomy and bone-versus-skin distances remain explicit. It retains stabilized local marker normals and observed-fragment safeguards. It does **not** establish forensic accuracy or recover a uniquely determined face. Tissue applicability and GNM correspondences require anatomical review. See the [craniometry protocol](docs/CRANIOMETRY.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
 
 ## Start here
 
@@ -13,6 +13,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [PDF Table 2, 48-marker set and correspondence changes](docs/PDF_PROTOCOL.md)
 - [Scientific rationale and primary references](docs/SCIENCE.md)
 - [Perpendicular marker placement and local normals](docs/MARKER_NORMALS.md)
+- [Table 3 cranial measurements and reviewed skin-distance controls](docs/CRANIOMETRY.md)
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
@@ -58,7 +59,7 @@ Local correction is opt-in (`--local-correction`). Dense skull constraints are e
 python tools/build_addon.py
 ```
 
-Install `dist/gnm_cranio-5.0.0rc5.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender 4.5.0 headless integration runs on Windows and Linux; see [revision-specific results](docs/VALIDATION.md). Blender **4.2+ remains the broader target**; interactive and other version checks remain pending.
+Install `dist/gnm_cranio-5.0.0rc6.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender 4.5.0 headless integration runs on Windows and Linux; see [revision-specific results](docs/VALIDATION.md). Blender **4.2+ remains the broader target**; interactive and other version checks remain pending.
 
 Select the local model, import the skull with explicit source units, place/review markers, and export v3 CSV. For **Run Offline Fit and Import**, select the external Python executable from the environment above and a case output folder. The add-on runs the CLI in a separate process, records a log, then imports the completed world-mm OBJ. Each run gets a new case subfolder. The default button uses marker-only statistical fitting with lambda based on the actual included marker count; explicit dense and local-correction switches are available in the panel and CLI. Register all preserved bone sources, review their normals and confirm mandibular articulation before including mandibular constraints.
 

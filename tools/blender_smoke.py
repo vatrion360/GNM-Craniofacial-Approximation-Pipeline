@@ -21,8 +21,9 @@ sys.path.insert(0, str(root / 'tools'))
 from blender_hardening_checks import run_source_checks, run_map_checks, run_icp_score_check
 from blender_fragment_checks import run_fragment_checks, run_lambda_checks
 from blender_normal_checks import run_normal_checks
+from blender_craniometry_checks import run_craniometry_checks
 
-archive = root / 'dist' / 'gnm_cranio-5.0.0rc5.zip'
+archive = root / 'dist' / 'gnm_cranio-5.0.0rc6.zip'
 with tempfile.TemporaryDirectory() as directory:
     with zipfile.ZipFile(archive) as z:
         z.extractall(directory)
@@ -38,6 +39,7 @@ with tempfile.TemporaryDirectory() as directory:
         run_fragment_checks(addon)
         run_source_checks(addon, directory)
         run_normal_checks(addon)
+        run_craniometry_checks(addon, directory)
         scene = bpy.context.scene
         scene.unit_settings.system = 'METRIC'
         scene.unit_settings.scale_length = .001

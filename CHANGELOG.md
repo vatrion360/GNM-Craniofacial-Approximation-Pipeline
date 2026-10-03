@@ -1,3 +1,12 @@
+# 5.0.0rc6 / add-on 18.0.0
+
+- Table 3 catalogue: 22 bone references, 14 case-specific chords, observed/reconstructed/missing status and placement/source review.
+- Dedicated Blender panel, bone placement/linking, selected-chord display, custom reviewed skin controls and standalone JSON/CSV export.
+- Optional shared live/offline skin-distance fitting, with explicit bone-to-skin correspondence and target construction. No specimen values or bone-to-skin multipliers are supplied.
+- Distance-aware scale updates, tolerance/Huber weighting, excluded-endpoint filtering and unchanged adaptive-lambda counting.
+- Before/statistical/final skin residuals and cranial measurements in reports; control policy included in frozen protocols.
+- Numeric and installed-ZIP Blender regressions added to existing Windows/Linux CI.
+
 # 5.0.0rc5 / add-on 17.1.0
 
 - Stabilized local tangent normals from connected, area-weighted surface patches; configurable radius and explicit face-normal alternative.

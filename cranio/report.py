@@ -11,7 +11,7 @@ from .validation import rmse, residual_metrics, sha256_file
 def write_stats(path, cfg, targets, skipped, scale, lam_used, fit_info,
                 res_align, res_fit, res_final, clamped_mags, field, c,
                 warnings_list, extra, dense_report=None, lm_regions=None,
-                consistency=None, excluded_auto=None, nasal_report=None):
+                consistency=None, excluded_auto=None, nasal_report=None, craniometry_report=None):
     """Raport complet de reconstructie (reproductibilitate / publicatie).
 
     ``cfg`` este un PipelineConfig (are aceleasi nume de attribute ca
@@ -73,6 +73,17 @@ def write_stats(path, cfg, targets, skipped, scale, lam_used, fit_info,
     if nasal_report:
         lines.append("")
         lines.extend(nasal_report)
+    if craniometry_report is not None:
+        lines.extend(['', 'Cranial measurements (bone chords, world mm):'])
+        for row in craniometry_report['bone_measurements']:
+            value = 'unavailable' if row['bone_mm'] is None else f"{row['bone_mm']:.3f} mm"
+            lines.append(f"  {row['measurement']:9s} {value:>16s} | {row['status']} | reviewed={row['definition_reviewed']} | source_current={row['sources_current']}")
+        lines.append(f"Reviewed skin-distance control strength: {craniometry_report['weight']:g}")
+        for row in craniometry_report['final_skin']:
+            lines.append(f"  {row['measurement']}: skin target {row['target_mm']:.3f}, final {row['fitted_skin_mm']:.3f}, residual {row['residual_mm']:+.3f} mm ({row['target_mode']})")
+        for row in craniometry_report['skipped_controls']:
+            lines.append(f"  skipped {row['measurement']}: {row['reason']}")
+        lines.append(craniometry_report['interpretation'])
     lines.append("")
     lines.append(f"{'Landmark':22s} {'Region':14s} {'Vertex':>7s} "
                  f"{'Alignment':>9s} {'Fit':>9s} {'Final':>9s} {'Prescribed':>10s}")
@@ -125,7 +136,7 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
               "model": {"path": os.path.abspath(cfg.npz), "sha256": model_hash}}
     if cfg.skull:
         inputs["skull"] = {"path": os.path.abspath(cfg.skull), "sha256": sha256_file(cfg.skull)}
-    for name in ('prior', 'landmark_map', 'protocol', 'case_metadata'):
+    for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry'):
         if getattr(cfg, name):
             inputs[name] = dict(path=os.path.abspath(getattr(cfg, name)), sha256=sha256_file(getattr(cfg, name)))
     loo, history, dense_history = fit_info
@@ -150,6 +161,7 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
         "iteration_history": history,
         "solver": fit_info.diagnostics,
         "geometry_quality": metadata.get("geometry_quality"),
+        "craniometry": metadata.get("craniometry_result"),
         "dense_history": [[n, d if np.isfinite(d) else None] for n, d in dense_history],
         "landmarks": [{"label": t.label, "vertex": t.vertex, "target_mm": t.xyz.tolist(),
                        "weight": t.weight, "alignment_mm": float(a), "fit_mm": float(b), "final_mm": float(c)}

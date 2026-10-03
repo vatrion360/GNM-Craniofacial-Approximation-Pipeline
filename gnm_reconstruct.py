@@ -95,6 +95,10 @@ def parse_args(argv=None) -> PipelineConfig:
     parser.add_argument('--landmark-map', default=None)
     parser.add_argument('--protocol', default=None)
     parser.add_argument('--case-metadata', default=None)
+    parser.add_argument('--craniometry', default=None,
+                        help='Case craniometry JSON in world mm; otherwise uses embedded CSV metadata')
+    parser.add_argument('--measurement-weight', type=float, default=0.,
+                        help='Reviewed skin-distance block strength; 0 disables. Bone chords are never skin targets')
     parser.add_argument('--max-iter', type=int, default=30)
     parser.add_argument('--tolerance', type=float, default=1e-5)
     parser.add_argument('--clip-sigma', type=float, default=3.0)
@@ -113,6 +117,8 @@ def parse_args(argv=None) -> PipelineConfig:
         landmark_map=args.landmark_map,
         protocol=args.protocol,
         case_metadata=args.case_metadata,
+        craniometry=args.craniometry,
+        measurement_weight=args.measurement_weight,
         max_iter=args.max_iter,
         tolerance=args.tolerance,
         clip_sigma=args.clip_sigma,

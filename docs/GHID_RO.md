@@ -1,6 +1,20 @@
-# Ghid rapid în română: 5.0.0rc5 / addon 17.1
+# Ghid rapid în română: 5.0.0rc6 / addon 18.0
 
 Addon-ul oferă **48 de markeri**, pipeline offline și verificarea mediului Python înainte de calcul. Tabelul 2 din PDF are 21 de tipuri anatomice, adică **32 de poziții**: 10 mediane și 11 perechi bilaterale. Reunirea lor cu cei 27 de markeri anteriori adaugă 21 de poziții noi.
+
+Versiunea 18 adaugă separat **22 de repere osoase pentru cele 14 măsurători din Table 3**. Nu le adaugă automat ca ținte cutanate la cei 48 de markeri.
+
+## Măsurătorile craniene din Table 3
+
+În **Cranial Measurements (Table 3)**, apasă **Add 22 Bone References / 14 Measurements**. Selectează reperul, apoi **Place Bone Reference** și clic pe osul înregistrat. **Link Selected Marker** permite reutilizarea punctului osos al markerului selectat în panoul principal. Verifică definiția, statutul osului și poziția, apoi **Confirm Definition / Position**. Deplasarea punctului invalidează verificarea acelei poziții.
+
+Lista afișează distanțele în mm; **Show / Hide Selected Chord** arată segmentul selectat. Dacă lipsește un capăt, valoarea este indisponibilă. Osul reconstruit rămâne etichetat ca atare. **Export Measurements JSON** salvează reperele, statutul și toate cele 14 rezultate; acestea sunt incluse și în CSV-ul markerilor și în rapoartele offline.
+
+Pentru condiționarea opțională a feței, activează **Use skin-distance control**, selectează markerii cutanați ancorați la cele două repere osoase, documentează metoda și confirmă corespondența. Apoi setează **Skin-distance strength** peste 0. Implicit este dezactivat. Poți utiliza distanța dintre țintele cutanate deja verificate sau o predicție cutanată explicită, cu metodă și toleranță. Distanța osoasă nu devine automat distanță pe piele. Basion și opisthion rămân numai pentru măsurare; reperele reconstruite nu sunt acceptate în acest termen de fit.
+
+Pentru un reper fără marker cutanat existent, **Create a custom skin control** cere vertex GNM, grosime pozitivă și sursă. Markerul nou pornește exclus și nerevizuit: verifică-l în panoul principal înainte de includere. Lambda continuă să depindă de numărul markerilor cutanați efectiv incluși, fără a număra din nou cele 14 distanțe.
+
+**Bregma nu este Vertex; `o` este opisthion, iar `op` opisthocranion.** `ftm` din articol este păstrat ca alias pentru `fmt`. Pentru `n–ns`, implementarea calculează coarda între cele două repere; documentează construcția nasospinale. Această convenție diferă de protocoalele care mediază două înălțimi nazale laterale. Valorile cazului din articol nu sunt precompletate. Detalii, ecuații și limite: [CRANIOMETRY](CRANIOMETRY.md).
 
 ## Instalare și eroarea Windows
 
@@ -13,7 +27,7 @@ py -3.12 -m venv .venv
 ```
 
 2. Obține modelul oficial conform [INSTALL](INSTALL.md), apoi verifică-l cu `.\.venv\Scripts\python.exe -m cranio.doctor --npz models\gnm_head.npz`. Modelul se păstrează local și nu este inclus în addon.
-3. Instalează `gnm_cranio-5.0.0rc5.zip` în Blender prin **Install from Disk** și activează **GNM Scientific Markers**. Dezactivează copia veche înainte de înlocuire. Pentru construirea ZIP-ului din surse: `python tools/build_addon.py`.
+3. Instalează `gnm_cranio-5.0.0rc6.zip` în Blender prin **Install from Disk** și activează **GNM Scientific Markers**. Dezactivează copia veche înainte de înlocuire. Pentru construirea ZIP-ului din surse: `python tools/build_addon.py`.
 4. La **Python executable / venv folder**, selectează `python.exe` din `.venv\Scripts`, sau directorul `.venv` creat pe Windows. Poți lipi calea afișată de ultima comandă de mai sus.
 5. Apasă **Check Python Environment**. Rezultatul trebuie să confirme Python 3.10+ pe 64 de biți și `numpy/scipy/trimesh OK`.
 

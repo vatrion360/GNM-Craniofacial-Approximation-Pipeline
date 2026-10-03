@@ -1,5 +1,35 @@
 # Validation and release gates
 
+## Evidence for 5.0.0rc6 / add-on 18.0
+
+Local execution on 2026-10-03, Linux x86_64, Python 3.12.14, NumPy 2.3.5,
+SciPy 1.17.0 and trimesh 5.1.0, with the pinned official GNM asset:
+**162 passed, 1 native-Windows test skipped**. The 23 new numeric regressions
+cover missing/reconstructed/stale endpoints, alias duplicates, nonfinite and
+malformed inputs, bone-versus-skin targets, scale/Jacobian correctness,
+tolerance weighting, live/offline equality, marker-count regularization,
+manual/automatic exclusions, separate/embedded JSON and frozen control policy.
+
+The actual add-on ZIP passed the Blender 4.5.0 Linux suite (official build
+`8cb6b388974a`), including `BLENDER_CRANIOMETRY_PASS`: registry initialization,
+bone-only placement, reviewed custom skin markers, moved-point review
+invalidation, unchanged source geometry, missing/reconstructed/stale rejection,
+CSV/resolver parity, standalone JSON, borrowed-marker preservation, unit guard
+and display-handler cleanup. Existing fragment, normal, live timer and external
+fit/import/cancellation checks also passed. Interactive picking/display remains
+a workstation acceptance check; headless checks do not establish visual usability.
+
+The wheel was installed in a separate environment and invoked with `python -I`
+outside the checkout. A synthetic official-model case with 48 skin markers and
+an active skin-distance control completed with full geometry QC, lambda 1.0,
+and residuals below 0.001 mm. These are software-generated mean-shape targets,
+not specimen evidence. No observed skull surface was supplied for contact QC.
+
+Ruff, source/wheel builds and add-on ZIP packaging passed. The ZIP also includes
+the offline guides. Remote revision-specific CI results are recorded with the PR.
+No CT accuracy, calibrated uncertainty, population applicability, macOS or other
+Blender-version validation is claimed. See [the complete contract](CRANIOMETRY.md).
+
 ## Evidence for 5.0.0rc5 / add-on 17.1
 
 Local execution on 2026-09-28, Linux x86_64, Python 3.12, with the pinned official
