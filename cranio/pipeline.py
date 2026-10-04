@@ -34,6 +34,7 @@ from .optimize import (LossConfig, bounded_tps_correction, fit_identity,
 from .report import write_stats
 from .report import write_run_json
 from .validation import rmse, sha256_file, validate_points
+from . import craniometry
 
 # Landmark-urile necesare diagnosticului de proiectie nazala (V13.6).
 _GERASIMOV_LABELS = ("Nasion", "Rhinion", "Acanthion",
@@ -99,7 +100,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     """Ruleaza pipeline-ul complet. Returneaza 0 (succes) sau 2 (fatal)."""
     cfg.fill_default_outputs()
     cfg.validate()
-    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.protocol, cfg.case_metadata) if path}
+    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.protocol, cfg.case_metadata, cfg.craniometry) if path}
     warnings_list = []
 
     backend = GNMBackend(cfg.npz)
@@ -132,6 +133,27 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         if not isinstance(case, dict):
             raise ValueError('Case metadata must be a JSON object')
         _csv_meta['case_metadata'] = case
+    document = _csv_meta.get('craniometry')
+    if document is not None:
+        craniometry.validate_document(document)
+    if cfg.craniometry:
+        external = craniometry.load_document(cfg.craniometry)
+        # Derived export tables are recomputed, never treated as authoritative inputs.
+        external.pop('measurements', None)
+        if document is not None and {k: v for k, v in document.items() if k != 'measurements'} != external:
+            raise ValueError('External and embedded craniometry disagree; select one authoritative case document')
+        document = external
+    if document is not None:
+        craniometry.measure(document)
+        if document.get('case_id') and _csv_meta.get('case_id') and document['case_id'] != _csv_meta['case_id']:
+            raise ValueError('Craniometry case ID does not match marker CSV')
+        if _csv_meta.get('bone_sources') is not None:
+            # Keep the raw input in the CSV/file hash; evaluate availability against
+            # the current export manifest rather than a stale auxiliary manifest.
+            document = dict(document, bone_sources=_csv_meta['bone_sources'])
+        _csv_meta['craniometry'] = document
+    if cfg.measurement_weight > 0 and document is None:
+        raise ValueError('--measurement-weight requires craniometry metadata or --craniometry')
     model_hash = input_hashes[cfg.npz]
     recorded_hash = _csv_meta.get("model_sha256")
     if recorded_hash and recorded_hash != model_hash:
@@ -197,6 +219,18 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     targets_xyz = np.array([t[2] for t in targets], dtype=np.float64)
     validate_points(targets_xyz, "marker targets", minimum=4)
     weights = np.array([t[3] for t in targets], dtype=np.float64)
+
+    def measurement_options():
+        if document is None or cfg.measurement_weight == 0:
+            return dict(measurement_controls=[], measurement_weight=0.), []
+        # The current CSV manifest, not just a self-consistent older JSON,
+        # determines whether the source geometry is still the same case.
+        current = dict(document, bone_sources=_csv_meta.get('bone_sources', []))
+        controls, skipped_pairs = craniometry.resolve_controls(current, labels, lm_idx, targets_xyz,
+            records, _csv_meta.get('bone_positions_mm', {}), model_hash)
+        return dict(measurement_controls=controls, measurement_weight=cfg.measurement_weight), skipped_pairs
+
+    measurement_fit_options, skipped_measurements = measurement_options()
 
     # Verificare de consistenta a plasarii (distante inter-landmark vs
     # template): markerii suspecti sunt semnalati INAINTE de orice fit.
@@ -323,7 +357,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     c, scale, rot, trans, lam_used, fit_info, res_fit = fit_identity(
         mu, basis, lm_idx, targets_xyz, weights, lam=lam_arg, dense=dense,
         mirror_indices=model.mirror_indices, distance_pairs=distance_pairs,
-        loss_cfg=loss_cfg, max_iter=cfg.max_iter, tol=cfg.tolerance, **prior_options)
+        loss_cfg=loss_cfg, max_iter=cfg.max_iter, tol=cfg.tolerance, **prior_options, **measurement_fit_options)
     logger.info(f"    lambda = {lam_used:g}, |c|max = {np.abs(c).max():.2f} sigma, "
           f"RMS = {rmse(res_fit):.2f} mm (max {res_fit.max():.2f} mm)")
     stab = stability_warnings(lam_used, fit_info[0], c, loss_cfg.clip_sigma)
@@ -368,10 +402,12 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                     f"remain (<10) - weakly constrained reconstruction.")
             logger.info("    Re-running the statistical fit without outliers...")
             lam_arg = selected_lambda(len(targets))
+            measurement_fit_options, skipped_measurements = measurement_options()
             c, scale, rot, trans, lam_used, fit_info, res_fit = fit_identity(
                 mu, basis, lm_idx, targets_xyz, weights, lam=lam_arg,
                 dense=dense, mirror_indices=model.mirror_indices,
-                distance_pairs=distance_pairs, loss_cfg=loss_cfg, max_iter=cfg.max_iter, tol=cfg.tolerance, **prior_options)
+                distance_pairs=distance_pairs, loss_cfg=loss_cfg, max_iter=cfg.max_iter, tol=cfg.tolerance,
+                **prior_options, **measurement_fit_options)
             logger.info(f"    refit: lambda = {lam_used:g}, |c|max = "
                   f"{np.abs(c).max():.2f} sigma, RMS = {rmse(res_fit):.2f} mm "
                   f"(max {res_fit.max():.2f} mm)")
@@ -524,6 +560,18 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     if quality['status'] == 'needs_review':
         warnings_list.append('Geometry/solver QC requires review; inspect the JSON diagnostics')
     _csv_meta['geometry_quality'] = quality
+    measurement_report = None
+    if document is not None:
+        controls = measurement_fit_options['measurement_controls']
+        measurement_report = dict(protocol=craniometry.PROTOCOL, bone_measurements=craniometry.measure(document),
+            weight=cfg.measurement_weight, controls=controls, skipped_controls=skipped_measurements,
+            aligned_skin=craniometry.control_residuals(controls, s1*(mu @ r1.T)+t1),
+            statistical_skin=craniometry.control_residuals(controls, v_world),
+            final_skin=craniometry.control_residuals(controls, v_final),
+            interpretation='Bone chords are unchanged input observations. Skin residuals are training diagnostics, not accuracy or calibrated uncertainty.')
+        _csv_meta['craniometry_result'] = measurement_report
+        if controls:
+            warnings_list.append('Reviewed skin-distance controls are experimental; marker-derived pair targets are dependent observations. Conditional LOO still tunes marker rows only.')
     if not cfg.skip_tps:
         _csv_meta['local_correction_centres_world_mm'] = centers.tolist()
         _csv_meta['local_correction_prescribed_vectors_mm'] = res_vecs.tolist()
@@ -596,7 +644,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                 clamped[:len(targets)], field, c, warnings_list, extra,
                 dense_report=dense_report, lm_regions=lm_regions,
                 consistency=cons_rows, excluded_auto=excluded_auto,
-                nasal_report=nasal_report)
+                nasal_report=nasal_report, craniometry_report=measurement_report)
     logger.info(f"    Statistics: {cfg.output_stats}")
     write_run_json(cfg, _csv_meta, model_hash, targets, skipped, excluded_auto,
                    scale, rot, trans, c, lam_used, fit_info, res_align,

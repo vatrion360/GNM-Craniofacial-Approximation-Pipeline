@@ -28,4 +28,6 @@ def fit_preview(model, snapshot, regularization, settings, dense=None, prior=Non
     return fit_identity(model.mu, model.basis, idx, targets, weights, lam=regularization,
         max_iter=int(settings.get('max_iter', DEFAULT_MAX_ITER)), tol=float(settings.get('tol', DEFAULT_TOL)),
         dense=dense, loss_cfg=LossConfig(clip_sigma=float(settings.get('clip_sigma', 3.))),
-        pose_rows=n if n >= 3 else None, huber_rows=n, **options)
+        pose_rows=n if n >= 3 else None, huber_rows=n,
+        measurement_controls=snapshot.get('measurement_controls'),
+        measurement_weight=float(snapshot.get('measurement_weight', 0.)), **options)

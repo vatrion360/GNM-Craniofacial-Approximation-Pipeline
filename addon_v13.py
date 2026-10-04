@@ -1,4 +1,4 @@
-"""GNM Craniofacial Markers 17.1 / software package 5.0.0rc5.
+"""GNM Craniofacial Markers 18.0 / software package 5.0.0rc6.
 
 Install the complete ZIP built with tools/build_addon.py. The bundled numerical
 core is imported under the add-on namespace. Optional previews run serially in
@@ -35,7 +35,7 @@ from bpy_extras import view3d_utils
 bl_info = {
     "name": "GNM Scientific Markers",
     "author": "VATRION",
-    "version": (17, 1, 0),
+    "version": (18, 0, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > GNM Markers",
     "category": "3D View",
@@ -369,7 +369,7 @@ class GNMMarkerItem(PropertyGroup):
     gnm_index: IntProperty()
     label: StringProperty()
     tissue_depth_mm: FloatProperty(default=5.0, min=0.0, update=_update_tissue_depth)
-    tissue_source: StringProperty(name="Tissue source / method", default="legacy-unvalidated")
+    tissue_source: StringProperty(name="Tissue source / method", default="legacy-unvalidated", update=_marker_fit_changed)
     use_for_fit: BoolProperty(name="Include in fit", default=True, update=_marker_fit_changed)
     fit_weight: FloatProperty(name="Weight (0 = preset)", default=0.0, min=0.0, max=1.0, update=_marker_fit_changed)
     mapping_reviewed: BoolProperty(name="Skin correspondence reviewed", default=False, update=_marker_fit_changed)
@@ -377,7 +377,7 @@ class GNMMarkerItem(PropertyGroup):
         ('unspecified', "Not recorded", "Record whether the site is preserved or inferred"),
         ('observed', "Observed", "Landmark on preserved scanned anatomy"),
         ('reconstructed', "Digitally repaired", "Landmark on repaired or mirrored bone"),
-        ('inferred', "Inferred", "Location inferred from incomplete anatomy")], default='unspecified')
+        ('inferred', "Inferred", "Location inferred from incomplete anatomy")], default='unspecified', update=_marker_fit_changed)
     use_for_plane: BoolProperty(name="Use observed cranial point for plane", default=True)
     marker_notes: StringProperty(name="Placement / direction notes")
     side: IntProperty(default=0)
@@ -480,7 +480,7 @@ class GNM_OT_init_markers(Operator):
                 continue
             item = scene.gnm_markers.add()
             item.gnm_index = _encode_index(_VERTEX_DATA.LABEL_TO_VERTEX[label], True)
-            item.label = label
+            item.name = item.label = label
             item.tissue_depth_mm, item.side = _MARKER_DATA.LANDMARK_INFO[label]
             item.tissue_source = _MARKER_DATA.initial_tissue_source(label)
             if scene.gnm_settings.marker_set == 'PAPER_32':
@@ -2298,8 +2298,11 @@ def _fingerprint(scene):
         b = item.bone_empty.matrix_world.translation
         t = item.target_empty.matrix_world.translation
         parts.append((item.label, item.gnm_vertex_override, item.use_for_fit, item.fit_weight, 1,
+                      item.mapping_reviewed, item.bone_status, item.tissue_source,
+                      item.bone_empty.get('gnm_bone_source_id', ''), item.bone_empty.get('gnm_source_sha256_at_placement', ''),
                       round(b.x, 3), round(b.y, 3), round(b.z, 3),
                       round(t.x, 3), round(t.y, 3), round(t.z, 3)))
+    parts.append(_core_module('blender_craniometry').fingerprint(scene))
     return tuple(parts)
 
 
@@ -2323,6 +2326,7 @@ def _build_snapshot(scene):
     if scene.gnm_live.dense_enabled and _LIVE.skull is None:
         raise ValueError('Dense preview requires prepared registered bones')
     _core_module('marker_audit').require_unique_landmarks(labels, verts, tgts)
+    controls, skipped_controls, control_weight = _core_module('blender_craniometry').snapshot_controls(scene, labels, verts, tgts)
     # V13.2: modul dense continuu + poza curenta a obiectului GNM (necesara
     # pentru calculul corespondentelor in worker; citita aici, pe main thread).
     gnm_obj = bpy.context.scene.objects.get(_case_name(GNM_MESH_NAME))
@@ -2344,6 +2348,8 @@ def _build_snapshot(scene):
         "m_world": (np.array(gnm_obj.matrix_world, dtype=np.float64)
                     if gnm_obj is not None else np.eye(4)),
         "bone": bone,
+        "measurement_controls": controls, "measurement_weight": control_weight,
+        "skipped_measurement_controls": skipped_controls,
     }
 
 
@@ -2355,6 +2361,7 @@ def _request_refit(scene):
         snap = _build_snapshot(scene)
     except (ValueError, TypeError) as exc:
         scene.gnm_live.status_text = 'Cannot fit: ' + str(exc)
+        scene.gnm_craniometry.status = 'Cannot fit: ' + str(exc)
         with _LIVE.pending_lock:
             _LIVE.pending = None
         return
@@ -2435,6 +2442,8 @@ def _compute_fit(snap):
         max_label=snap['labels'][int(res.argmax())] if n else '-', lam=lam_used, lam_src=source,
         beta_norm=float(np.linalg.norm(c)), n_clip=int(np.sum(np.abs(c) >= _LIVE.cfg.get('clip_sigma', 3.)-1e-6)),
         solver=info.diagnostics, converged=info.diagnostics['converged'],
+        measurement_residuals=_core_module('craniometry').control_residuals(
+            snap.get('measurement_controls', []), scale*(vertices @ rot.T)+trans),
         dense_keep=dense.get('last_diagnostics', {}).get('accepted_count', 0) if dense else None,
         dense_mean=float(np.mean(dense['last_distances'])) if dense and len(dense.get('last_distances', [])) else float('nan'),
         dense_rstats=dense.get('last_region_stats') if dense else None,
@@ -2485,6 +2494,9 @@ def _apply_result(scene, res):
                             @ Matrix.Scale(s, 4) @ rot4)
         _update_ghosts_from_fit(scene, res["v_model"], s, rot, t)
     st.rms_mm = res["rms"]
+    pairs = res.get('measurement_residuals', [])
+    scene.gnm_craniometry.last_fit = (f"Last fit: {len(pairs)} skin distances, max residual "
+        f"{max(abs(p['residual_mm']) for p in pairs):.2f} mm" if pairs else '')
     prefix = "ICP+deform: " if status == "icp_done" else "Fit OK: "
     st.status_text = (
         f"{prefix}{n} markers, lambda={res['lam']:.2g}({res.get('lam_src', '?')}), "
@@ -2609,6 +2621,7 @@ def _gnm_live_on_load_post(_dummy):
     _stop_offline()
     _LIVE.__init__()
     _core_module('blender_marker_normals').clear_preview()
+    _core_module('blender_craniometry').clear_segment()
 
 
 def _add_live_handler():
@@ -3519,6 +3532,8 @@ def _export_markers(scene, path):
             "plane_marker_labels": [item.label for item in _plane_markers(scene)],
             "restoration_regions": _restoration_records(scene),
             "target_construction": "bone plus operator-reviewed depth/direction; local normal is initial heuristic"}
+    if scene.gnm_cranial_points:
+        meta['craniometry'] = _core_module('blender_craniometry').document(scene, manifest, model_digest)
     _core_module('io_csv').write_marker_csv_v3(path, rows, meta)
     # Validate exactly what the CLI will consume, including manual overrides.
     backend = _core_module('backend').GNMBackend(model_path)
@@ -3651,6 +3666,7 @@ class GNM_OT_run_offline(Operator):
                        '--lambda-min', str(scene.gnm_live.lambda_min),
                        '--lambda-max', str(scene.gnm_live.lambda_max)]
             arguments += ['--clip-sigma', str(scene.gnm_live.clip_sigma)]
+            arguments += ['--measurement-weight', str(scene.gnm_craniometry.weight)]
             if settings.local_correction:
                 arguments.append('--local-correction')
             if settings.offline_dense:
@@ -3725,6 +3741,7 @@ def register():
     bpy.types.Scene.gnm_bone_sources = CollectionProperty(type=GNMBoneSource)
     bpy.types.Scene.gnm_restoration_regions = CollectionProperty(type=GNMRestorationRegion)
     bpy.types.Scene.gnm_restoration_active_index = IntProperty(default=0)
+    _core_module('blender_craniometry').register(sys.modules[__name__])
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
     for h in list(bpy.app.handlers.load_post):
@@ -3735,6 +3752,7 @@ def register():
 def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
+    _core_module('blender_craniometry').unregister()
     _core_module('blender_marker_normals').clear_preview()
     try:
         _stop_live()

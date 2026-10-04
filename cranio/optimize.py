@@ -242,7 +242,8 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
                  default_lambda=30.0, max_iter=DEFAULT_MAX_ITER, tol=DEFAULT_TOL, dense=None,
                  mirror_indices=None, distance_pairs=None, loss_cfg=None,
                  prior_mean=None, prior_scale=None, prior_weight=1.0,
-                 huber_rows=None, pose_rows=None):
+                 huber_rows=None, pose_rows=None, measurement_controls=None,
+                 measurement_weight=0.0):
     """Alternate weighted pose and ridge identity with one Huber IRLS layer.
 
     Huber uses world-mm residuals and original confidence weights. Effective
@@ -294,6 +295,28 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
     use_dense = dense is not None and dense.get("in_fit", True)
     dense_stats = []
     last_solve, last_dense = {}, {}
+    from . import measurement_fit
+    pair_data = measurement_fit.prepare(measurement_controls, len(mu), float(weights.sum()), measurement_weight)
+    use_measurements = measurement_weight > 0 and len(pair_data[0]) > 0
+    last_pair_weights = np.zeros(len(pair_data[0]))
+
+    def pose(c, model_lm, w_eff):
+        nonlocal last_pair_weights
+        count = len(w_eff) if pose_rows is None else pose_rows
+        src, dst, w = model_lm[:count], targets_xyz[:count], w_eff[:count]
+        scale, rot, trans = weighted_umeyama(src, dst, w)
+        if use_measurements:
+            pairs, targets, sigmas, mass = pair_data
+            distance = measurement_fit.differences(c, mu, basis, pairs)[3]
+            # Scalar IRLS at fixed R; pair residuals are measured in world mm.
+            for _ in range(30):
+                last_pair_weights = measurement_fit.robust_weights(distance, scale, targets, sigmas, mass)
+                updated, trans = measurement_fit.update_scale(src, dst, w, rot, distance, targets, last_pair_weights)
+                change = abs(updated-scale)
+                scale = updated
+                if change <= 1e-10*max(1., scale):
+                    break
+        return scale, rot, trans
 
     def robust_w(residuals_all):
         """Ponderi IRLS; cu huber_rows, Huber numai pe primele huber_rows."""
@@ -314,13 +337,17 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
     def solve(c, w_eff, lam_used):
         """O iteratie completa: aliniere + (dense) + rezolvare ridge."""
         model_lm = mu_lm + np.einsum("i,ilk->lk", c, basis_lm)
-        kp = len(w_eff) if pose_rows is None else pose_rows
-        scale, rot, trans = weighted_umeyama(model_lm[:kp], targets_xyz[:kp], w_eff[:kp])
+        scale, rot, trans = pose(c, model_lm, w_eff)
         targets_model = (targets_xyz - trans) @ (scale * rot) / (scale ** 2)
 
         parts_a = [basis_lm_flat * np.sqrt(np.repeat(w_eff, 3))[:, None]]
         parts_b = [(targets_model - mu_lm).reshape(-1)
                    * np.sqrt(np.repeat(w_eff, 3))]
+
+        if use_measurements:
+            a_pair, b_pair = measurement_fit.linear_rows(c, mu, basis, pair_data, scale, last_pair_weights)
+            parts_a.append(a_pair)
+            parts_b.append(b_pair)
 
         if use_dense:
             from .geometry import dense_correspondences
@@ -387,7 +414,7 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
 
     kp = len(weights) if pose_rows is None else pose_rows
     c = np.zeros(identity_dim)
-    scale, rot, trans = weighted_umeyama(mu_lm[:kp], targets_xyz[:kp], weights[:kp])
+    scale, rot, trans = pose(c, mu_lm, weights)
     def residuals():
         points = mu_lm + np.einsum('i,ilk->lk', c, basis_lm)
         return np.linalg.norm(scale*(points @ rot.T)+trans-targets_xyz, axis=1)
@@ -421,7 +448,7 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
         if converged:
             break
     points = mu_lm + np.einsum('i,ilk->lk', c, basis_lm)
-    scale, rot, trans = weighted_umeyama(points[:kp], targets_xyz[:kp], w_eff[:kp])
+    scale, rot, trans = pose(c, points, w_eff)
     res = residuals()
     final_weights = robust_w(res)
     diagnostics = dict(converged=bool(converged), stop_reason='tolerances_met' if converged else 'max_iterations',
@@ -432,6 +459,10 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
         observability=dict(source=weighted_geometry(points[:kp], final_weights[:kp]),
                            target=weighted_geometry(targets_xyz[:kp], final_weights[:kp])),
         dense=last_dense if use_dense else None,
+        skin_distance_controls=dict(enabled=bool(use_measurements), count=len(pair_data[0]),
+            strength=float(measurement_weight), base_weights=pair_data[3].tolist(),
+            last_solve_weights=last_pair_weights.tolist(), huber_k_sigma=2.5,
+            note='Operator tolerance, not calibrated uncertainty; marker-derived targets are dependent data'),
         objective_note='Block-coordinate surrogate with clipping; not joint MAP or independent validation')
     return FitResult(c, scale, rot, trans, float(lam_used), FitInfo(loo_table, history, dense_stats, diagnostics), res)
 
