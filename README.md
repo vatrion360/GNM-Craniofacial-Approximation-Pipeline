@@ -2,7 +2,7 @@
 
 A Blender marker add-on and an offline, auditable fitting pipeline for **supervised craniofacial approximation research**. Fits a neutral GNM Head identity model to operator-defined skin targets derived from a scanned skull.
 
-**Software 5.0.0rc6 / add-on 18.0.0.** This revision adds 22 dedicated bone references and the 14 cranial measurements from Table 3, with optional reviewed skin-distance controls shared by live and offline fitting. Missing/reconstructed anatomy and bone-versus-skin distances remain explicit. It retains stabilized local marker normals and observed-fragment safeguards. It does **not** establish forensic accuracy or recover a uniquely determined face. Tissue applicability and GNM correspondences require anatomical review. See the [craniometry protocol](docs/CRANIOMETRY.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
+**Software 5.0.0rc7 / add-on 18.0.1.** This patch removes full geometry/model reads from panel redraws, defers refits until marker edits settle, and reuses each conditional-LOO decomposition across the lambda grid. It retains the 22 bone references, 14 Table 3 measurements and reviewed skin-distance controls shared by live and offline fitting. Missing/reconstructed anatomy and bone-versus-skin distances remain explicit. It does **not** establish forensic accuracy or recover a uniquely determined face. See [performance evidence](docs/PERFORMANCE.md), the [craniometry protocol](docs/CRANIOMETRY.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
 
 ## Start here
 
@@ -59,7 +59,7 @@ Local correction is opt-in (`--local-correction`). Dense skull constraints are e
 python tools/build_addon.py
 ```
 
-Install `dist/gnm_cranio-5.0.0rc6.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender 4.5.0 headless integration runs on Windows and Linux; see [revision-specific results](docs/VALIDATION.md). Blender **4.2+ remains the broader target**; interactive and other version checks remain pending.
+Install `dist/gnm_cranio-5.0.0rc7.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender 4.5.0 headless integration runs on Windows and Linux; see [revision-specific results](docs/VALIDATION.md). Blender **4.2+ remains the broader target**; interactive and other version checks remain pending.
 
 Select the local model, import the skull with explicit source units, place/review markers, and export v3 CSV. For **Run Offline Fit and Import**, select the external Python executable from the environment above and a case output folder. The add-on runs the CLI in a separate process, records a log, then imports the completed world-mm OBJ. Each run gets a new case subfolder. The default button uses marker-only statistical fitting with lambda based on the actual included marker count; explicit dense and local-correction switches are available in the panel and CLI. Register all preserved bone sources, review their normals and confirm mandibular articulation before including mandibular constraints.
 
@@ -67,7 +67,7 @@ Use **Extended 48**, **Paper 32** or **Legacy 27**, then **Add Missing Markers**
 
 On Windows select **`.venv\Scripts\python.exe`** (or the Windows-created `.venv` folder), then **Check Python Environment**. Selecting the pipeline `.py`, Blender itself, an installer or a copied Linux interpreter is rejected before fitting. See [Windows troubleshooting](docs/INSTALL.md#windows-interpreter-check-and-winerror-193).
 
-Optional legacy previews run serially on Blender's main thread and may pause the UI. No persistent Python fitting thread is started inside Blender.
+Optional previews wait **0.35 s after the last edit** before reading the latest positions and fitting; adjust **Refit after idle (s)** if needed. Panel redraws perform no fit snapshots or source/model hashing. Bone-only measurements do not trigger face fitting while skin-distance strength is zero. A fit still runs on Blender's main thread and can pause the UI, particularly with dense constraints or LOO; these NumPy calculations do not use GPU VRAM. Use external fitting for expensive jobs. See [performance troubleshooting](docs/PERFORMANCE.md).
 
 ## Reproducible demonstration
 

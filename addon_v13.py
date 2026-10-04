@@ -1,4 +1,4 @@
-"""GNM Craniofacial Markers 18.0 / software package 5.0.0rc6.
+"""GNM Craniofacial Markers 18.0.1 / software package 5.0.0rc7.
 
 Install the complete ZIP built with tools/build_addon.py. The bundled numerical
 core is imported under the add-on namespace. Optional previews run serially in
@@ -35,7 +35,7 @@ from bpy_extras import view3d_utils
 bl_info = {
     "name": "GNM Scientific Markers",
     "author": "VATRION",
-    "version": (18, 0, 0),
+    "version": (18, 0, 1),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > GNM Markers",
     "category": "3D View",
@@ -202,6 +202,7 @@ def _source_changed(self, context):
     if context and context.scene and _LIVE.case_token == _case_token(context.scene):
         _LIVE.geometry_epoch += 1
         _LIVE.skull, _LIVE.last_c, _LIVE.pending, _LIVE.result = None, None, None, None
+        _LIVE.refit_requested_at = None
         context.scene.gnm_live.skull_status = 'Bone sources changed; prepare again'
 
 
@@ -1615,6 +1616,7 @@ class _LiveState:
         self.worker = None         # legacy state slot; no Python thread is started
         self.stop_event = threading.Event()
         self.pending = None        # snapshot de fit (latest-wins)
+        self.refit_requested_at = None  # debounce before reading evaluated geometry
         self.pending_lock = threading.Lock()
         self.result = None         # ultimul rezultat de fit gata de aplicat
         self.result_lock = threading.Lock()
@@ -2306,16 +2308,24 @@ def _fingerprint(scene):
     return tuple(parts)
 
 
+def _included_fit_markers(scene):
+    """Cheap eligibility iterator shared by UI counts and fit snapshots.
+
+    No evaluated meshes, disk access, provenance checks or RNA writes belong
+    in panel drawing. Full validation remains in the actual fit/export path.
+    """
+    for item in scene.gnm_markers:
+        if item.is_placed and item.use_for_fit:
+            vertex = _resolve_vertex(item)
+            if vertex is not None:
+                yield item, vertex
+
+
 def _build_snapshot(scene):
     """Colecteaza perechile (eticheta, vertex, tinta-piele, pondere) pentru
     markerii plasati si mapati. Ruleaza pe MAIN thread (citeste bpy)."""
     labels, verts, tgts, ws = [], [], [], []
-    for item in scene.gnm_markers:
-        if not item.is_placed or not item.use_for_fit:
-            continue
-        vid = _resolve_vertex(item)
-        if vid is None:
-            continue
+    for item, vid in _included_fit_markers(scene):
         p = item.target_empty.matrix_world.translation
         labels.append(item.label)
         verts.append(vid)
@@ -2354,19 +2364,16 @@ def _build_snapshot(scene):
 
 
 def _request_refit(scene):
-    """Marcheaza un nou snapshot pentru worker (no-op daca live e oprit)."""
+    """Coalesce edits without building snapshots in RNA/depsgraph callbacks.
+
+    The main-thread timer reads the latest positions once edits settle.
+    No geometry/hash/solver work is done during dragging or property updates.
+    """
     if not _LIVE.enabled or _LIVE.model is None or scene.name != getattr(_LIVE, "scene_name", scene.name):
         return
-    try:
-        snap = _build_snapshot(scene)
-    except (ValueError, TypeError) as exc:
-        scene.gnm_live.status_text = 'Cannot fit: ' + str(exc)
-        scene.gnm_craniometry.status = 'Cannot fit: ' + str(exc)
-        with _LIVE.pending_lock:
-            _LIVE.pending = None
-        return
+    _LIVE.refit_requested_at = time.monotonic()
     with _LIVE.pending_lock:
-        _LIVE.pending = snap
+        _LIVE.pending = None
 
 
 def _adaptive_lambda(n_markers, base, lam_min, lam_max):
@@ -2572,6 +2579,18 @@ def _live_timer_tick():
         snap = _LIVE.pending
         _LIVE.pending = None
     if snap is not None:
+        _LIVE.refit_requested_at = None
+    elif _LIVE.refit_requested_at is not None:
+        remaining = float(st.settle_delay) - (time.monotonic() - _LIVE.refit_requested_at)
+        if remaining > 0:
+            return min(remaining, 1.0 / max(float(st.update_hz), 0.1))
+        _LIVE.refit_requested_at = None
+        try:
+            snap = _build_snapshot(scene)
+        except (ValueError, TypeError) as exc:
+            st.status_text = 'Cannot fit: ' + str(exc)
+            scene.gnm_craniometry.status = st.status_text
+    if snap is not None:
         started = time.perf_counter()
         try:
             result = _icp_deform_job(snap) if snap.get("job") == "icp_deform" else _compute_fit(snap)
@@ -2649,13 +2668,16 @@ def _start_live(scene):
         bpy.app.timers.register(
             _live_timer_tick, first_interval=0.1, persistent=True)
     _add_live_handler()
-    _request_refit(scene)  # fit initial imediat
+    _request_refit(scene)
+    # Starting preview is explicit; only subsequent edits need the idle delay.
+    _LIVE.refit_requested_at -= float(scene.gnm_live.settle_delay)
 
 
 def _stop_live():
     """Opreste toate serviciile live (sigur la unregister/reload F8)."""
     _LIVE.enabled = False
     _LIVE.pending, _LIVE.result = None, None
+    _LIVE.refit_requested_at = None
     _LIVE.stop_event.set()
     w = _LIVE.worker
     if w is not None and w.is_alive():
@@ -3257,6 +3279,10 @@ class GNMLiveSettings(PropertyGroup):
         name="Update Rate (Hz)", default=10.0, min=1.0, max=30.0,
         description="How many result applications per second (the fit itself "
                     "runs serially in the main-thread timer and may pause the UI)")
+    settle_delay: FloatProperty(
+        name="Refit after idle (s)", default=0.35, min=0.0, max=2.0,
+        description="Wait after the last edit before collecting geometry and fitting; "
+                    "keeps repeated calculations out of marker dragging")
     lambda_base: FloatProperty(
         name="Lambda at 48 landmarks", default=1.0, min=0.05, max=1000.0,
         soft_min=0.3, soft_max=30.0, update=_on_fit_settings_update,
@@ -3265,7 +3291,7 @@ class GNMLiveSettings(PropertyGroup):
     lambda_max: FloatProperty(name="Lambda Max", default=1000.0, min=1.0, update=_on_fit_settings_update)
     loo_auto: BoolProperty(name="Conditional LOO tuning (slower)", default=False,
         update=_on_fit_settings_update,
-        description="Tune with current positions, vertices and weights; cached only while inputs stay identical. Runs on the main thread")
+        description="Tune with current marker positions, vertices and weights; slower than adaptive preview. Runs on the main thread")
 
 
     prior_sex: EnumProperty(
@@ -3305,8 +3331,8 @@ class GNMLiveSettings(PropertyGroup):
         update=_on_dense_toggle_update,
         description="Dense skull constraints at every fit (scalp + thin-"
                     "tissue regions, like --skull offline). The general "
-                    "deformation follows skull morphology; rate drops to "
-                    "~2-3 Hz. Requires 'Prepare Skull'")
+                    "deformation follows skull morphology; cost depends on "
+                    "geometry and settings. Requires 'Prepare Skull'")
     dense_scalp_only: BoolProperty(
         name="Scalp only (conservative)", default=False,
         update=_on_dense_toggle_update,
@@ -3405,7 +3431,7 @@ def _draw_live_section(layout, context):
     row.prop(st, 'lambda_min')
     row.prop(st, 'lambda_max')
     try:
-        used = len(_build_snapshot(scene)['labels'])
+        used = sum(1 for _ in _included_fit_markers(scene))
         value = _adaptive_lambda(used, st.lambda_base, st.lambda_min, st.lambda_max)
         box.label(text=f"Included: {used}; conditional LOO tuning" if st.loo_auto
                        else f"Included: {used}; adaptive lambda = {value:.4g}")
@@ -3414,6 +3440,7 @@ def _draw_live_section(layout, context):
 
     if st.status_text:
         box.label(text=st.status_text[:170])
+    box.prop(st, 'settle_delay')
     box.label(text=(
         f"Fit: {st.n_fitted}/{len(scene.gnm_markers)} markers  |  "
         f"RMS {st.rms_mm:.2f} mm  |  {st.last_fit_ms:.0f} ms"))
