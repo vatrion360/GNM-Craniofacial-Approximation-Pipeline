@@ -26,7 +26,14 @@ and residuals below 0.001 mm. These are software-generated mean-shape targets,
 not specimen evidence. No observed skull surface was supplied for contact QC.
 
 Ruff, source/wheel builds and add-on ZIP packaging passed. The ZIP also includes
-the offline guides. Remote revision-specific CI results are recorded with the PR.
+the offline guides. All seven remote jobs passed for code commit
+`0a25b69f3c7f24b93c157c61a61bc78fbc99ff37` on 2026-10-03:
+
+| Check | Evidence |
+| --- | --- |
+| Python 3.10 / 3.12, Windows / Linux and dependency audit | Four test/lint/build jobs and the runtime audit passed: [run 37145965441](https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline/actions/runs/37145965441). |
+| Official model and Blender 4.5.0, Windows / Linux | Both numeric/installed-ZIP integration jobs passed: [run 37145965406](https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline/actions/runs/37145965406). |
+
 No CT accuracy, calibrated uncertainty, population applicability, macOS or other
 Blender-version validation is claimed. See [the complete contract](CRANIOMETRY.md).
 
