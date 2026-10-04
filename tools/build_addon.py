@@ -14,7 +14,8 @@ def build(destination=None):
              (root / 'NOTICE', 'gnm_cranio/NOTICE'),
              (root / 'README.md', 'gnm_cranio/README.md')]
     files += [(p, 'gnm_cranio/' + p.relative_to(root).as_posix()) for p in sorted((root / 'cranio').rglob('*.py'))]
-    files += [(p, 'gnm_cranio/' + p.relative_to(root).as_posix()) for p in sorted((root / 'docs').glob('*.md'))]
+    files += [(p, 'gnm_cranio/' + p.relative_to(root).as_posix()) for p in sorted((root / 'docs').iterdir())
+              if p.suffix in {'.md', '.json'}]
     with ZipFile(destination, 'w', ZIP_DEFLATED) as archive:
         for source, name in files:
             archive.writestr(name, source.read_bytes())
