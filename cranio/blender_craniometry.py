@@ -21,7 +21,10 @@ _draw_handle = None
 
 def changed(self, context):
     if _api is not None and context and context.scene:
-        _api._request_refit(context.scene)
+        # Bone-only measurements do not affect the face when controls are off.
+        # A strength change, including switching to zero, still needs a refit.
+        if isinstance(self, GNMCranialSettings) or context.scene.gnm_craniometry.weight > 0:
+            _api._request_refit(context.scene)
 
 
 class GNMCranialPoint(PropertyGroup):
@@ -134,7 +137,12 @@ def snapshot_controls(scene, labels, vertices, targets):
     if strength <= 0:
         scene.gnm_craniometry.status = 'Skin-distance controls disabled'
         return [], [], 0.
-    doc = document(scene)
+    live = _api._LIVE
+    # Use the provenance of the loaded in-memory model, not a repeated 53 MB
+    # disk read. Standalone snapshots/exports still hash the current file.
+    model_hash = (live.model_hash if live.model is not None
+                  and live.case_token == _api._case_token(scene) else None)
+    doc = document(scene, model_hash=model_hash)
     records, bones = {}, {}
     for item in scene.gnm_markers:
         if not item.is_placed:
@@ -149,6 +157,8 @@ def snapshot_controls(scene, labels, vertices, targets):
 
 
 def fingerprint(scene):
+    if scene.gnm_craniometry.weight <= 0:
+        return (0.,)
     return (float(scene.gnm_craniometry.weight),
         tuple((p.code, tuple(_xyz(scene, p) or ()), p.bone_status, p.definition_reviewed,
                tuple(p.review_xyz), p.source_id, p.source_sha256, p.notes) for p in scene.gnm_cranial_points),

@@ -1,6 +1,6 @@
 # Cranial measurements and reviewed skin-distance controls
 
-Version: **5.0.0rc6 / add-on 18.0.0**. Interchange protocol: `table3-chords-v1`.
+Version: **5.0.0rc7 / add-on 18.0.1**. Interchange protocol: `table3-chords-v1`.
 
 The catalogue follows Table 3 in the supplied article,
 [DOI 10.4995/var.2024.24796](https://doi.org/10.4995/var.2024.24796), which attributes

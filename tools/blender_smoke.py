@@ -22,8 +22,9 @@ from blender_hardening_checks import run_source_checks, run_map_checks, run_icp_
 from blender_fragment_checks import run_fragment_checks, run_lambda_checks
 from blender_normal_checks import run_normal_checks
 from blender_craniometry_checks import run_craniometry_checks
+from blender_performance_checks import run_performance_checks
 
-archive = root / 'dist' / 'gnm_cranio-5.0.0rc6.zip'
+archive = root / 'dist' / 'gnm_cranio-5.0.0rc7.zip'
 with tempfile.TemporaryDirectory() as directory:
     with zipfile.ZipFile(archive) as z:
         z.extractall(directory)
@@ -40,6 +41,7 @@ with tempfile.TemporaryDirectory() as directory:
         run_source_checks(addon, directory)
         run_normal_checks(addon)
         run_craniometry_checks(addon, directory)
+        run_performance_checks(addon)
         scene = bpy.context.scene
         scene.unit_settings.system = 'METRIC'
         scene.unit_settings.scale_length = .001

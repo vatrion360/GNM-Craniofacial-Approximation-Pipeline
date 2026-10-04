@@ -1,5 +1,27 @@
 # Validation and release gates
 
+## Evidence for 5.0.0rc7 / add-on 18.0.1
+
+Local execution on 2026-10-04 with the official GNM asset: **167 passed,
+1 native-Windows test skipped** (Linux x86_64, Python 3.12.14, NumPy 2.3.5,
+SciPy 1.17.0, trimesh 5.1.0). Ruff passed. New numerical tests compare the
+reused conditional-LOO SVD path with independent augmented least-squares
+solves, including rank deficiency and poor scaling, and bound factorization
+count to one per held-out landmark.
+
+The actual ZIP passed Blender 4.5.0 Linux (`8cb6b388974a`), including
+`BLENDER_PREVIEW_RESPONSIVENESS_PASS`: no draw-time snapshots, 50 coalesced
+requests, latest target position, no idle refit loop, loaded-model checksum
+reuse, disabled-control handling, delayed validation errors and cancellation
+on Stop Live. The existing measurement source-change/review/export checks,
+fragment safeguards, shared fit and external fitting/import/cancel also passed.
+
+The [benchmark and limitations](PERFORMANCE.md) record baseline and patched
+timings and full numerical outputs on a synthetic 500,000-triangle scene.
+These are software tests; this user's Windows scene and interactive frame
+rate were not measured. Windows/Linux CI must be checked on the patch PR;
+the successful earlier runs below do not validate this revision.
+
 ## Evidence for 5.0.0rc6 / add-on 18.0
 
 Local execution on 2026-10-03, Linux x86_64, Python 3.12.14, NumPy 2.3.5,

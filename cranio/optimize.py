@@ -145,22 +145,30 @@ def loo_select_lambda(basis_lm, mu_lm, targets_model, weights, lam_grid,
     Transformarea de similaritate se considera fixa (estimata cu lambda
     initial); pentru fiecare landmark exclus, se fit-uiesc coeficientii pe
     restul si se masoara eroarea de predictie pe landmarkul exclus.
+    Each held-out landmark shares one thin SVD across the lambda grid. For
+    A = U S V^T, ridge is V diag(s/(s^2+lambda)) U^T b. This is the same
+    weighted, isotropic ridge objective as the augmented least-squares solve;
+    no normal equations, coefficient clipping or approximate CV are used.
     """
-    offset_all = (targets_model - mu_lm).reshape(-1)
+    grid = finite_array(lam_grid, 'LOO lambda grid')
+    if grid.ndim != 1 or not len(grid) or np.any(grid <= 0):
+        raise ValueError('LOO lambda grid must contain positive values')
     n_lm = len(mu_lm)
-    results = []
-    for lam in lam_grid:
-        errors = []
-        for j in range(n_lm):
-            mask = np.ones(n_lm, dtype=bool)
-            mask[j] = False
-            b_sub = basis_lm[:, mask, :].reshape(identity_dim, -1).T
-            o_sub = (targets_model[mask] - mu_lm[mask]).reshape(-1)
-            w_sub = np.repeat(np.asarray(weights)[mask], 3)
-            c = _ridge_solve(b_sub, o_sub, w_sub, lam, identity_dim)
-            pred_j = mu_lm[j] + np.einsum("i,ik->k", c, basis_lm[:, j, :])
-            errors.append(np.linalg.norm(pred_j - targets_model[j]))
-        results.append((float(np.mean(errors)), lam))
+    errors = np.empty((len(grid), n_lm))
+    for j in range(n_lm):
+        mask = np.arange(n_lm) != j
+        b_sub = basis_lm[:, mask, :].reshape(identity_dim, -1).T
+        o_sub = (targets_model[mask] - mu_lm[mask]).reshape(-1)
+        sw = np.sqrt(np.repeat(np.asarray(weights)[mask], 3))
+        u, singular, vt = np.linalg.svd(b_sub * sw[:, None], full_matrices=False)
+        projected = u.T @ (o_sub * sw)
+        # hypot avoids squaring a very large singular value before division.
+        denom = np.hypot(singular[None, :], np.sqrt(grid[:, None]))
+        factors = (singular[None, :] / denom) / denom
+        coefficients = (factors * projected[None, :]) @ vt
+        predictions = mu_lm[j] + coefficients @ basis_lm[:, j, :]
+        errors[:, j] = np.linalg.norm(predictions - targets_model[j], axis=1)
+    results = [(float(error), float(lam)) for error, lam in zip(errors.mean(axis=1), grid)]
     results.sort()
     return results[0][1], results
 

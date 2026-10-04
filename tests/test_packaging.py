@@ -10,7 +10,8 @@ def test_addon_zip_contains_core_and_cli(tmp_path):
         names = set(archive.namelist())
         assert {'gnm_cranio/__init__.py', 'gnm_cranio/cranio/optimize.py',
                 'gnm_cranio/cranio/io_csv.py', 'gnm_cranio/gnm_reconstruct.py',
-                'gnm_cranio/docs/CRANIOMETRY.md', 'gnm_cranio/docs/GHID_RO.md'}.issubset(names)
+                'gnm_cranio/docs/CRANIOMETRY.md', 'gnm_cranio/docs/GHID_RO.md',
+                'gnm_cranio/docs/PERFORMANCE.md', 'gnm_cranio/docs/performance_v18.json'}.issubset(names)
         assert not any(name.endswith('.npz') or '__pycache__' in name for name in names)
         for name in names:
             if name.endswith('.py'):

@@ -1,8 +1,18 @@
-# Ghid rapid în română: 5.0.0rc6 / addon 18.0
+# Ghid rapid în română: 5.0.0rc7 / addon 18.0.1
 
 Addon-ul oferă **48 de markeri**, pipeline offline și verificarea mediului Python înainte de calcul. Tabelul 2 din PDF are 21 de tipuri anatomice, adică **32 de poziții**: 10 mediane și 11 perechi bilaterale. Reunirea lor cu cei 27 de markeri anteriori adaugă 21 de poziții noi.
 
 Versiunea 18 adaugă separat **22 de repere osoase pentru cele 14 măsurători din Table 3**. Nu le adaugă automat ca ținte cutanate la cei 48 de markeri.
+
+## Corecția de performanță 18.0.1
+
+V18 construia un snapshot complet la fiecare redesenare a panoului pentru a afișa numărul de markeri și lambda. Cu **Skin-distance strength > 0**, această operație recitea geometria osului și calcula amprenta fișierului GNM, inclusiv cu Live oprit. În 18.0.1, afișarea numărului de markeri este o operație simplă, fără aceste citiri.
+
+Fitul automat pornește după **0,35 s fără modificări**; opțiunea **Refit after idle (s)** controlează pauza. Mutarea reperelor exclusiv osoase nu declanșează fitul când ponderea distanțelor cutanate este zero. LOO reutilizează descompunerile numerice între valorile lambda, cu aceeași funcție obiectiv și aceeași grilă.
+
+Salvează proiectul, oprește Live, dezactivează addon-ul vechi, instalează ZIP-ul complet 18.0.1 și repornește Blender. Încarcă din nou modelul GNM. Pentru editare fluentă, începe cu **Conditional LOO tuning** și **Dense on each refit** oprite; activarea lor schimbă timpul de calcul și trebuie consemnată în protocolul final. **Stop Live** permite plasarea reperelor fără refit automat; **Run Offline Fit and Import** rulează separat de interfață.
+
+Fitul live folosește CPU prin NumPy, nu placa RTX. Mai multă RAM/VRAM nu elimină blocajele de pe firul principal. Dacă problema persistă după actualizare, notează versiunea Blender, procesorul, numărul de triunghiuri, setările LOO/dense și timpul afișat la **Fit**. Măsurătorile de performanță pe un caz sintetic sunt în [PERFORMANCE](PERFORMANCE.md); nu reprezintă o măsurare pe stația ta Windows.
 
 ## Măsurătorile craniene din Table 3
 
@@ -27,7 +37,7 @@ py -3.12 -m venv .venv
 ```
 
 2. Obține modelul oficial conform [INSTALL](INSTALL.md), apoi verifică-l cu `.\.venv\Scripts\python.exe -m cranio.doctor --npz models\gnm_head.npz`. Modelul se păstrează local și nu este inclus în addon.
-3. Instalează `gnm_cranio-5.0.0rc6.zip` în Blender prin **Install from Disk** și activează **GNM Scientific Markers**. Dezactivează copia veche înainte de înlocuire. Pentru construirea ZIP-ului din surse: `python tools/build_addon.py`.
+3. Instalează `gnm_cranio-5.0.0rc7.zip` în Blender prin **Install from Disk** și activează **GNM Scientific Markers**. Dezactivează copia veche înainte de înlocuire. Pentru construirea ZIP-ului din surse: `python tools/build_addon.py`.
 4. La **Python executable / venv folder**, selectează `python.exe` din `.venv\Scripts`, sau directorul `.venv` creat pe Windows. Poți lipi calea afișată de ultima comandă de mai sus.
 5. Apasă **Check Python Environment**. Rezultatul trebuie să confirme Python 3.10+ pe 64 de biți și `numpy/scipy/trimesh OK`.
 
