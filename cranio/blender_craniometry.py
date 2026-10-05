@@ -131,6 +131,12 @@ def document(scene, manifest=None, model_hash=None):
     return doc
 
 
+def _skin_marker_record(item):
+    """Read only the endpoint metadata needed for the shared review check."""
+    return dict(mapping_reviewed=item.mapping_reviewed, bone_status=item.bone_status,
+                tissue_source=item.tissue_source)
+
+
 def snapshot_controls(scene, labels, vertices, targets):
     """Use the same resolver as offline; only an opt-in fit reads source geometry."""
     strength = float(scene.gnm_craniometry.weight)
@@ -147,8 +153,8 @@ def snapshot_controls(scene, labels, vertices, targets):
     for item in scene.gnm_markers:
         if not item.is_placed:
             continue
-        records[item.label] = dict(mapping_reviewed=item.mapping_reviewed, bone_status=item.bone_status,
-            tissue_source=item.tissue_source, bone_source_id=item.bone_empty.get('gnm_bone_source_id', ''),
+        records[item.label] = dict(_skin_marker_record(item),
+            bone_source_id=item.bone_empty.get('gnm_bone_source_id', ''),
             bone_source_geometry_sha256=item.bone_empty.get('gnm_source_sha256_at_placement', ''))
         bones[item.label] = list(item.bone_empty.matrix_world.translation)
     controls, skipped = core.resolve_controls(doc, labels, vertices, targets, records, bones, doc['model_sha256'])
@@ -396,6 +402,31 @@ class GNM_UL_cranial_measurements(UIList):
         layout.label(text='skin control' if item.enabled else '')
 
 
+def draw_endpoint_review(layout, scene, binding):
+    """Expose the actual marker fields; never hash files or build a fit snapshot."""
+    box = layout.box()
+    box.label(text='Endpoint marker review')
+    for endpoint, label in (('A', binding.marker_a), ('B', binding.marker_b)):
+        item = _api._marker_item(scene, label) if label else None
+        if item is None:
+            box.label(text=f'Select skin marker {endpoint}', icon='INFO')
+            continue
+        marker_box = box.box()
+        marker_box.label(text=f'{endpoint}: {item.label}')
+        if not item.is_placed:
+            marker_box.label(text='Marker is not placed', icon='ERROR')
+        if not item.use_for_fit:
+            marker_box.label(text='Excluded from fit; this pair will be skipped', icon='INFO')
+        marker_box.prop(item, 'bone_status')
+        marker_box.prop(item, 'mapping_reviewed')
+        marker_box.prop(item, 'tissue_source')
+        for issue in core.skin_marker_issues(_skin_marker_record(item)):
+            for line in textwrap.wrap(issue, width=48):
+                marker_box.label(text=line, icon='ERROR')
+    box.label(text='Reference position and pair review are separate')
+    box.label(text='Source geometry and anchors are checked at fit')
+
+
 class GNM_PT_craniometry(Panel):
     bl_label = 'Cranial Measurements (Table 3)'
     bl_idname = 'GNM_PT_craniometry'
@@ -447,6 +478,7 @@ class GNM_PT_craniometry(Panel):
                         box.prop(binding, 'target_mm')
                     box.prop(binding, 'sigma_mm'); box.prop(binding, 'influence')
                     box.prop(binding, 'method'); box.prop(binding, 'mapping_reviewed')
+                    draw_endpoint_review(box, scene, binding)
             else:
                 layout.label(text='Bone-only measurement; no skin control')
         layout.prop(settings, 'weight')

@@ -1,3 +1,10 @@
+# 5.0.0rc8 / add-on 18.0.2
+
+- Replace the combined craniometry marker error with field-specific diagnostics for both endpoints of a rejected pair, shared by live and offline fitting.
+- Expose the existing endpoint marker review/source fields directly in the Craniometry panel, with metadata-only checks and no draw-time geometry/model reads.
+- Reject whitespace-only, non-text and reserved tissue-source placeholders. Preserve case metadata and all source/anchor checks; do not automatically certify existing markers.
+- Add numeric and installed-Blender regressions for the reported legacy-marker failure and inline review controls.
+
 # 5.0.0rc6 / add-on 18.0.0
 
 - Table 3 catalogue: 22 bone references, 14 case-specific chords, observed/reconstructed/missing status and placement/source review.

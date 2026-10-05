@@ -2,7 +2,7 @@
 
 A Blender marker add-on and an offline, auditable fitting pipeline for **supervised craniofacial approximation research**. Fits a neutral GNM Head identity model to operator-defined skin targets derived from a scanned skull.
 
-**Software 5.0.0rc7 / add-on 18.0.1.** This patch removes full geometry/model reads from panel redraws, defers refits until marker edits settle, and reuses each conditional-LOO decomposition across the lambda grid. It retains the 22 bone references, 14 Table 3 measurements and reviewed skin-distance controls shared by live and offline fitting. Missing/reconstructed anatomy and bone-versus-skin distances remain explicit. It does **not** establish forensic accuracy or recover a uniquely determined face. See [performance evidence](docs/PERFORMANCE.md), the [craniometry protocol](docs/CRANIOMETRY.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
+**Software 5.0.0rc8 / add-on 18.0.2.** This patch reports the exact missing endpoint-marker fields for skin-distance controls and exposes those fields in the Craniometry panel. It retains the 18.0.1 redraw, refit-debounce and conditional-LOO performance fixes. It retains the 22 bone references, 14 Table 3 measurements and reviewed skin-distance controls shared by live and offline fitting. Missing/reconstructed anatomy and bone-versus-skin distances remain explicit. It does **not** establish forensic accuracy or recover a uniquely determined face. See [performance evidence](docs/PERFORMANCE.md), the [craniometry protocol](docs/CRANIOMETRY.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
 
 ## Start here
 
@@ -59,7 +59,7 @@ Local correction is opt-in (`--local-correction`). Dense skull constraints are e
 python tools/build_addon.py
 ```
 
-Install `dist/gnm_cranio-5.0.0rc7.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender 4.5.0 headless integration runs on Windows and Linux; see [revision-specific results](docs/VALIDATION.md). Blender **4.2+ remains the broader target**; interactive and other version checks remain pending.
+Install `dist/gnm_cranio-5.0.0rc8.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender 4.5.0 headless integration runs on Windows and Linux; see [revision-specific results](docs/VALIDATION.md). Blender **4.2+ remains the broader target**; interactive and other version checks remain pending.
 
 Select the local model, import the skull with explicit source units, place/review markers, and export v3 CSV. For **Run Offline Fit and Import**, select the external Python executable from the environment above and a case output folder. The add-on runs the CLI in a separate process, records a log, then imports the completed world-mm OBJ. Each run gets a new case subfolder. The default button uses marker-only statistical fitting with lambda based on the actual included marker count; explicit dense and local-correction switches are available in the panel and CLI. Register all preserved bone sources, review their normals and confirm mandibular articulation before including mandibular constraints.
 

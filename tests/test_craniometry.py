@@ -113,6 +113,53 @@ def test_prediction_is_explicit_and_protocol_freezes_method_not_subject_values()
         resolve(doc, records, bones)
 
 
+def test_legacy_endpoint_error_names_actual_fields_for_both_markers():
+    doc, records, bones = case()
+    for record in records.values():
+        record.update(mapping_reviewed=False, tissue_source='legacy-unvalidated')
+    before = copy.deepcopy(records)
+    with pytest.raises(ValueError) as error:
+        resolve(doc, records, bones)
+    message = str(error.value)
+    assert message.startswith('eu-eu: right:') and ' | left:' in message
+    assert message.count('Skin correspondence reviewed is not confirmed') == 2
+    assert message.count("Tissue source / method = 'legacy-unvalidated'") == 2
+    assert 'Bone provenance' not in message
+    assert records == before  # Diagnostics never certify or migrate case data.
+    # Completing only one requirement must not mask the remaining blocker.
+    for record in records.values():
+        record['mapping_reviewed'] = True
+    with pytest.raises(ValueError) as error:
+        resolve(doc, records, bones)
+    assert 'Skin correspondence reviewed' not in str(error.value)
+    assert 'Tissue source / method' in str(error.value)
+    for record in records.values():
+        record['tissue_source'] = 'Synthetic fixture; not anatomical evidence'
+    assert len(resolve(doc, records, bones)[0]) == 1
+
+
+@pytest.mark.parametrize('field,value,expected', [
+    ('bone_status', 'unspecified', "Bone provenance = 'unspecified'"),
+    ('bone_status', 'reconstructed', "Bone provenance = 'reconstructed'"),
+    ('bone_status', 'inferred', "Bone provenance = 'inferred'"),
+    ('mapping_reviewed', False, 'Skin correspondence reviewed'),
+    ('tissue_source', 'legacy-unvalidated', 'Tissue source / method'),
+    ('tissue_source', 'unspecified', 'Tissue source / method'),
+    ('tissue_source', '', 'Tissue source / method'),
+    ('tissue_source', '  \t', 'Tissue source / method'),
+    ('tissue_source', ' Legacy-Unvalidated ', 'Tissue source / method'),
+    ('tissue_source', None, 'Tissue source / method'),
+])
+def test_endpoint_metadata_diagnostic_reports_only_the_failed_field(field, value, expected):
+    doc, records, bones = case()
+    records['right'][field] = value
+    issues = cm.skin_marker_issues(records['right'])
+    assert len(issues) == 1 and expected in issues[0]
+    with pytest.raises(ValueError) as error:
+        resolve(doc, records, bones)
+    assert str(error.value) == f'eu-eu: right: {issues[0]}'
+
+
 def problem():
     rng = np.random.default_rng(62)
     mu = rng.normal(size=(20, 3))*35

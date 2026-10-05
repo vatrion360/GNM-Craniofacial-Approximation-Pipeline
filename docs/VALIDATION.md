@@ -1,5 +1,22 @@
 # Validation and release gates
 
+## Evidence for 5.0.0rc8 / add-on 18.0.2
+
+Local execution on 2026-10-05 with the official GNM asset: **178 passed,
+1 native-Windows test skipped** (Linux x86_64, Python 3.12.14, NumPy 2.3.5,
+SciPy 1.17.0, trimesh 5.1.0). Ruff passed. Eleven added cases exercise both
+endpoints with legacy defaults, isolated bone/mapping/tissue failures,
+whitespace/reserved/non-text sources, partial completion and unchanged input
+records. Existing fit, source/anchor and exclusion regressions also passed.
+
+The installed-ZIP Blender suite includes `BLENDER_CRANIOMETRY_DIAGNOSTICS_PASS`:
+the production Craniometry draw callback must expose both endpoints' actual
+RNA properties, report the missing metadata, leave those records unchanged,
+and avoid file hashes, source geometry and fit snapshots. Blender is not
+available in this local environment; Windows/Linux execution is tracked by
+the patch pull request's Blender integration checks. Headless checks do not
+establish visual usability in the user's scene or scientific accuracy.
+
 ## Evidence for 5.0.0rc7 / add-on 18.0.1
 
 Local execution on 2026-10-04 with the official GNM asset: **167 passed,
