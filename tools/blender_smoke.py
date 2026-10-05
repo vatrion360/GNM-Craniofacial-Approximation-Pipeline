@@ -24,7 +24,7 @@ from blender_normal_checks import run_normal_checks
 from blender_craniometry_checks import run_craniometry_checks
 from blender_performance_checks import run_performance_checks
 
-archive = root / 'dist' / 'gnm_cranio-5.0.0rc7.zip'
+archive = root / 'dist' / 'gnm_cranio-5.0.0rc8.zip'
 with tempfile.TemporaryDirectory() as directory:
     with zipfile.ZipFile(archive) as z:
         z.extractall(directory)

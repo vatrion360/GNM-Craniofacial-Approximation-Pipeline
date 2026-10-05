@@ -5,6 +5,7 @@ has no Blender/SciPy dependency; both preview and offline use this contract.
 See docs/CRANIOMETRY.md for anatomical conventions and evidential limits.
 """
 from dataclasses import dataclass
+from typing import Mapping
 import json
 import numpy as np
 from .validation import finite_array
@@ -191,6 +192,26 @@ def measure(document):
     return rows
 
 
+def skin_marker_issues(record: Mapping[str, object]) -> list[str]:
+    """Describe missing endpoint metadata without reading geometry or changing review.
+
+    Shared by the Blender panel and the live/offline control resolver. An empty
+    result only checks these three fields; source hashes, anchoring and bone
+    reference review are still validated by ``resolve_controls``.
+    """
+    issues = []
+    status = record.get('bone_status', 'unspecified')
+    if status != 'observed':
+        issues.append(f"Bone provenance = {status!r}; requires observed bone")
+    if record.get('mapping_reviewed') is not True:
+        issues.append('Skin correspondence reviewed is not confirmed')
+    source = record.get('tissue_source', '')
+    if (not isinstance(source, str) or
+            source.strip().lower() in ('', 'unspecified', 'legacy-unvalidated')):
+        issues.append(f"Tissue source / method = {source!r}; document the tissue-depth source or method")
+    return issues
+
+
 def resolve_controls(document, labels, vertices, skin_targets, records, bone_positions, model_sha256):
     """Validate opt-in controls against the *included* marker snapshot.
 
@@ -217,11 +238,15 @@ def resolve_controls(document, labels, vertices, skin_targets, records, bone_pos
             raise ValueError(f'{key}: requires reviewed, current, distinct observed bone endpoints')
         if binding.get('mapping_reviewed') is not True:
             raise ValueError(f'{key}: review the bone-to-skin correspondence')
+        endpoint_issues = []
+        for label in (a, b):
+            issues = skin_marker_issues(records.get(label, {}))
+            if issues:
+                endpoint_issues.append(f"{label}: {'; '.join(issues)}")
+        if endpoint_issues:
+            raise ValueError(f"{key}: " + ' | '.join(endpoint_issues))
         for label, code in ((a, spec.a), (b, spec.b)):
             rec, point = records.get(label, {}), points[code]
-            if (rec.get('mapping_reviewed') is not True or rec.get('bone_status') != 'observed'
-                    or rec.get('tissue_source', '') in ('', 'unspecified', 'legacy-unvalidated')):
-                raise ValueError(f'{key}: {label} needs observed bone, reviewed mapping and a tissue source')
             if (rec.get('bone_source_id') != point.get('source_id') or
                     rec.get('bone_source_geometry_sha256') != point.get('source_geometry_sha256')):
                 raise ValueError(f'{key}: {label} and bone reference must share a current source')

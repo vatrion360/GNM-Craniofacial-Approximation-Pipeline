@@ -1,6 +1,6 @@
 # Cranial measurements and reviewed skin-distance controls
 
-Version: **5.0.0rc7 / add-on 18.0.1**. Interchange protocol: `table3-chords-v1`.
+Version: **5.0.0rc8 / add-on 18.0.2**. Interchange protocol: `table3-chords-v1`.
 
 The catalogue follows Table 3 in the supplied article,
 [DOI 10.4995/var.2024.24796](https://doi.org/10.4995/var.2024.24796), which attributes
@@ -85,6 +85,30 @@ tolerance and influence; explicitly confirm the bone-to-skin mapping. The global
 **Skin-distance strength** starts at **0**, so measurement alone does not change
 the face. Tolerance defaults to 2 mm as an editable engineering setting, not a
 population-derived uncertainty estimate.
+
+### Endpoint metadata errors (18.0.2)
+
+The former message `needs observed bone, reviewed mapping and a tissue source`
+combined three different marker checks. The resolver now lists the failing
+fields for both endpoints of the rejected pair. An observed marker with an
+unreviewed skin correspondence no longer receives a bone-provenance complaint.
+The panel exposes **Bone provenance**, **Skin correspondence reviewed** and
+**Tissue source / method** directly under **Endpoint marker review**. These are
+the same marker properties shown in the main panel; editing either view changes
+the same record. Cranial-reference review and pair-level mapping review remain
+separate. The inline checks read metadata only; current source geometry and
+the 0.1 mm bone anchor are still checked when a fit is requested.
+
+Legacy markers can retain `legacy-unvalidated` tissue sources and unconfirmed
+skin correspondences. Eurion's inherited 5 mm depth has no documented source in
+the registry, and **Apply Table 2 Tissue Depths** does not cover Eurion. Document
+the actual source/method and inspect the correspondence before confirming it.
+Blank, whitespace-only, non-text and reserved source placeholders are rejected.
+No review, tissue depth or source is supplied automatically by this patch.
+Until a control is documented, disable its **Use skin-distance control**, or
+set **Skin-distance strength** to zero for bone measurements without skin-distance
+conditioning. The measurement points and values are retained. The fitting
+solver and the source/anchor requirements are unchanged.
 
 New anatomy without an existing skin marker can use **Create a custom skin
 control**. Supply an explicit GNM skin vertex, positive tissue depth and source.

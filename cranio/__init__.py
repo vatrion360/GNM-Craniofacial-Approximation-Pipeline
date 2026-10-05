@@ -24,4 +24,4 @@ Module:
 """
 
 
-__version__ = "5.0.0rc7"
+__version__ = "5.0.0rc8"
