@@ -1,0 +1,26 @@
+cff-version: 5.0.0
+message: "If you use this software in your research, please cite it using the metadata below."
+authors:
+  - name: "VATRION"
+    website: "https://github.com"
+title: "GNM-Craniofacial-Approximation-Pipeline: Blender add-on and offline fitting pipeline for supervised craniofacial approximation"
+version: 5.0.0rc8
+date-released: 2026-10-13
+doi: 10.5281/zenodo.23333535
+repository-code: "https://github.com/GNM-Craniofacial-Approximation-Pipeline"
+license: Apache-2.0
+keywords:
+  - "3d-skull"
+  - "facial-approximation"
+  - "forensics"
+  - "gnm"
+  - "blender-addon"
+  - "statistical-shape-model"
+  - "craniometry"
+abstract: >-
+  A Blender marker add-on and an offline, auditable fitting pipeline for
+  supervised craniofacial approximation research. The pipeline fits a neutral
+  GNM Head identity model to operator-defined skin targets derived from a
+  scanned skull using Umeyama alignment, ridge regression with IRLS, and TPS
+  correction. It features parallel dual viewports and explicit bone-versus-skin
+  distance metrics designed for publication-grade reconstruction.
