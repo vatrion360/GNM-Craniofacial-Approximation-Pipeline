@@ -1,5 +1,5 @@
 # GNM Craniofacial Approximation
-
+[![DOI](https://zenodo.org/badge/1306404052.svg)](https://doi.org/10.5281/zenodo.23333534)
 A Blender marker add-on and an offline, auditable fitting pipeline for **supervised craniofacial approximation research**. Fits a neutral GNM Head identity model to operator-defined skin targets derived from a scanned skull.
 
 **Software 5.0.0rc8 / add-on 18.0.2.** This patch reports the exact missing endpoint-marker fields for skin-distance controls and exposes those fields in the Craniometry panel. It retains the 18.0.1 redraw, refit-debounce and conditional-LOO performance fixes. It retains the 22 bone references, 14 Table 3 measurements and reviewed skin-distance controls shared by live and offline fitting. Missing/reconstructed anatomy and bone-versus-skin distances remain explicit. It does **not** establish forensic accuracy or recover a uniquely determined face. See [performance evidence](docs/PERFORMANCE.md), the [craniometry protocol](docs/CRANIOMETRY.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
