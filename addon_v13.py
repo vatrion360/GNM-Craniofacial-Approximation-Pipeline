@@ -1,4 +1,4 @@
-"""GNM Craniofacial Markers 18.0.2 / software package 5.0.0rc8.
+"""GNM Craniofacial Markers 18.1.0 / software package 5.0.0rc9.
 
 Install the complete ZIP built with tools/build_addon.py. The bundled numerical
 core is imported under the add-on namespace. Optional previews run serially in
@@ -35,7 +35,7 @@ from bpy_extras import view3d_utils
 bl_info = {
     "name": "GNM Scientific Markers",
     "author": "VATRION",
-    "version": (18, 0, 2),
+    "version": (18, 1, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > GNM Markers",
     "category": "3D View",
@@ -323,6 +323,13 @@ class GNMSettings(PropertyGroup):
     offline_status: StringProperty(default="Ready")
     marker_size_mm: FloatProperty(name="Marker Radius (mm)", default=1.5, min=0.1)
     peg_thickness_mm: FloatProperty(name="Peg Thickness (mm)", default=0.5, min=0.1)
+    depth_adjust_percent: FloatProperty(name='Change (%)', default=10., min=0., soft_max=100.,
+        description='Percentage of the current selected depths; repeated applications compound')
+    depth_adjust_mode: EnumProperty(name='Operation', items=[
+        ('INCREASE', 'Increase', 'Current depth multiplied by (1 + percentage / 100)'),
+        ('DECREASE', 'Decrease', 'Current depth multiplied by (1 - percentage / 100); at most 100%')],
+        default='INCREASE')
+    depth_adjust_status: StringProperty(default='Select rows using the left-hand adjustment checkboxes')
     normal_mode: EnumProperty(name='Marker direction', items=[
         ('LOCAL_PLANE', 'Stabilized local normal', 'Area-weighted plane on a connected surface patch; review edges and anatomical direction'),
         ('FACE', 'Face normal', 'Perpendicular to the single evaluated triangle')],
@@ -347,7 +354,12 @@ class GNMSettings(PropertyGroup):
     ultim_export_csv: StringProperty(name="Last CSV Export", default="")
     ultim_export_timestamp: StringProperty(name="Last Export Date", default="")
 
+_MARKER_DEPTH_BATCH = False
+
+
 def _update_tissue_depth(self, context):
+    if _MARKER_DEPTH_BATCH:
+        return
     if self.bone_empty is None or self.target_empty is None:
         return
     bone = self.bone_empty.matrix_world.translation
@@ -361,6 +373,8 @@ def _update_tissue_depth(self, context):
 
 
 def _marker_fit_changed(self, context):
+    if _MARKER_DEPTH_BATCH:
+        return
     if context is not None and hasattr(context.scene, 'gnm_live'):
         _refresh_marker_objects(context.scene)
         _request_refit(context.scene)
@@ -370,6 +384,9 @@ class GNMMarkerItem(PropertyGroup):
     gnm_index: IntProperty()
     label: StringProperty()
     tissue_depth_mm: FloatProperty(default=5.0, min=0.0, update=_update_tissue_depth)
+    adjust_depth_selected: BoolProperty(name='Select for percentage adjustment', default=False,
+        description='Select this row for the bulk depth edit; independent of Include in fit')
+    depth_adjustment_history: StringProperty(default='[]', options={'HIDDEN'})
     tissue_source: StringProperty(name="Tissue source / method", default="legacy-unvalidated", update=_marker_fit_changed)
     use_for_fit: BoolProperty(name="Include in fit", default=True, update=_marker_fit_changed)
     fit_weight: FloatProperty(name="Weight (0 = preset)", default=0.0, min=0.0, max=1.0, update=_marker_fit_changed)
@@ -508,6 +525,42 @@ class GNM_OT_apply_paper_tissues(Operator):
                 item.tissue_source = paper.TISSUE_SOURCE
                 count += 1
         self.report({'INFO'}, f"Updated {count} Table 2 sites; review study applicability and placement direction.")
+        return {'FINISHED'}
+
+
+class GNM_OT_select_depth_markers(Operator):
+    bl_idname = 'gnm.select_depth_markers'
+    bl_label = 'Select Markers for Depth Adjustment'
+    bl_options = {'REGISTER', 'UNDO'}
+    select: BoolProperty(default=True)
+
+    def execute(self, context):
+        for item in context.scene.gnm_markers:
+            item.adjust_depth_selected = self.select
+        return {'FINISHED'}
+
+
+class GNM_OT_adjust_marker_depths(Operator):
+    bl_idname = 'gnm.adjust_marker_depths'
+    bl_label = 'Apply to Selected Depths'
+    bl_description = 'Change checked marker depths and skin targets along their current axes. Manual scenario, not a BMI prediction. Undo restores the edit'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return bool(context.scene and any(m.adjust_depth_selected for m in context.scene.gnm_markers))
+
+    def execute(self, context):
+        settings = context.scene.gnm_settings
+        try:
+            count = _core_module('blender_marker_depths').apply_adjustment(
+                sys.modules[__name__], context, settings.depth_adjust_percent, settings.depth_adjust_mode)
+        except (ValueError, RuntimeError, TypeError, OverflowError) as exc:
+            settings.depth_adjust_status = str(exc)
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        settings.depth_adjust_status = f'Updated {count} depths; current values are shown in the marker list. Undo restores the edit.'
+        self.report({'INFO'}, settings.depth_adjust_status)
         return {'FINISHED'}
 
 
@@ -1337,6 +1390,7 @@ def _progress_bar_text(placed: int, total: int, width: int = 20) -> str:
 class GNM_UL_markers(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         row = layout.row(align=True)
+        row.prop(item, 'adjust_depth_selected', text='')
         row.label(text="", icon="CHECKMARK" if item.is_placed else "RADIOBUT_OFF")
         side_str = "[M]" if item.side == 0 else ("[R]" if item.side == -1 else "[L]")
         row.label(text=f"{side_str} {item.label}")
@@ -1383,6 +1437,20 @@ class GNM_PT_panel(Panel):
             return
 
         layout.template_list("GNM_UL_markers", "", scene, "gnm_markers", scene, "gnm_marker_active_index")
+
+        adjust = layout.box()
+        selected = sum(m.adjust_depth_selected for m in scene.gnm_markers)
+        adjust.label(text=f'Manual tissue-depth adjustment ({selected} selected)')
+        row = adjust.row(align=True)
+        row.operator('gnm.select_depth_markers', text='Select All').select = True
+        row.operator('gnm.select_depth_markers', text='Clear Selection').select = False
+        adjust.prop(settings, 'depth_adjust_percent')
+        adjust.prop(settings, 'depth_adjust_mode', expand=True)
+        adjust.operator('gnm.adjust_marker_depths', icon='CHECKMARK')
+        adjust.label(text='Uses current mm values; repeated edits compound')
+        adjust.label(text='Manual scenario; not a calibrated BMI model')
+        for line in textwrap.wrap(settings.depth_adjust_status, width=48):
+            adjust.label(text=line)
 
         placed_count = sum(1 for m in scene.gnm_markers if m.is_placed)
         total_count = len(scene.gnm_markers)
@@ -3550,6 +3618,8 @@ def _export_markers(scene, path):
             "scene_scale_length": scene.unit_settings.scale_length,
             "requested_marker_set": scene.gnm_settings.marker_set,
             "marker_count": len(scene.gnm_markers),
+            "marker_depth_adjustments": {item.label: _core_module('blender_marker_depths').history(item)
+                                         for item in scene.gnm_markers if item.depth_adjustment_history != '[]'},
             "marker_orientation": {item.label: _core_module('blender_marker_normals').export_record(item)
                                    for item in scene.gnm_markers if item.is_placed},
             "mapping_revision": _VERTEX_DATA.MAPPING_REVISION,
@@ -3750,6 +3820,7 @@ _classes = (
     GNM_OT_capturi_standardizate, GNM_OT_mirror_reconstruct, GNM_OT_export_csv,
     GNM_UL_markers, GNM_PT_panel, GNM_OT_run_offline, GNM_OT_cancel_offline,
     GNM_OT_check_python, GNM_OT_apply_paper_tissues,
+    GNM_OT_select_depth_markers, GNM_OT_adjust_marker_depths,
     # V13:
     GNMLiveSettings, GNM_OT_setup_dual_viewports, GNM_OT_toggle_skull_overlay,
     GNM_OT_load_live_model, GNM_OT_toggle_live, GNM_OT_delete_marker,

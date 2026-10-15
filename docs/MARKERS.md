@@ -54,3 +54,11 @@ Optional `bone_source_id`, `bone_source_geometry_sha256`, `bone_anatomy` and `ar
 ## Direction provenance in 5.0.0rc5
 
 The optional `marker_orientation` metadata preserves the applied local-normal estimate and current direction for each placed marker, with source hash, radius, diagnostics and UTC time. Manual point/direction edits are flagged by `matches_current_marker=false`. It survives offline report export without changing CSV coordinate fields or the fitter. See [MARKER_NORMALS](MARKER_NORMALS.md).
+
+## Manual depth adjustments in 5.0.0rc9
+
+Optional `marker_depth_adjustments` metadata maps marker labels to a history of
+manual percentage edits (UTC, operation, percentage, before/after mm and previous
+tissue source). The edited values are already reflected in placed targets and
+depths. The offline pipeline must not apply the percentage again. This provenance
+does not validate an anatomical or BMI relationship. See [the Blender workflow](MARKER_DEPTH_ADJUSTMENT.md).
