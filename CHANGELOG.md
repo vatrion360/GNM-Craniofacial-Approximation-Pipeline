@@ -1,3 +1,12 @@
+# 5.0.0rc10 / add-on 19.0.0
+
+- Add Blender-only presentation copies of completed live/offline fits, retaining the exact frozen neutral surface and any local correction.
+- Transfer native GNM per-corner UVs; provide independent skin, teeth/gums, tongue and eye materials with local image-texture loading.
+- Expose 383 native expression components, 80 teeth and three eye shape offsets, plus eye axis-angle rotation; lock head identity and head/neck pose.
+- Apply controls relative to the frozen result with a combined world-mm displacement cap; explicit Apply and exact Reset avoid accumulated deformation and per-slider fitting.
+- Persist controls, fit transform, neutral hash and displacement diagnostics in `.blend`; reject changed topology, frozen basis or unsupported object transforms/modifiers.
+- Add numerical and installed-Blender tests, including native upstream LBS parity, UV seams, final-surface preservation, texture assignment and save/reload. Presentation bounds do not guarantee anatomical validity or collision avoidance.
+
 # 5.0.0rc9 / add-on 18.1.0
 
 - Blender-only percentage adjustment for one or more checked marker rows, with Increase/Decrease and select-all/clear controls independent of fit inclusion.
