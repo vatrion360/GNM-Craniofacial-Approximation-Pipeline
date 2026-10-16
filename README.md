@@ -3,13 +3,14 @@
 
 A Blender marker add-on and an offline, auditable fitting pipeline for **supervised craniofacial approximation research**. Fits a neutral GNM Head identity model to operator-defined skin targets derived from a scanned skull.
 
-**Software 5.0.0rc9 / add-on 18.1.0.** Blender now supports [manual percentage changes to selected tissue depths](docs/MARKER_DEPTH_ADJUSTMENT.md), with updated marker targets, Undo and exported edit history. This is a user-defined scenario, not a calibrated BMI-to-tissue model. It retains the endpoint-marker diagnostics, redraw/refit performance fixes, 22 bone references, 14 Table 3 measurements and reviewed skin-distance controls shared by live and offline fitting. Missing/reconstructed anatomy and bone-versus-skin distances remain explicit. It does **not** establish forensic accuracy or recover a uniquely determined face. See [performance evidence](docs/PERFORMANCE.md), the [craniometry protocol](docs/CRANIOMETRY.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
+**Software 5.0.0rc10 / add-on 19.0.0.** Blender adds [post-fit presentation copies](docs/POSTFIT_PRESENTATION.md): native GNM UVs, expression components, teeth/eye shape offsets and eye rotation, with bounded displacement from the frozen final surface. The original neutral fit remains available for validation. It retains [manual percentage changes to selected tissue depths](docs/MARKER_DEPTH_ADJUSTMENT.md), endpoint-marker diagnostics, redraw/refit performance fixes, 22 bone references, 14 Table 3 measurements and reviewed skin-distance controls shared by live and offline fitting. These controls do **not** establish forensic accuracy, infer BMI or recover a uniquely determined face. See [performance evidence](docs/PERFORMANCE.md), the [craniometry protocol](docs/CRANIOMETRY.md), [scientific basis](docs/SCIENCE.md) and [audit](docs/AUDIT.md).
 
 ## Start here
 
 - [Install, obtain model assets, prepare an offline workstation](docs/INSTALL.md)
 - [Specialist workflow, anatomical review and output interpretation](docs/SPECIALIST_WORKFLOW.md)
 - [Ghid rapid în română](docs/GHID_RO.md)
+- [Post-fit expressions, teeth, eyes and GNM UV textures](docs/POSTFIT_PRESENTATION.md)
 - [Marker v3 specification and migration](docs/MARKERS.md)
 - [PDF Table 2, 48-marker set and correspondence changes](docs/PDF_PROTOCOL.md)
 - [Scientific rationale and primary references](docs/SCIENCE.md)
@@ -60,13 +61,15 @@ Local correction is opt-in (`--local-correction`). Dense skull constraints are e
 python tools/build_addon.py
 ```
 
-Install `dist/gnm_cranio-5.0.0rc9.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender 4.5.0 headless integration runs on Windows and Linux; see [revision-specific results](docs/VALIDATION.md). Blender **4.2+ remains the broader target**; interactive and other version checks remain pending.
+Install `dist/gnm_cranio-5.0.0rc10.zip` through Blender's **Install from Disk** and enable **GNM Scientific Markers**. The ZIP includes `cranio`; installing `addon_v13.py` alone is no longer the recommended route. Blender 4.5.0 headless integration runs on Windows and Linux; see [revision-specific results](docs/VALIDATION.md). Blender **4.2+ remains the broader target**; interactive and other version checks remain pending.
 
 Select the local model, import the skull with explicit source units, place/review markers, and export v3 CSV. For **Run Offline Fit and Import**, select the external Python executable from the environment above and a case output folder. The add-on runs the CLI in a separate process, records a log, then imports the completed world-mm OBJ. Each run gets a new case subfolder. The default button uses marker-only statistical fitting with lambda based on the actual included marker count; explicit dense and local-correction switches are available in the panel and CLI. Register all preserved bone sources, review their normals and confirm mandibular articulation before including mandibular constraints.
 
 Use **Extended 48**, **Paper 32** or **Legacy 27**, then **Add Missing Markers**. Existing placements, tissue values and manual picks are retained. The paper's normal-female reference can be applied explicitly with **Apply Table 2 Tissue Depths**; review applicability before case use. Sites marked **Include in fit = off** remain documented but do not affect pose or identity fitting. The default Pogonion candidate is corrected from lower-lip vertex 12284 to chin candidate 12261; review previous cases.
 
 For a manual depth scenario, check one or more rows using the **left-hand adjustment checkboxes**, enter **Change (%)**, choose **Increase** or **Decrease**, and press **Apply to Selected Depths**. The operation changes the current mm values in that same list and moves existing skin targets along their current axes. Selection is independent of **Include in fit**. Repeated applications compound; use Undo to revert. Only Blender provides this control; an exported CSV contains the edited targets without any additional offline multiplier.
+
+After the final live/offline fit, open **Post-fit Presentation / GNM UV**, select the fitted source and **Create Presentation Copy**. This preserves the final surface, including local correction, and hides the retained original. Choose native statistical controls, then **Apply Preview**; **Reset to Frozen Neutral** restores the saved neutral coordinates. The default maximum combined displacement is 3 mm, an engineering limit rather than an anatomical threshold. Select a texture region and **Load GNM UV Texture** to apply an image matching the native UV layout. Read the [workflow and limitations](docs/POSTFIT_PRESENTATION.md) before editing: no separate jaw joint, named emotion presets, collision guarantee or scientifically inferred appearance is supplied.
 
 On Windows select **`.venv\Scripts\python.exe`** (or the Windows-created `.venv` folder), then **Check Python Environment**. Selecting the pipeline `.py`, Blender itself, an installer or a copied Linux interpreter is rejected before fitting. See [Windows troubleshooting](docs/INSTALL.md#windows-interpreter-check-and-winerror-193).
 
