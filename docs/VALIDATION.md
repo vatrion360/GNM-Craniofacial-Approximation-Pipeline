@@ -1,43 +1,5 @@
 # Validation and release gates
 
-## Evidence for 5.0.0rc10 / add-on 19.0.0
-
-Local execution on 2026-10-16 with the reviewed official GNM asset: **211 passed,
-1 native-Windows test skipped** (Linux x86_64, Python 3.12.14, NumPy 2.3.5,
-SciPy 1.17.0, trimesh 5.1.1). Ruff and ZIP compilation passed. The 17 additional
-numeric cases cover exact neutral preservation with a non-statistical residual,
-combined displacement bounds in world mm, non-accumulating edits, local teeth
-support, analytic eye rotation, malformed controls, locked head parameters,
-topology order and invalid transforms.
-
-The installed ZIP passed the full Blender **4.5.0** Linux suite (official binary,
-build `8cb6b388974a`), including `BLENDER_POSTFIT_PRESENTATION_PASS` and
-`BLENDER_EXTERNAL_FIT_IMPORT_CANCEL_PASS`. New checks cover the frozen final
-surface under a nontrivial similarity, all 466 scalar controls, exact face-corner
-UVs, independent materials, bounded/repeated Apply, unchanged source geometry,
-exact Reset, a modified-Basis rejection, local texture assignment, `.blend`
-save/reload with an empty model cache, and offline-report metadata with a
-non-statistical final residual. Existing marker-depth Undo checks also passed;
-interactive acceptance of the new presentation controls remains pending.
-
-`tools/check_postfit_upstream.py` compares eye skinning plus expression to
-`gnm.shape.gnm_common.linear_blend_skinning` from Google GNM commit
-`5cf11d785a38a83597e64ad0b6d15950bcd6b390`. With seed 1900 and an uncapped
-synthetic case, maximum absolute coordinate difference was
-**5.684341886080802e-14 mm**. This verifies the LBS calculation with identical
-inputs; it does not validate the anatomical correctness of residual-based eye
-pivots or expressive surfaces. To reproduce, install upstream's optional
-dependencies and run:
-
-```bash
-PYTHONPATH=/path/to/google/GNM python tools/check_postfit_upstream.py /path/to/gnm_head.npz
-```
-
-The existing Windows/Linux Actions matrix includes the new checks. Check its
-result for the exact PR commit; local Linux success is not Windows evidence.
-No CT subject, dental ground truth, texture accuracy, collision-free animation
-or interactive workstation performance was evaluated by these software tests.
-
 ## Evidence for 5.0.0rc9 / add-on 18.1.0
 
 Local execution on 2026-10-15: **194 passed, 1 native-Windows test skipped**,

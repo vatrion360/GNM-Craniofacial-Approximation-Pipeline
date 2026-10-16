@@ -1,41 +1,8 @@
-# Ghid rapid în română: 5.0.0rc10 / addon 19.0.0
+# Ghid rapid în română: 5.0.0rc9 / addon 18.1.0
 
 Addon-ul oferă **48 de markeri**, pipeline offline și verificarea mediului Python înainte de calcul. Tabelul 2 din PDF are 21 de tipuri anatomice, adică **32 de poziții**: 10 mediane și 11 perechi bilaterale. Reunirea lor cu cei 27 de markeri anteriori adaugă 21 de poziții noi.
 
 Versiunea 18 adaugă separat **22 de repere osoase pentru cele 14 măsurători din Table 3**. Nu le adaugă automat ca ținte cutanate la cei 48 de markeri.
-
-## Expresie, dantură, ochi și textură după fit (19.0.0)
-
-După finalizarea și verificarea aproximării, deschide **Post-fit Presentation /
-GNM UV**, selectează mesh-ul final la **Fitted source** și apasă **Create
-Presentation Copy**. Se păstrează suprafața finală, inclusiv corecția locală
-offline. Originalul rămâne în scenă, ascuns în viewport și randare; îl poți
-reafișa din Outliner. Live se oprește. Într-o scenă live din versiuni mai vechi,
-rulează un refit înainte de creare; un rezultat offline trebuie să aibă raportul
-JSON complet accesibil.
-
-Alege categoria de controale: expresie/limbă/pupile, forma dinților sau forma
-ochilor. Sunt componentele statistice native numerotate ale GNM, nu emoții
-denumite. Poți modifica și rotația fiecărui ochi, prin vector axă-unghi în radiani.
-**Apply Preview** calculează rezultatul; simpla deplasare a sliderelor nu rulează
-fitul. **Max combined shift (mm)** limitează deplasarea totală față de suprafața
-neutră salvată, implicit la 3 mm. Identitatea capului și rotația cap/gât sunt
-blocate. **Reset to Frozen Neutral** revine la coordonatele neutre salvate.
-
-Pentru textură: **Texture region → Load GNM UV Texture**, apoi alege o imagine
-adaptată UV-urilor GNM. Sunt materiale separate pentru piele, dinți/gingii,
-limbă și componentele ochilor. UV-urile sunt transferate automat, cu păstrarea
-cusăturilor. Poți exporta șablonul din UV Editing → **UV → Export UV Layout**.
-Nu este inclusă și nu se generează automat o textură. Salvează `.blend`; pentru
-transferul imaginilor folosește Pack Resources. Actualizează **Presentation
-model** dacă fișierul GNM a fost mutat.
-
-Limita în mm este tehnică: nu împiedică automat intersecțiile buze–dinți și nu
-garantează păstrarea reziduurilor la markeri pe fața expresivă. Markerii și
-măsurătorile originale nu sunt modificați. Pentru validare folosește mesh-ul
-neutru; pentru prezentare exportă separat copia evaluată din Blender. Mesh-urile
-remesh/decimate sau cu ordinea vertecșilor schimbată nu sunt acceptate. Detalii
-și limite: [POSTFIT_PRESENTATION](POSTFIT_PRESENTATION.md).
 
 ## Diagnosticul perechilor în 18.0.2
 
@@ -65,7 +32,7 @@ V18 construia un snapshot complet la fiecare redesenare a panoului pentru a afi�
 
 Fitul automat pornește după **0,35 s fără modificări**; opțiunea **Refit after idle (s)** controlează pauza. Mutarea reperelor exclusiv osoase nu declanșează fitul când ponderea distanțelor cutanate este zero. LOO reutilizează descompunerile numerice între valorile lambda, cu aceeași funcție obiectiv și aceeași grilă.
 
-Salvează proiectul, oprește Live, dezactivează addon-ul vechi, instalează ZIP-ul complet 19.0.0 și repornește Blender. Încarcă din nou modelul GNM. Pentru editare fluentă, începe cu **Conditional LOO tuning** și **Dense on each refit** oprite; activarea lor schimbă timpul de calcul și trebuie consemnată în protocolul final. **Stop Live** permite plasarea reperelor fără refit automat; **Run Offline Fit and Import** rulează separat de interfață.
+Salvează proiectul, oprește Live, dezactivează addon-ul vechi, instalează ZIP-ul complet 18.1.0 și repornește Blender. Încarcă din nou modelul GNM. Pentru editare fluentă, începe cu **Conditional LOO tuning** și **Dense on each refit** oprite; activarea lor schimbă timpul de calcul și trebuie consemnată în protocolul final. **Stop Live** permite plasarea reperelor fără refit automat; **Run Offline Fit and Import** rulează separat de interfață.
 
 Fitul live folosește CPU prin NumPy, nu placa RTX. Mai multă RAM/VRAM nu elimină blocajele de pe firul principal. Dacă problema persistă după actualizare, notează versiunea Blender, procesorul, numărul de triunghiuri, setările LOO/dense și timpul afișat la **Fit**. Măsurătorile de performanță pe un caz sintetic sunt în [PERFORMANCE](PERFORMANCE.md); nu reprezintă o măsurare pe stația ta Windows.
 
@@ -92,7 +59,7 @@ py -3.12 -m venv .venv
 ```
 
 2. Obține modelul oficial conform [INSTALL](INSTALL.md), apoi verifică-l cu `.\.venv\Scripts\python.exe -m cranio.doctor --npz models\gnm_head.npz`. Modelul se păstrează local și nu este inclus în addon.
-3. Instalează `gnm_cranio-5.0.0rc10.zip` în Blender prin **Install from Disk** și activează **GNM Scientific Markers**. Dezactivează copia veche înainte de înlocuire. Pentru construirea ZIP-ului din surse: `python tools/build_addon.py`.
+3. Instalează `gnm_cranio-5.0.0rc9.zip` în Blender prin **Install from Disk** și activează **GNM Scientific Markers**. Dezactivează copia veche înainte de înlocuire. Pentru construirea ZIP-ului din surse: `python tools/build_addon.py`.
 4. La **Python executable / venv folder**, selectează `python.exe` din `.venv\Scripts`, sau directorul `.venv` creat pe Windows. Poți lipi calea afișată de ultima comandă de mai sus.
 5. Apasă **Check Python Environment**. Rezultatul trebuie să confirme Python 3.10+ pe 64 de biți și `numpy/scipy/trimesh OK`.
 

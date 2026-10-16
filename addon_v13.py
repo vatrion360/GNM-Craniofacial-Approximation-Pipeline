@@ -1,4 +1,4 @@
-"""GNM Craniofacial Markers 19.0.0 / software package 5.0.0rc10.
+"""GNM Craniofacial Markers 18.1.0 / software package 5.0.0rc9.
 
 Install the complete ZIP built with tools/build_addon.py. The bundled numerical
 core is imported under the add-on namespace. Optional previews run serially in
@@ -35,7 +35,7 @@ from bpy_extras import view3d_utils
 bl_info = {
     "name": "GNM Scientific Markers",
     "author": "VATRION",
-    "version": (19, 0, 0),
+    "version": (18, 1, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > GNM Markers",
     "category": "3D View",
@@ -1851,8 +1851,6 @@ def _ensure_gnm_mesh_object(context):
         # La re-incarcare: rescriem template-ul si resetam poza cosmetica
         # (un eventual fit vechi nu mai corespunde noului model).
         obj.data.vertices.foreach_set("co", model.mu.ravel())
-        if 'gnm_fit_state' in obj:
-            del obj['gnm_fit_state']
         obj.data.update()
         obj.matrix_world = Matrix.Rotation(np.deg2rad(90.0), 4, 'X')
         return obj
@@ -2569,9 +2567,6 @@ def _apply_result(scene, res):
         ))
         obj.matrix_world = (Matrix.Translation((t[0], t[1], t[2]))
                             @ Matrix.Scale(s, 4) @ rot4)
-        if 'c' in res:
-            _core_module('blender_postfit').stamp_fit(obj, res['c'], np.eye(4), _LIVE.model_hash,
-                dict(converged=res.get('converged'), marker_rms_mm=res.get('rms')))
         _update_ghosts_from_fit(scene, res["v_model"], s, rot, t)
     st.rms_mm = res["rms"]
     pairs = res.get('measurement_residuals', [])
@@ -3845,7 +3840,6 @@ def register():
     bpy.types.Scene.gnm_restoration_regions = CollectionProperty(type=GNMRestorationRegion)
     bpy.types.Scene.gnm_restoration_active_index = IntProperty(default=0)
     _core_module('blender_craniometry').register(sys.modules[__name__])
-    _core_module('blender_postfit').register(sys.modules[__name__])
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
     for h in list(bpy.app.handlers.load_post):
@@ -3856,7 +3850,6 @@ def register():
 def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
-    _core_module('blender_postfit').unregister()
     _core_module('blender_craniometry').unregister()
     _core_module('blender_marker_normals').clear_preview()
     try:

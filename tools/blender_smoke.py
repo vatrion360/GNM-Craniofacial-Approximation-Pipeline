@@ -24,9 +24,8 @@ from blender_normal_checks import run_normal_checks
 from blender_craniometry_checks import run_craniometry_checks
 from blender_performance_checks import run_performance_checks
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
-from blender_postfit_checks import run_postfit_checks
 
-archive = root / 'dist' / 'gnm_cranio-5.0.0rc10.zip'
+archive = root / 'dist' / 'gnm_cranio-5.0.0rc9.zip'
 with tempfile.TemporaryDirectory() as directory:
     with zipfile.ZipFile(archive) as z:
         z.extractall(directory)
@@ -182,8 +181,6 @@ with tempfile.TemporaryDirectory() as directory:
                 print('EXTERNAL FIT NOT TESTED: set GNM_EXTERNAL_PYTHON')
         else:
             print('MODEL LOAD/EXPORT NOT TESTED: set GNM_MODEL_PATH')
-        if os.environ.get('GNM_MODEL_PATH'):
-            run_postfit_checks(addon)
         run_depth_undo_checks(addon)
     finally:
         addon.unregister()
