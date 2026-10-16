@@ -74,6 +74,11 @@ jobs:
           & './blender-4.5.0-windows-x64/blender.exe' --background --factory-startup --python-exit-code 1 --python tools/blender_smoke.py 2>&1 | Tee-Object -FilePath blender-smoke.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
+        with:
+          name: gnm-cranio-addon-${{ runner.os }}
+          path: dist/gnm_cranio-*.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: blender-4.5.0-${{ runner.os }}-smoke

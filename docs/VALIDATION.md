@@ -1,5 +1,28 @@
 # Validation and release gates
 
+## Evidence for 5.0.0rc9 / add-on 18.1.0
+
+Local execution on 2026-10-15: **194 passed, 1 native-Windows test skipped**,
+with the reviewed official GNM v3 asset (Linux x86_64, Python 3.12.14, NumPy
+2.3.5, SciPy 1.17.0, trimesh 5.1.1). Ruff and ZIP compilation passed. Sixteen
+new arithmetic cases cover manual percentage changes, compounding, zero,
+out-of-range decreases, non-finite inputs and float overflow.
+
+The installed ZIP passed the full Blender **4.5.0** Linux suite (official
+checksum-verified binary, build `8cb6b388974a`), including
+`BLENDER_MARKER_DEPTH_ADJUSTMENT_PASS`, `BLENDER_MARKER_DEPTH_UNDO_PASS`,
+`BLENDER_SMOKE_PASS` and `BLENDER_EXTERNAL_FIT_IMPORT_CANCEL_PASS`. New checks
+exercise selected/untouched and unplaced/excluded rows, fixed bone coordinates,
+targets and pegs, one batch refit request, rollback after an injected geometry
+failure, invalid placements/constraints, zero-depth direction retention,
+`.blend` persistence, CSV history and real Blender undo/redo boundaries.
+
+The existing Windows/Linux CI matrix runs these same checks. Its remote result
+must be read for the exact PR commit; local Linux success does not establish
+Windows or interactive acceptance. No BMI calibration or anatomical accuracy
+was evaluated by these software tests. The local dependency versions above are
+reported as executed; the existing pinned CI runtime was not changed.
+
 ## Evidence for 5.0.0rc8 / add-on 18.0.2
 
 Local execution on 2026-10-05 with the official GNM asset: **178 passed,

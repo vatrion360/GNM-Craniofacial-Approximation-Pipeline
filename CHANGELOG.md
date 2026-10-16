@@ -1,3 +1,10 @@
+# 5.0.0rc9 / add-on 18.1.0
+
+- Blender-only percentage adjustment for one or more checked marker rows, with Increase/Decrease and select-all/clear controls independent of fit inclusion.
+- Update current mm values, placed targets and pegs while preserving bone points and directions; coalesce refit requests for the batch and support Undo.
+- Validate the full selection before mutation, roll back adapter failures and retain per-marker manual-adjustment provenance in `.blend` and CSV metadata.
+- Add arithmetic and installed-ZIP Blender regressions to the existing Windows/Linux CI workflow. No BMI calibration, tissue-table change or offline solver multiplier is introduced.
+
 # 5.0.0rc8 / add-on 18.0.2
 
 - Replace the combined craniometry marker error with field-specific diagnostics for both endpoints of a rejected pair, shared by live and offline fitting.
