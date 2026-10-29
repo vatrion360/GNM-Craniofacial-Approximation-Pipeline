@@ -32,6 +32,10 @@ with tempfile.TemporaryDirectory() as directory:
         z.extractall(directory)
     sys.path.insert(0, directory)
     addon = importlib.import_module('gnm_cranio')
+    tissue = addon._core_module('tissue')
+    empty, warnings = tissue.validate_table(tissue.empty_table('engineering_test'))
+    assert empty['landmarks'] == {} and warnings
+    print('BLENDER_TISSUE_SCHEMA_PASS')
     for _ in range(2):
         addon.register()
         assert hasattr(bpy.context.scene, 'gnm_markers')

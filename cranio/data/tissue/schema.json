@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GNM tissue table exchange v1 (not marker CSV v3)",
+  "$defs": {
+    "measurement": {
+      "type": "object",
+      "properties": {
+        "central_mm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "estimator": {
+          "enum": [
+            "mean",
+            "median",
+            "shorth",
+            "75-shormax",
+            null
+          ]
+        },
+        "sd_mm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p10_mm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p90_mm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "n": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "measurement_direction": {
+          "enum": [
+            "bone_normal",
+            "vertical",
+            "sagittal",
+            "other",
+            null
+          ]
+        },
+        "direction_notes": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "pattern": ".*\\S.*"
+        },
+        "provenance": {
+          "enum": [
+            "legacy_hardcoded",
+            "source_transcription",
+            "user_supplied"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "central_mm"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "units": {
+      "const": "mm"
+    },
+    "provenance": {
+      "enum": [
+        "legacy_hardcoded",
+        "source_transcription",
+        "user_supplied"
+      ]
+    },
+    "citation": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "doi": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "measurement_method": {
+      "enum": [
+        "ultrasound",
+        "CT",
+        "needle",
+        "other",
+        null
+      ]
+    },
+    "posture": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "sex": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "age_range_years": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "ancestry_label": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "n": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "notes": {
+      "type": "string"
+    },
+    "landmarks": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": ".*\\S.*"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/measurement"
+      }
+    },
+    "regions": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": ".*\\S.*"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/measurement"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "revision",
+    "units",
+    "provenance",
+    "citation",
+    "doi",
+    "measurement_method",
+    "posture",
+    "sex",
+    "age_range_years",
+    "ancestry_label",
+    "n",
+    "notes",
+    "landmarks",
+    "regions"
+  ],
+  "additionalProperties": false
+}

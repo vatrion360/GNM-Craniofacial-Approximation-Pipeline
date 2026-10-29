@@ -19,6 +19,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
+- [Versioned tissue tables: JSON/CSV exchange](docs/tissue_tables_howto.md)
 - [Contributing and CI](CONTRIBUTING.md)
 - [Optional head-only identity fitting](docs/IDENTITY_SUBSPACE.md)
 - [V19 task comparison and revised implementation plan (Romanian)](docs/TASKS_V19_REVIEW.md)
@@ -104,6 +105,20 @@ python -m cranio.evaluation --input examples/synthetic_markers.csv --npz models/
 ```
 
 `cranio.evaluation` holds out each landmark and refits pose and identity without it. Its scores are distinct from the conditional fixed-pose LOO used to tune regularisation. Neither is a substitute for evaluation on paired skull/face subjects.
+
+## Tissue-table data exchange
+
+`python -m cranio.tissue` provides opt-in data preparation; it does not apply a
+table to a case or overwrite manual marker values. Unknown SD/source metadata
+remain null with diagnostics. See [format and commands](docs/tissue_tables_howto.md).
+
+| Command | Purpose |
+| --- | --- |
+| `template --id ID --output FILE` | Create an empty JSON template, without tissue values |
+| `inspect ID_OR_FILE` | Validate structure; print metadata, SHA-256 and warnings |
+| `export-csv --input ID_OR_FILE --output FILE` | Export lossless tissue-table CSV |
+| `import-csv --input FILE --output FILE` | Validate CSV and write JSON |
+| `--overwrite` | Explicitly replace an output; never replace an input |
 
 ## Development
 

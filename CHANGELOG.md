@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add opt-in versioned tissue-table JSON/CSV validation and exchange, exact-file provenance hashes and explicit missing-data diagnostics. No new tissue values, weights or automatic case changes. Package the schema in the wheel and Blender ZIP.
+
 - Add opt-in `--identity-subspace head` and the Blender Identity fit selector. Resolve the 170 head components from validated GNM names; inactive eye/teeth coefficients stay zero even with a prior. Default `all` retains the prior numerical path.
 - Preserve full-order coefficients for replay, record active component/clip diagnostics, and pass the same choice through live preview, external fitting and marker holdout. Add synthetic and official-model parity/invariance checks.
 
