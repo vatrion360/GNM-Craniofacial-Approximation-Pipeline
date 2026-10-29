@@ -57,10 +57,12 @@ def test_documentation_marker_is_retained_but_cannot_affect_fit(tmp_path, model_
 
 @pytest.mark.parametrize('field,value', [('use_for_fit', 'yes'), ('mapping_reviewed', 'yes'),
                                         ('bone_status', 'validated')])
-def test_invalid_review_fields_are_rejected(marker_file, field, value):
+def test_invalid_review_fields_are_rejected(marker_file, field, value, raw_v3_writer):
     rows, meta = _fixture_rows(marker_file)
     rows[0][field] = value
-    write_marker_csv_v3(marker_file, rows, meta)
+    with pytest.raises(ValueError, match=field):
+        write_marker_csv_v3(marker_file, rows, meta)
+    raw_v3_writer(marker_file, rows, meta)
     with pytest.raises(ValueError, match=field):
         read_marker_csv(marker_file, {}, {})
 

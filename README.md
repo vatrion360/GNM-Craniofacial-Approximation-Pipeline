@@ -60,6 +60,10 @@ Local correction is opt-in (`--local-correction`). Dense skull constraints are e
 
 ## Blender
 
+Marker CSV exports validate a closed temporary file before replacing the destination;
+failed exports preserve the previous file. Session reports list each marker's recorded
+tissue source and do not attribute project tissue-depth values to the GNM model.
+
 ```bash
 python tools/build_addon.py
 ```

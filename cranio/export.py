@@ -54,13 +54,20 @@ import tempfile
 
 
 @contextmanager
-def atomic_text(path):
+def atomic_text(path, *, validate=None):
+    """Publish text after optionally validating the closed temporary file.
+
+    Same-directory replacement preserves the destination on write/validation
+    failure. Closing before validation also permits reopening on Windows.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
             yield stream
+        if validate is not None:
+            validate(Path(temporary))
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):

@@ -6,6 +6,22 @@ import pytest
 
 
 @pytest.fixture
+def raw_v3_writer():
+    """Deliberately malformed reader fixtures, bypassing the production writer."""
+    import csv
+    import json
+    from cranio.io_csv import V3_MAGIC, V3_FIELDS
+    def write(path, rows, metadata=None):
+        meta = dict(metadata or {}, version=3, units='mm', coordinate_space='world')
+        with open(path, 'w', newline='', encoding='utf-8') as stream:
+            stream.write(V3_MAGIC+'\n# '+json.dumps(meta)+'\n')
+            writer = csv.DictWriter(stream, fieldnames=V3_FIELDS, lineterminator='\n')
+            writer.writeheader()
+            writer.writerows(rows)
+    return write
+
+
+@pytest.fixture
 def model_file(tmp_path):
     rng = np.random.default_rng(4)
     points = rng.normal(size=(12, 3)) * .04 + [0, .35, .09]

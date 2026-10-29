@@ -24,17 +24,22 @@ def test_v3_preserves_origin_and_manual_vertex(tmp_path):
 
 @pytest.mark.parametrize('changes', [dict(x='nan'), dict(z='inf'), dict(vertex=-1), dict(weight=0),
                                      dict(weight=-.2), dict(weight=2), dict(placed='yes'), dict(label='')])
-def test_bad_v3_rows_rejected(tmp_path, changes):
+def test_bad_v3_rows_rejected(tmp_path, changes, raw_v3_writer):
     path = tmp_path / 'markers.csv'
-    write_marker_csv_v3(path, [row(**changes)])
+    with pytest.raises(ValueError, match='row 1'):
+        write_marker_csv_v3(path, [row(**changes)])
+    assert not path.exists()
+    raw_v3_writer(path, [row(**changes)])
     with pytest.raises(ValueError, match='row 1'):
         read_marker_csv(path, {}, {})
 
 
 @pytest.mark.parametrize('second', [row(), row(label='Glabella')])
-def test_duplicate_labels_and_vertices_rejected(tmp_path, second):
+def test_duplicate_labels_and_vertices_rejected(tmp_path, second, raw_v3_writer):
     path = tmp_path / 'markers.csv'
-    write_marker_csv_v3(path, [row(), second])
+    with pytest.raises(ValueError, match='duplicate'):
+        write_marker_csv_v3(path, [row(), second])
+    raw_v3_writer(path, [row(), second])
     with pytest.raises(ValueError, match='duplicate'):
         read_marker_csv(path, {}, {})
 
@@ -48,9 +53,12 @@ def test_bone_and_skin_separate(tmp_path):
     assert meta['bone_positions_mm']['Nasion'] == [0, 0, 0]
 
 
-def test_inconsistent_depth_rejected(tmp_path):
+def test_inconsistent_depth_rejected(tmp_path, raw_v3_writer):
     path = tmp_path / 'markers.csv'
-    write_marker_csv_v3(path, [row(z=10, bone_x=0, bone_y=0, bone_z=0, tissue_depth_mm=5)])
+    rows = [row(z=10, bone_x=0, bone_y=0, bone_z=0, tissue_depth_mm=5)]
+    with pytest.raises(ValueError, match='differs'):
+        write_marker_csv_v3(path, rows)
+    raw_v3_writer(path, rows)
     with pytest.raises(ValueError, match='differs'):
         read_marker_csv(path, {}, {})
 
