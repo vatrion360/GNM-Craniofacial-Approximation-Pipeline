@@ -30,6 +30,8 @@ class FaceModelData:
         mirror_indices: (N,) permutare de oglindire (vertex <-> pereche).
         vertex_groups: (G, N) ponderi per grup semantical.
         vertex_group_names: numele celor G grupuri.
+        identity_names: optional component names from the archive; required for
+            named subspace selection, never inferred from component count.
     """
 
     mu: np.ndarray
@@ -38,6 +40,7 @@ class FaceModelData:
     mirror_indices: np.ndarray
     vertex_groups: np.ndarray
     vertex_group_names: List[str]
+    identity_names: List[str] | None = None
 
     @property
     def identity_dim(self) -> int:

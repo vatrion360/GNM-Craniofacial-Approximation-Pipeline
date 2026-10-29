@@ -251,14 +251,16 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
                  mirror_indices=None, distance_pairs=None, loss_cfg=None,
                  prior_mean=None, prior_scale=None, prior_weight=1.0,
                  huber_rows=None, pose_rows=None, measurement_controls=None,
-                 measurement_weight=0.0):
+                 measurement_weight=0.0, active_components=None):
     """Alternate weighted pose and ridge identity with one Huber IRLS layer.
 
     Huber uses world-mm residuals and original confidence weights. Effective
     weights are frozen for both blocks in a sweep; the ridge block is in model
     mm. Clipping and changing correspondences make this a block-coordinate
     heuristic, not a globally optimal joint MAP estimator. Conditional LOO tunes
-    marker rows only and is not independent validation. Returns FitResult.
+    marker rows only and is not independent validation. With active_components,
+    solve only that basis and fix all other coefficients at zero, including
+    with a demographic prior; return the full-order vector. Returns FitResult.
     """
     if loss_cfg is None:
         loss_cfg = LossConfig()
@@ -295,6 +297,24 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
             raise ValueError("Prior scale and weight must be positive")
     if huber_rows is not None and not (isinstance(huber_rows, (int, np.integer)) and 0 <= huber_rows <= len(weights)):
         raise ValueError('Invalid huber_rows')
+    if active_components is not None:
+        # Solve the identical objective in a reduced basis. Inactive components
+        # stay exactly zero, including with a demographic prior. Keep the public
+        # coefficient vector in full model order for replay and presentation.
+        from .identity import validate_active_components
+        active = validate_active_components(active_components, len(basis))
+        result = fit_identity(mu, basis[active], lm_idx, targets_xyz, weights,
+            lam=lam, default_lambda=default_lambda, max_iter=max_iter, tol=tol,
+            dense=dense, mirror_indices=mirror_indices, distance_pairs=distance_pairs,
+            loss_cfg=loss_cfg, prior_mean=None if prior_mean is None else prior_mean[active],
+            prior_scale=None if prior_mean is None else prior_scale[active], prior_weight=prior_weight,
+            huber_rows=huber_rows, pose_rows=pose_rows, measurement_controls=measurement_controls,
+            measurement_weight=measurement_weight)
+        full = np.zeros(len(basis), dtype=result.coefficients.dtype)
+        full[active] = result.coefficients
+        result.info.diagnostics['identity_fit'].update(
+            total_components=len(basis), active_indices=active.tolist(), inactive_policy='zero')
+        return result._replace(coefficients=full)
     identity_dim = basis.shape[0]
     mu_lm = mu[lm_idx]
     basis_lm = basis[:, lm_idx, :]                      # (I, L, 3)
@@ -460,6 +480,9 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
     res = residuals()
     final_weights = robust_w(res)
     diagnostics = dict(converged=bool(converged), stop_reason='tolerances_met' if converged else 'max_iterations',
+        identity_fit=dict(total_components=identity_dim, active_components=identity_dim,
+            active_indices=list(range(identity_dim)), inactive_policy='none',
+            clipped_active_count=int(np.sum(np.abs(c) >= loss_cfg.clip_sigma-1e-9))),
         iterations=len(history), max_iterations=max_iter, coefficient_tolerance=tol,
         pose_translation_tolerance_mm=1e-4, pose_rotation_tolerance_deg=1e-4, pose_scale_relative_tolerance=1e-7,
         irls_layers=1, huber_k_world_mm=10., final_irls_weights=final_weights.tolist(), iteration_records=records,
@@ -532,7 +555,7 @@ def bounded_tps_correction(vertices_world, centers, residuals_vec, cap_vertex,
 # ---------------------------------------------------------------------------
 # DIAGNOSTICE DE STABILITATE
 # ---------------------------------------------------------------------------
-def stability_warnings(lam_used, loo_table, c, clip_sigma=3.0):
+def stability_warnings(lam_used, loo_table, c, clip_sigma=3.0, active_components=None):
     """Semnaleaza fiturile aflate la marginea stabilitatii.
 
     * LOO-CV alege lambda exact la marginea grilei (grila ar trebui
@@ -554,7 +577,11 @@ def stability_warnings(lam_used, loo_table, c, clip_sigma=3.0):
                 f"LOO-CV chose lambda={lam_used:g}, the UPPER edge of the "
                 f"grid ({min(grid_lams):g}..{max(grid_lams):g}) - "
                 "maximum regularization; check marker placement.")
-    n_clip = int((np.abs(np.asarray(c)) >= clip_sigma - 1e-9).sum())
+    coefficients = np.asarray(c)
+    if active_components is not None:
+        from .identity import validate_active_components
+        coefficients = coefficients[validate_active_components(active_components, len(coefficients))]
+    n_clip = int((np.abs(coefficients) >= clip_sigma - 1e-9).sum())
     if n_clip:
         warns.append(
             f"{n_clip} identity coefficients hit the "

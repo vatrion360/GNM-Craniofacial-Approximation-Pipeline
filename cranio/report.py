@@ -52,6 +52,9 @@ def write_stats(path, cfg, targets, skipped, scale, lam_used, fit_info,
                  f"|c|mean = {np.abs(c).mean():.2f} sigma, "
                  f"RMS = {rmse(res_fit):.2f} mm")
     lines.append(f"  Solver converged: {diagnostics['converged']}; stop: {diagnostics['stop_reason']}")
+    identity = diagnostics['identity_fit']
+    lines.append(f"  Identity subspace: {cfg.identity_subspace}; active {identity['active_components']}/{identity['total_components']}; "
+                 f"inactive: {identity['inactive_policy']}; clipped active: {identity['clipped_active_count']}")
     if loo_table:
         lines.append("  Conditional fixed-pose LOO tuning (model-space mean distance -> lambda; NOT independent validation):")
         for err, lam in loo_table:

@@ -12,10 +12,12 @@ from .backend import GNMBackend
 from .export import atomic_text
 from .io_csv import read_marker_csv
 from .optimize import fit_identity
+from .identity import active_components
 from .validation import finite_array, residual_metrics, sha256_file, validate_points
 
 
-def landmark_holdout(model, indices, targets, weights, regularization=30.0):
+def landmark_holdout(model, indices, targets, weights, regularization=30.0, identity_subspace='all'):
+    active = active_components(model, identity_subspace)
     targets = validate_points(targets, 'holdout targets', minimum=5)
     indices = np.asarray(indices, dtype=np.int64)
     weights = finite_array(weights, 'holdout weights', (len(targets),))
@@ -26,12 +28,13 @@ def landmark_holdout(model, indices, targets, weights, regularization=30.0):
         keep = np.arange(len(targets)) != held_out
         c, s, r, t, lam, _, _ = fit_identity(model.mu, model.basis,
                                            indices[keep], targets[keep], weights[keep],
-                                           lam=regularization)
+                                           lam=regularization, active_components=active)
         predicted = s * (model.generate(c)[indices[held_out]] @ r.T) + t
         predictions.append(predicted)
         errors.append(float(np.linalg.norm(predicted - targets[held_out])))
         lambdas.append(float(lam))
     return {'method': 'outer leave-one-landmark-out with pose and identity refitted',
+            'identity_subspace': identity_subspace,
             'units': 'mm', 'metrics': residual_metrics(errors), 'errors_mm': errors,
             'predictions_mm': np.asarray(predictions).tolist(), 'fold_lambdas': lambdas,
             'interpretation': 'Generalisation to provided marker targets; not independent face accuracy'}
@@ -43,6 +46,7 @@ def main(argv=None):
     parser.add_argument('--npz', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--regularization', default='30', help='Positive fixed lambda, or auto nested within each fold')
+    parser.add_argument('--identity-subspace', choices=('all', 'head'), default='all')
     args = parser.parse_args(argv)
     try:
         from .validation import validate_outputs
@@ -54,7 +58,8 @@ def main(argv=None):
             raise ValueError('Marker/model SHA-256 mismatch')
         result = landmark_holdout(backend.load(), [x.vertex for x in targets],
                                   [x.xyz for x in targets], [x.weight for x in targets],
-                                  'auto' if args.regularization == 'auto' else float(args.regularization))
+                                  'auto' if args.regularization == 'auto' else float(args.regularization),
+                                  identity_subspace=args.identity_subspace)
         result.update(labels=[x.label for x in targets], skipped=skipped,
                       input_sha256=sha256_file(args.input), model_sha256=digest)
         with atomic_text(args.output) as stream:

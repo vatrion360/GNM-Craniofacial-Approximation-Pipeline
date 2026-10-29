@@ -206,6 +206,8 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         from .protocol import validate_protocol
         _csv_meta['protocol_review'] = validate_protocol(cfg, _csv_meta, targets, model_hash)
     model = backend.load()
+    from .identity import active_components
+    active_identity = active_components(model, cfg.identity_subspace)
     mu, basis = model.mu, model.basis
     triangles = model.triangles
     vertex_groups, vertex_group_names = (model.vertex_groups,
@@ -357,10 +359,11 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     c, scale, rot, trans, lam_used, fit_info, res_fit = fit_identity(
         mu, basis, lm_idx, targets_xyz, weights, lam=lam_arg, dense=dense,
         mirror_indices=model.mirror_indices, distance_pairs=distance_pairs,
-        loss_cfg=loss_cfg, max_iter=cfg.max_iter, tol=cfg.tolerance, **prior_options, **measurement_fit_options)
+        loss_cfg=loss_cfg, max_iter=cfg.max_iter, tol=cfg.tolerance, active_components=active_identity,
+        **prior_options, **measurement_fit_options)
     logger.info(f"    lambda = {lam_used:g}, |c|max = {np.abs(c).max():.2f} sigma, "
           f"RMS = {rmse(res_fit):.2f} mm (max {res_fit.max():.2f} mm)")
-    stab = stability_warnings(lam_used, fit_info[0], c, loss_cfg.clip_sigma)
+    stab = stability_warnings(lam_used, fit_info[0], c, loss_cfg.clip_sigma, active_identity)
     for w in stab:
         logger.info(f"    [!] {w}")
     warnings_list.extend(stab)
@@ -407,12 +410,12 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                 mu, basis, lm_idx, targets_xyz, weights, lam=lam_arg,
                 dense=dense, mirror_indices=model.mirror_indices,
                 distance_pairs=distance_pairs, loss_cfg=loss_cfg, max_iter=cfg.max_iter, tol=cfg.tolerance,
-                **prior_options, **measurement_fit_options)
+                active_components=active_identity, **prior_options, **measurement_fit_options)
             logger.info(f"    refit: lambda = {lam_used:g}, |c|max = "
                   f"{np.abs(c).max():.2f} sigma, RMS = {rmse(res_fit):.2f} mm "
                   f"(max {res_fit.max():.2f} mm)")
             stab = stability_warnings(lam_used, fit_info[0], c,
-                                      loss_cfg.clip_sigma)
+                                      loss_cfg.clip_sigma, active_identity)
             for w in stab:
                 logger.info(f"    [!] {w}")
             warnings_list.extend(stab)

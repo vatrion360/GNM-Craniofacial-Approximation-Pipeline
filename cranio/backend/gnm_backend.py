@@ -192,6 +192,14 @@ class GNMBackend(FaceModelBackend):
             if names.dtype.kind not in "US" or names.ndim != 1:
                 raise ValueError("vertex_group_names must be a one-dimensional string array")
             vertex_group_names = [n.decode("utf-8") if isinstance(n, bytes) else str(n) for n in names]
+            identity_names = None
+            if 'identity_names' in npz.files:
+                names = npz['identity_names']
+                if names.dtype.kind not in 'US' or names.ndim != 1 or len(names) != len(basis):
+                    raise ValueError('identity_names must be a string vector matching the identity basis')
+                identity_names = [n.decode('utf-8') if isinstance(n, bytes) else str(n) for n in names]
+                if len(set(identity_names)) != len(identity_names):
+                    raise ValueError('identity_names must be unique')
         n = len(mu)
         if mu.shape != (n, 3) or n < 4 or basis.ndim != 3 or basis.shape[1:] != (n, 3) or not len(basis):
             raise ValueError("Invalid model template or identity basis dimensions")
@@ -211,6 +219,7 @@ class GNMBackend(FaceModelBackend):
             mu=mu, basis=basis, triangles=triangles,
             mirror_indices=mirror_indices, vertex_groups=vertex_groups,
             vertex_group_names=vertex_group_names,
+            identity_names=identity_names,
         )
 
     @property

@@ -109,3 +109,18 @@ def test_weighted_rank_accepts_planarity_but_rejects_effective_collinearity():
         weighted_umeyama(points, points, [1, 1, 1, 1e-20])
     scale, rotation, translation = weighted_umeyama(points, points, np.ones(4))
     assert_allclose(scale*(points @ rotation.T)+translation, points, atol=1e-12)
+
+
+def test_restricted_identity_retains_dense_objective_and_full_coefficient_order():
+    mu, dense = sphere_problem()
+    rng = np.random.default_rng(18)
+    basis, ids = rng.normal(size=(4, len(mu), 3)), np.arange(0, len(mu), 2)
+    targets = mu[ids]+rng.normal(size=(len(ids), 3))
+    restricted = fit_identity(mu, basis, ids, targets, np.ones(len(ids)), lam=3,
+                              dense=copy.deepcopy(dense), active_components=[0, 2])
+    reduced = fit_identity(mu, basis[[0, 2]], ids, targets, np.ones(len(ids)), lam=3,
+                           dense=copy.deepcopy(dense))
+    np.testing.assert_array_equal(restricted.coefficients[[1, 3]], [0., 0.])
+    assert_allclose(restricted.coefficients[[0, 2]], reduced.coefficients, atol=1e-12)
+    assert_allclose(restricted.residuals_mm, reduced.residuals_mm, atol=1e-12)
+    assert restricted.info.diagnostics['dense']['used_in_identity_solve']

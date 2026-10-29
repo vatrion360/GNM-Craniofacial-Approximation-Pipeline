@@ -30,6 +30,7 @@ class PipelineConfig:
 
     # Fit statistic
     regularization: str = "auto"          # "auto" (LOO-CV) sau valoare fixa
+    identity_subspace: str = 'all'
     lambda_base: float = 1.0
     lambda_min: float = 0.3
     lambda_max: float = 1000.0
@@ -79,6 +80,8 @@ class PipelineConfig:
 
 
     def validate(self):
+        if self.identity_subspace not in ('all', 'head'):
+            raise ValueError('identity_subspace must be all or head')
         if not self.input or not os.path.isfile(self.input):
             raise ValueError(f"Marker input not found: {self.input}")
         if not os.path.isfile(self.npz):

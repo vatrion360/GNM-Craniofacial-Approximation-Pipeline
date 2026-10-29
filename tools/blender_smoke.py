@@ -146,6 +146,18 @@ with tempfile.TemporaryDirectory() as directory:
                 addon._start_live(scene)
                 addon._live_timer_tick()
                 assert scene.gnm_live.n_fitted == 48 and scene.gnm_live.rms_mm < .001
+                assert scene.gnm_live.identity_subspace == 'all'
+                scene.gnm_live.identity_subspace = 'head'
+                addon._LIVE.refit_requested_at = time.monotonic()-2
+                addon._live_timer_tick()
+                assert addon._LIVE.cfg['identity_subspace'] == 'head'
+                assert len(addon._LIVE.last_c) == 253
+                assert not addon._LIVE.last_c[170:].any()
+                fitted = scene.objects[addon._case_name(addon.GNM_MESH_NAME)]
+                stamp = json.loads(fitted['gnm_fit_state'])
+                assert stamp['diagnostics']['identity_fit']['active_components'] == 170
+                assert stamp['diagnostics']['identity_fit']['inactive_policy'] == 'zero'
+                print('BLENDER_HEAD_ONLY_LIVE_PASS')
                 addon._stop_live()
                 addon._LIVE.geometry_epoch += 1
                 previous_status = scene.gnm_live.status_text
@@ -183,6 +195,11 @@ with tempfile.TemporaryDirectory() as directory:
                     print((folder / 'run.log').read_text(encoding='utf-8'))
                     raise AssertionError(settings.offline_status)
                 report = json.loads((folder / 'face_report.json').read_text(encoding='utf-8'))
+                assert report['config']['identity_subspace'] == 'head'
+                assert report['solver']['identity_fit']['active_components'] == 170
+                assert not any(report['identity_coefficients'][170:])
+                assert report['marker_metadata']['requested_identity_subspace'] == 'head'
+                print('BLENDER_HEAD_ONLY_EXTERNAL_PASS')
                 assert report['metrics']['final_fit']['rmse_mm'] < .01
                 assert len(report['landmarks']) == 47
                 assert abs(report['lambda'] - 48 / 47) < 1e-8
