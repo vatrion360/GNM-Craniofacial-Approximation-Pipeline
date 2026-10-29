@@ -20,6 +20,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
 - [Contributing and CI](CONTRIBUTING.md)
+- [Optional head-only identity fitting](docs/IDENTITY_SUBSPACE.md)
 - [V19 task comparison and revised implementation plan (Romanian)](docs/TASKS_V19_REVIEW.md)
 - [Change log](CHANGELOG.md)
 
@@ -83,6 +84,17 @@ On Windows select **`.venv\Scripts\python.exe`** (or the Windows-created `.venv`
 Optional previews wait **0.35 s after the last edit** before reading the latest positions and fitting; adjust **Refit after idle (s)** if needed. Panel redraws perform no fit snapshots or source/model hashing. Bone-only measurements do not trigger face fitting while skin-distance strength is zero. A fit still runs on Blender's main thread and can pause the UI, particularly with dense constraints or LOO; these NumPy calculations do not use GPU VRAM. Use external fitting for expensive jobs. See [performance troubleshooting](docs/PERFORMANCE.md).
 
 ## Reproducible demonstration
+
+Optional identity fitting controls (defaults preserve the previous path):
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `--identity-subspace all` | Selected | Fit the complete identity basis |
+| `--identity-subspace head` | Off | Fit 170 named GNM head components; eye/teeth coefficients remain zero, even with a prior |
+
+Blender exposes the same choice as **Identity fit** and forwards it to external
+fitting. This constrains coefficients, not all movement of eye/teeth vertices.
+See [the numerical contract and checks](docs/IDENTITY_SUBSPACE.md).
 
 The supplied `examples/synthetic_markers.csv` is generated from the GNM mean. It demonstrates software operation, **not reconstruction accuracy**.
 

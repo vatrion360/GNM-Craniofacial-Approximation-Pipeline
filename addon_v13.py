@@ -1693,6 +1693,7 @@ class _LiveState:
         self.result_lock = threading.Lock()
         self.fingerprints = {}     # nume_scena -> fingerprint markeri
         self.cfg = {"lambda_base": 1.0, "lambda_min": 0.3,
+                    "identity_subspace": "all",
                     "lambda_max": 1000.0, "max_iter": 30,
                     "loo_auto": False, "prior_weight": 1.0,
                     # V13.3: forta/geometria constrangerilor dense + clip.
@@ -2520,7 +2521,7 @@ def _compute_fit(snap):
     return dict(status='ok', n=n, scale=float(scale), rot=rot, trans=trans, v_model=vertices, c=c,
         rms=_core_module('validation').rmse(res), max_res=float(res.max()) if n else 0.,
         max_label=snap['labels'][int(res.argmax())] if n else '-', lam=lam_used, lam_src=source,
-        beta_norm=float(np.linalg.norm(c)), n_clip=int(np.sum(np.abs(c) >= _LIVE.cfg.get('clip_sigma', 3.)-1e-6)),
+        beta_norm=float(np.linalg.norm(c)), n_clip=info.diagnostics['identity_fit']['clipped_active_count'],
         solver=info.diagnostics, converged=info.diagnostics['converged'],
         measurement_residuals=_core_module('craniometry').control_residuals(
             snap.get('measurement_controls', []), scale*(vertices @ rot.T)+trans),
@@ -2574,7 +2575,8 @@ def _apply_result(scene, res):
                             @ Matrix.Scale(s, 4) @ rot4)
         if 'c' in res:
             _core_module('blender_postfit').stamp_fit(obj, res['c'], np.eye(4), _LIVE.model_hash,
-                dict(converged=res.get('converged'), marker_rms_mm=res.get('rms')))
+                dict(converged=res.get('converged'), marker_rms_mm=res.get('rms'),
+                     identity_fit=res.get('solver', {}).get('identity_fit')))
         _update_ghosts_from_fit(scene, res["v_model"], s, rot, t)
     st.rms_mm = res["rms"]
     pairs = res.get('measurement_residuals', [])
@@ -2641,6 +2643,7 @@ def _live_timer_tick():
         return None
     st = scene.gnm_live
     _LIVE.cfg.update({
+        "identity_subspace": st.identity_subspace,
         "lambda_base": float(st.lambda_base),
         "lambda_min": float(st.lambda_min),
         "lambda_max": float(st.lambda_max),
@@ -3363,6 +3366,10 @@ class GNMLiveSettings(PropertyGroup):
         name="Lambda at 48 landmarks", default=1.0, min=0.05, max=1000.0,
         soft_min=0.3, soft_max=30.0, update=_on_fit_settings_update,
         description="Count heuristic: base * 48 / actual included landmarks; not an accuracy calibration")
+    identity_subspace: EnumProperty(
+        name="Identity fit", default='all', update=_on_fit_settings_update,
+        items=[('all', 'All components (legacy)', 'Fit the full identity basis'),
+               ('head', 'Head only', 'Fit 170 named head components; eyes/teeth fixed at zero, even with a prior')])
     lambda_min: FloatProperty(name="Lambda Min", default=0.3, min=0.01, update=_on_fit_settings_update)
     lambda_max: FloatProperty(name="Lambda Max", default=1000.0, min=1.0, update=_on_fit_settings_update)
     loo_auto: BoolProperty(name="Conditional LOO tuning (slower)", default=False,
@@ -3501,6 +3508,7 @@ def _draw_live_section(layout, context):
              icon="HIDE_OFF" if st.show_ghosts else "HIDE_ON")
 
     # Preview regularisation heuristic; see docs/SCIENCE.md.
+    box.prop(st, "identity_subspace")
     box.prop(st, "lambda_base", slider=True)
     box.prop(st, "loo_auto")
     row = box.row(align=True)
@@ -3625,6 +3633,7 @@ def _export_markers(scene, path):
             "skull_source": scene.gnm_settings.sursa_fisier,
             "scene_scale_length": scene.unit_settings.scale_length,
             "requested_marker_set": scene.gnm_settings.marker_set,
+            "requested_identity_subspace": scene.gnm_live.identity_subspace,
             "marker_count": len(scene.gnm_markers),
             "marker_depth_adjustments": {item.label: _core_module('blender_marker_depths').history(item)
                                          for item in scene.gnm_markers if item.depth_adjustment_history != '[]'},
@@ -3769,6 +3778,7 @@ class GNM_OT_run_offline(Operator):
                        '--lambda-min', str(scene.gnm_live.lambda_min),
                        '--lambda-max', str(scene.gnm_live.lambda_max)]
             arguments += ['--clip-sigma', str(scene.gnm_live.clip_sigma)]
+            arguments += ['--identity-subspace', scene.gnm_live.identity_subspace]
             arguments += ['--measurement-weight', str(scene.gnm_craniometry.weight)]
             if settings.local_correction:
                 arguments.append('--local-correction')

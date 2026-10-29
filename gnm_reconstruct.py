@@ -35,6 +35,8 @@ def parse_args(argv=None) -> PipelineConfig:
     parser.add_argument("--regularization", default="auto",
                         help="'auto' (conditional LOO-CV), 'adaptive' (base*48/included count), or a fixed value")
     parser.add_argument("--lambda-base", type=float, default=1.0)
+    parser.add_argument('--identity-subspace', choices=('all', 'head'), default='all',
+                        help='Fit all components (default), or only named head components; eyes/teeth fixed at zero')
     parser.add_argument("--lambda-min", type=float, default=0.3)
     parser.add_argument("--lambda-max", type=float, default=1000.0)
     parser.add_argument("--exclude", nargs="+", default=[], metavar="LABEL",
@@ -141,6 +143,7 @@ def parse_args(argv=None) -> PipelineConfig:
         npz=args.npz,
         skull=args.skull,
         regularization=args.regularization,
+        identity_subspace=args.identity_subspace,
         lambda_base=args.lambda_base,
         lambda_min=args.lambda_min,
         lambda_max=args.lambda_max,

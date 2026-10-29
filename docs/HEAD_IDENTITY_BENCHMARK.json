@@ -1,0 +1,62 @@
+{
+  "baseline_commit": "0a51bd5c6b1fdf77481875e7c0c60ebcf1c10727",
+  "description": "Single deterministic synthetic engineering scenario; no CT validation, no anatomical accuracy inference",
+  "baseline": {
+    "scenario": "Synthetic mean landmarks + independent N(0, 1 mm) coordinate perturbations; engineering only",
+    "seed": 1901,
+    "model_sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de",
+    "mode": "all",
+    "lambda_used": 3.0,
+    "marker_count": 48,
+    "rmse_mm": 1.3161960032015425,
+    "max_residual_mm": 2.6917155658510503,
+    "coefficient_norm": 1.743447986151211,
+    "inactive_norm": 7.387016657011929e-17,
+    "clipped_count": 0,
+    "converged": false,
+    "iterations": 30,
+    "seconds": 0.2544683730000088,
+    "obj_sha256": "5b4e9b012a3e8558f849f34d3ef5ee9ce1a2dd6da08576127e4cba22376b635b"
+  },
+  "all_after": {
+    "scenario": "Synthetic mean landmarks + independent N(0, 1 mm) coordinate perturbations; engineering only",
+    "seed": 1901,
+    "model_sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de",
+    "mode": "all",
+    "lambda_used": 3.0,
+    "marker_count": 48,
+    "rmse_mm": 1.3161960032015425,
+    "max_residual_mm": 2.6917155658510503,
+    "coefficient_norm": 1.743447986151211,
+    "inactive_norm": 7.387016657011929e-17,
+    "clipped_count": 0,
+    "converged": false,
+    "iterations": 30,
+    "seconds": 0.2725687360000393,
+    "obj_sha256": "5b4e9b012a3e8558f849f34d3ef5ee9ce1a2dd6da08576127e4cba22376b635b"
+  },
+  "head_after": {
+    "scenario": "Synthetic mean landmarks + independent N(0, 1 mm) coordinate perturbations; engineering only",
+    "seed": 1901,
+    "model_sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de",
+    "mode": "head",
+    "lambda_used": 3.0,
+    "marker_count": 48,
+    "rmse_mm": 1.3161960032015407,
+    "max_residual_mm": 2.691715565851041,
+    "coefficient_norm": 1.7434479861512249,
+    "inactive_norm": 0.0,
+    "clipped_count": 0,
+    "converged": false,
+    "iterations": 30,
+    "seconds": 0.12890995099996871,
+    "obj_sha256": "5b4e9b012a3e8558f849f34d3ef5ee9ce1a2dd6da08576127e4cba22376b635b"
+  },
+  "default_vertices_byte_identical": true,
+  "maximum_head_vs_all_vertex_distance_mm": 9.981307825020222e-13,
+  "limitations": [
+    "Both modes reached max_iter=30 without satisfying the convergence thresholds.",
+    "Single timings are illustrative, not a performance guarantee.",
+    "Head-only fixes individual eye/teeth coefficients, not all geometric movement of those regions."
+  ]
+}

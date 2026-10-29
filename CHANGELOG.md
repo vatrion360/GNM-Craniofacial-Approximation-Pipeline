@@ -1,5 +1,8 @@
 # Unreleased
 
+- Add opt-in `--identity-subspace head` and the Blender Identity fit selector. Resolve the 170 head components from validated GNM names; inactive eye/teeth coefficients stay zero even with a prior. Default `all` retains the prior numerical path.
+- Preserve full-order coefficients for replay, record active component/clip diagnostics, and pass the same choice through live preview, external fitting and marker holdout. Add synthetic and official-model parity/invariance checks.
+
 - Publish marker CSV v3 only after validating the serialized temporary; preserve existing exports on write, validation or replacement failure. Legacy v2 writes are atomic too.
 - Replace the session report's incorrect "GNM table" attribution with per-marker recorded tissue sources and current depths.
 
