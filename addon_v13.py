@@ -2118,7 +2118,7 @@ def _build_dense_set(model, scalp_only):
     region_idx = [r[1] for r in face_regions] + [scalp_idx]
     region_offs = [np.full(len(r[1]), r[2], dtype=np.float64)
                    for r in face_regions]
-    region_offs += [np.full(len(scalp_idx), 5.0, dtype=np.float64)]
+    region_offs += [np.full(len(scalp_idx), _MARKER_DATA.SCALP_OFFSET_MM, dtype=np.float64)]
     region_names = [r[0] for r in face_regions] + ["scalp"]
     dense_idx_all = np.concatenate(region_idx)
     offsets_all = np.concatenate(region_offs)

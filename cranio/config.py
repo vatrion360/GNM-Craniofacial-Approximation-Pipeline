@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from .backend import default_npz_path
+from .landmarks import SCALP_OFFSET_MM
 
 
 @dataclass
@@ -44,7 +45,7 @@ class PipelineConfig:
     protect_damping: float = 0.25         # amortizare zone fara ancore
 
     # Constrangeri dense (necesita skull)
-    scalp_offset_mm: float = 5.0
+    scalp_offset_mm: float = SCALP_OFFSET_MM
     dense_weight: float = 0.5
     dense_samples: int = 200000
     tps_scalp_centres: int = 500

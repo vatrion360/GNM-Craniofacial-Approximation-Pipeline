@@ -13,6 +13,8 @@ def implementation_manifest():
     package = Path(__file__).resolve().parent
     root = package.parent
     files = {'cranio/'+p.relative_to(package).as_posix(): sha256_file(p) for p in sorted(package.rglob('*.py'))}
+    for path in sorted((package/'data'/'tissue').glob('*.json')):
+        files['cranio/'+path.relative_to(package).as_posix()] = sha256_file(path)
     for name in ('gnm_reconstruct.py', 'addon_v13.py'):
         if (root/name).exists():
             files[name] = sha256_file(root/name)

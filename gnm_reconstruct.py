@@ -12,6 +12,7 @@ import sys
 
 from cranio.backend import default_npz_path
 from cranio.config import PipelineConfig
+from cranio.landmarks import SCALP_OFFSET_MM
 from cranio.pipeline import run_pipeline
 
 
@@ -63,7 +64,7 @@ def parse_args(argv=None) -> PipelineConfig:
     parser.add_argument("--skull", default=None,
                         help="Skull (STL/OBJ) from the same Blender scene as the "
                              "CSV (world, mm) - enables the dense scalp constraints")
-    parser.add_argument("--scalp-offset-mm", type=float, default=5.0,
+    parser.add_argument("--scalp-offset-mm", type=float, default=SCALP_OFFSET_MM,
                         help="Soft-tissue skin-bone offset on the scalp (mm)")
     parser.add_argument("--dense-weight", type=float, default=0.5,
                         help="Total weight of the dense constraints, relative to "

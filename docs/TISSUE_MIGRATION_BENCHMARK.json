@@ -1,0 +1,117 @@
+{
+  "baseline_commit": "24d3706b47d28d660dd700675f6f6e4536a8f886",
+  "seed": 1902,
+  "model_sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de",
+  "comparison": "Exact equality of all manifest fields, numerical arrays and OBJ/PLY byte hashes",
+  "cases": "Synthetic engineering targets, not human CT cases",
+  "runs": {
+    "statistical_default": {
+      "mesh_hashes": {
+        "output": "0688d1a8356003d76607b2089836564bc323d9f581f53bcc4c385a543a5ef56b",
+        "output_statistical": "0688d1a8356003d76607b2089836564bc323d9f581f53bcc4c385a543a5ef56b",
+        "output_error_mesh": "91974b1fa57c6bf77b55ce273f8ca79640c8d65907777f2dc1314469d64a88d7"
+      },
+      "metrics": {
+        "alignment": {
+          "count": 48,
+          "rmse_mm": 7.938100633798812,
+          "mean_mm": 6.912242030713638,
+          "median_mm": 5.797209543321146,
+          "p95_mm": 14.149867588873828,
+          "max_mm": 16.312955770635373
+        },
+        "statistical_fit": {
+          "count": 48,
+          "rmse_mm": 7.178607009423505,
+          "mean_mm": 6.074308125670089,
+          "median_mm": 4.98461422997824,
+          "p95_mm": 13.39472041364393,
+          "max_mm": 15.952237131508264
+        },
+        "final_fit": {
+          "count": 48,
+          "rmse_mm": 7.178607009423505,
+          "mean_mm": 6.074308125670089,
+          "median_mm": 4.98461422997824,
+          "p95_mm": 13.39472041364393,
+          "max_mm": 15.952237131508264
+        },
+        "local_displacement": {
+          "count": 17821,
+          "rmse_mm": 0.0,
+          "mean_mm": 0.0,
+          "median_mm": 0.0,
+          "p95_mm": 0.0,
+          "max_mm": 0.0
+        }
+      },
+      "lambda_used": 1.0,
+      "converged": false,
+      "stop_reason": "max_iterations",
+      "identity_fit": {
+        "total_components": 253,
+        "active_components": 253,
+        "inactive_policy": "none",
+        "clipped_active_count": 0
+      }
+    },
+    "local_correction": {
+      "mesh_hashes": {
+        "output": "a5d99a410f03955023bb1815553d5e747578fcb4839f78eb014f08bc7330de18",
+        "output_statistical": "0688d1a8356003d76607b2089836564bc323d9f581f53bcc4c385a543a5ef56b",
+        "output_error_mesh": "5da8b1143b39cae37aa7d04d9d71c80af38f1079b94395bd70bc5de9825f34cd"
+      },
+      "metrics": {
+        "alignment": {
+          "count": 48,
+          "rmse_mm": 7.938100633798812,
+          "mean_mm": 6.912242030713638,
+          "median_mm": 5.797209543321146,
+          "p95_mm": 14.149867588873828,
+          "max_mm": 16.312955770635373
+        },
+        "statistical_fit": {
+          "count": 48,
+          "rmse_mm": 7.178607009423505,
+          "mean_mm": 6.074308125670089,
+          "median_mm": 4.98461422997824,
+          "p95_mm": 13.39472041364393,
+          "max_mm": 15.952237131508264
+        },
+        "final_fit": {
+          "count": 48,
+          "rmse_mm": 3.8763217237909444,
+          "mean_mm": 2.798633311385158,
+          "median_mm": 1.966719021683335,
+          "p95_mm": 8.50032003490215,
+          "max_mm": 9.869536297740012
+        },
+        "local_displacement": {
+          "count": 17821,
+          "rmse_mm": 2.9794704670246577,
+          "mean_mm": 2.464213156769617,
+          "median_mm": 2.1095642874728346,
+          "p95_mm": 5.78347334855386,
+          "max_mm": 7.100730340929669
+        }
+      },
+      "lambda_used": 1.0,
+      "converged": false,
+      "stop_reason": "max_iterations",
+      "identity_fit": {
+        "total_components": 253,
+        "active_components": 253,
+        "inactive_policy": "none",
+        "clipped_active_count": 0
+      }
+    }
+  },
+  "runtime": {
+    "python": "3.12.14",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "trimesh": "5.1.0",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "reproduce": "See tools/verify_tissue_migration.py and docs/tissue_tables_howto.md. Targets derive from historical marker depths, not human observations."
+}

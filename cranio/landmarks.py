@@ -18,28 +18,25 @@ Weights are relative influence controls, not probabilities or inverse variances.
 See docs/SCIENCE.md and docs/SPECIALIST_WORKFLOW.md before casework.
 """
 
-# Eticheta -> (adancime_tesut_mm, latura)
-# latura: -1 = dreapta subiectului (_Dr), +1 = stanga (_St), 0 = median.
-LANDMARK_INFO = {
-    "Nasion": (6.0, 0), "Rhinion": (3.0, 0), "Glabella": (5.0, 0),
-    "Pogonion": (10.0, 0), "Gnathion": (10.5, 0),
-    "Gonion_Dr": (13.0, -1), "Gonion_St": (13.0, 1),
-    "Orbita_Dr_Ext": (8.0, -1), "Orbita_St_Ext": (8.0, 1),
-    "Orbita_Dr_Int": (6.0, -1), "Orbita_St_Int": (6.0, 1),
-    "Supraorbitale_Dr": (7.0, -1), "Supraorbitale_St": (7.0, 1),
-    "Infraorbitale_Dr": (7.0, -1), "Infraorbitale_St": (7.0, 1),
-    "Zygion_Dr": (8.5, -1), "Zygion_St": (8.5, 1),
-    "Alare_Dr": (4.5, -1), "Alare_St": (4.5, 1),
-    "Eurion_Dr": (5.0, -1), "Eurion_St": (5.0, 1),
-    "Vertex_VarfCap": (5.5, 0),
-    "Nasospinale_BazaNas": (11.0, 0), "Prosthion_BuzaSup": (12.0, 0),
-    # V13.6: pentru diagnosticul de proiectie nazala (Gerasimov/Ullrich-
-    # Stephan). Adancimi orientative (de calibrat la validarea pe cazuri):
-    # Acanthion ~ zona subnasale; Piriform ~ tesutul nazolabial de pe
-    # marginea inferioara a aperturei.
-    "Acanthion": (10.0, 0),
-    "Piriform_Dr": (6.5, -1), "Piriform_St": (6.5, 1),
-}
+from .tissue import load_table
+
+# Loaded once; explicit diagnostics are available through default_tissue_records.
+_LEGACY_TABLE = load_table('legacy_hardcoded')
+_LEGACY_DATA = _LEGACY_TABLE.document
+
+
+def side_of(label: str) -> int:
+    """-1 pentru *_Dr (dreapta), +1 pentru *_St (stanga), 0 altfel."""
+    if "Dr" in label.split("_"):
+        return -1
+    if "St" in label.split("_"):
+        return 1
+    return 0
+
+
+# Same marker values/order/side convention, now from versioned data.
+LANDMARK_INFO = {label: (row['central_mm'], side_of(label))
+                 for label, row in _LEGACY_DATA['landmarks'].items()}
 
 # Ordinea canonica (cea din addonul V12) - folosita la initializarea
 # listei de markeri in Blender si la documentatie.
@@ -130,16 +127,10 @@ PLACEMENT_HINTS = {
 PROTECTED_GROUPS = ("eyes", "eye_interiors", "mouth_sock",
                     "upper_lip", "lower_lip")
 
-# Offseturi per regiune faciala (mm) - preluate din tabelul de adancimi de
-# tesut (aceeasi sursa ca LANDMARK_INFO), deci consistente cu baturile
-# markerilor. Folosite de constrangerile dense faciale (--skull).
-REGION_OFFSETS_MM = {
-    "brow_median": 5.0,        # ~ Glabella
-    "punte_nazala": 3.0,       # ~ Rhinion
-    "zigomatic": 8.5,          # ~ Zygion
-    "infraorbital": 7.0,       # ~ Infraorbitale
-    "barbie": 10.0,            # ~ Pogonion
-}
+# Inherited engineering offsets; no verified row-level source or SD.
+REGION_OFFSETS_MM = {label: row['central_mm']
+                     for label, row in _LEGACY_DATA['regions'].items() if label != 'scalp'}
+SCALP_OFFSET_MM = _LEGACY_DATA['regions']['scalp']['central_mm']
 
 # Geometria regiunii dense "punte_nazala" (V13.3, corectata).
 # Puntea osoasa se afla pe segmentul Nasion -> pronasale (vertex 12296),
@@ -154,13 +145,6 @@ NOSE_BRIDGE_CENTER_FRAC = 0.45  # pozitia centrului pe Nasion -> pronasale
 NOSE_BRIDGE_TIP_CUT_MM = 6.0    # exclude vertecsii sub varf+6 mm (cartilaj)
 
 
-def side_of(label: str) -> int:
-    """-1 pentru *_Dr (dreapta), +1 pentru *_St (stanga), 0 altfel."""
-    if "Dr" in label.split("_"):
-        return -1
-    if "St" in label.split("_"):
-        return 1
-    return 0
 
 
 def pair_label(label: str):
@@ -223,3 +207,10 @@ MANDIBULAR_LANDMARKS = frozenset({
     'Pogonion', 'Gnathion', 'Menton', 'Infradentale_BuzaInf', 'Supramentale',
     'Gonion_Dr', 'Gonion_St', 'Midmasseter_Dr', 'Midmasseter_St', 'SubM2_Dr', 'SubM2_St',
 })
+
+
+def default_tissue_records():
+    """Catalogue of bundled defaults, NOT attribution of a case's skin targets."""
+    from .paper_reference import _PAPER_TABLE
+    return {'interpretation': 'Bundled default catalogue only. Actual marker targets/sources come from case CSV; loading does not overwrite manual values. Dense scalp offset comes from case config.',
+            'tables': [_LEGACY_TABLE.record(), _PAPER_TABLE.record()]}

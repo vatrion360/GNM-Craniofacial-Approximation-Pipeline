@@ -1,0 +1,553 @@
+{
+  "landmarks": {
+    "Nasion": [
+      6.0,
+      0
+    ],
+    "Rhinion": [
+      3.0,
+      0
+    ],
+    "Glabella": [
+      5.0,
+      0
+    ],
+    "Pogonion": [
+      10.0,
+      0
+    ],
+    "Gnathion": [
+      10.5,
+      0
+    ],
+    "Gonion_Dr": [
+      13.0,
+      -1
+    ],
+    "Gonion_St": [
+      13.0,
+      1
+    ],
+    "Orbita_Dr_Ext": [
+      8.0,
+      -1
+    ],
+    "Orbita_St_Ext": [
+      8.0,
+      1
+    ],
+    "Orbita_Dr_Int": [
+      6.0,
+      -1
+    ],
+    "Orbita_St_Int": [
+      6.0,
+      1
+    ],
+    "Supraorbitale_Dr": [
+      7.0,
+      -1
+    ],
+    "Supraorbitale_St": [
+      7.0,
+      1
+    ],
+    "Infraorbitale_Dr": [
+      7.0,
+      -1
+    ],
+    "Infraorbitale_St": [
+      7.0,
+      1
+    ],
+    "Zygion_Dr": [
+      8.5,
+      -1
+    ],
+    "Zygion_St": [
+      8.5,
+      1
+    ],
+    "Alare_Dr": [
+      4.5,
+      -1
+    ],
+    "Alare_St": [
+      4.5,
+      1
+    ],
+    "Eurion_Dr": [
+      5.0,
+      -1
+    ],
+    "Eurion_St": [
+      5.0,
+      1
+    ],
+    "Vertex_VarfCap": [
+      5.5,
+      0
+    ],
+    "Nasospinale_BazaNas": [
+      11.0,
+      0
+    ],
+    "Prosthion_BuzaSup": [
+      12.0,
+      0
+    ],
+    "Acanthion": [
+      10.0,
+      0
+    ],
+    "Piriform_Dr": [
+      6.5,
+      -1
+    ],
+    "Piriform_St": [
+      6.5,
+      1
+    ],
+    "Supraglabella": [
+      4.5,
+      0
+    ],
+    "Midphiltrum": [
+      10.0,
+      0
+    ],
+    "Infradentale_BuzaInf": [
+      12.25,
+      0
+    ],
+    "Supramentale": [
+      10.0,
+      0
+    ],
+    "Menton": [
+      8.0,
+      0
+    ],
+    "FrontalEminence_Dr": [
+      4.0,
+      -1
+    ],
+    "FrontalEminence_St": [
+      4.0,
+      1
+    ],
+    "Suborbitale_Dr": [
+      6.25,
+      -1
+    ],
+    "Suborbitale_St": [
+      6.25,
+      1
+    ],
+    "InferiorMalar_Dr": [
+      12.0,
+      -1
+    ],
+    "InferiorMalar_St": [
+      12.0,
+      1
+    ],
+    "LateralOrbit_Dr": [
+      11.5,
+      -1
+    ],
+    "LateralOrbit_St": [
+      11.5,
+      1
+    ],
+    "Supraglenoid_Dr": [
+      6.25,
+      -1
+    ],
+    "Supraglenoid_St": [
+      6.25,
+      1
+    ],
+    "SupraM2_Dr": [
+      18.0,
+      -1
+    ],
+    "SupraM2_St": [
+      18.0,
+      1
+    ],
+    "Midmasseter_Dr": [
+      17.5,
+      -1
+    ],
+    "Midmasseter_St": [
+      17.5,
+      1
+    ],
+    "SubM2_Dr": [
+      17.0,
+      -1
+    ],
+    "SubM2_St": [
+      17.0,
+      1
+    ]
+  },
+  "order": [
+    "Nasion",
+    "Rhinion",
+    "Glabella",
+    "Pogonion",
+    "Gnathion",
+    "Gonion_Dr",
+    "Gonion_St",
+    "Orbita_Dr_Ext",
+    "Orbita_St_Ext",
+    "Orbita_Dr_Int",
+    "Orbita_St_Int",
+    "Supraorbitale_Dr",
+    "Supraorbitale_St",
+    "Infraorbitale_Dr",
+    "Infraorbitale_St",
+    "Zygion_Dr",
+    "Zygion_St",
+    "Alare_Dr",
+    "Alare_St",
+    "Eurion_Dr",
+    "Eurion_St",
+    "Vertex_VarfCap",
+    "Nasospinale_BazaNas",
+    "Prosthion_BuzaSup",
+    "Acanthion",
+    "Piriform_Dr",
+    "Piriform_St",
+    "Supraglabella",
+    "Midphiltrum",
+    "Infradentale_BuzaInf",
+    "Supramentale",
+    "Menton",
+    "FrontalEminence_Dr",
+    "FrontalEminence_St",
+    "Suborbitale_Dr",
+    "Suborbitale_St",
+    "InferiorMalar_Dr",
+    "InferiorMalar_St",
+    "LateralOrbit_Dr",
+    "LateralOrbit_St",
+    "Supraglenoid_Dr",
+    "Supraglenoid_St",
+    "SupraM2_Dr",
+    "SupraM2_St",
+    "Midmasseter_Dr",
+    "Midmasseter_St",
+    "SubM2_Dr",
+    "SubM2_St"
+  ],
+  "legacy_order": [
+    "Nasion",
+    "Rhinion",
+    "Glabella",
+    "Pogonion",
+    "Gnathion",
+    "Gonion_Dr",
+    "Gonion_St",
+    "Orbita_Dr_Ext",
+    "Orbita_St_Ext",
+    "Orbita_Dr_Int",
+    "Orbita_St_Int",
+    "Supraorbitale_Dr",
+    "Supraorbitale_St",
+    "Infraorbitale_Dr",
+    "Infraorbitale_St",
+    "Zygion_Dr",
+    "Zygion_St",
+    "Alare_Dr",
+    "Alare_St",
+    "Eurion_Dr",
+    "Eurion_St",
+    "Vertex_VarfCap",
+    "Nasospinale_BazaNas",
+    "Prosthion_BuzaSup",
+    "Acanthion",
+    "Piriform_Dr",
+    "Piriform_St"
+  ],
+  "regions": {
+    "brow_median": 5.0,
+    "punte_nazala": 3.0,
+    "zigomatic": 8.5,
+    "infraorbital": 7.0,
+    "barbie": 10.0
+  },
+  "paper": [
+    [
+      1,
+      "sg",
+      [
+        "Supraglabella"
+      ],
+      4.5,
+      "Midline depression immediately superior to glabella."
+    ],
+    [
+      2,
+      "g",
+      [
+        "Glabella"
+      ],
+      4.5,
+      "Most anterior midline point of frontal bone above the nasal root."
+    ],
+    [
+      3,
+      "n",
+      [
+        "Nasion"
+      ],
+      7.0,
+      "Midline junction of the nasofrontal sutures."
+    ],
+    [
+      4,
+      "rhi",
+      [
+        "Rhinion"
+      ],
+      2.5,
+      "Inferior midline end of the internasal suture at the bone/cartilage boundary."
+    ],
+    [
+      5,
+      "mp",
+      [
+        "Midphiltrum"
+      ],
+      10.0,
+      "Projection of the midpoint of the philtral column; see the placement caveat."
+    ],
+    [
+      6,
+      "pr",
+      [
+        "Prosthion_BuzaSup"
+      ],
+      11.0,
+      "Most anterior midline point of the maxillary alveolar process, on bone."
+    ],
+    [
+      7,
+      "id",
+      [
+        "Infradentale_BuzaInf"
+      ],
+      12.25,
+      "Superior midline alveolar point between the mandibular central incisors."
+    ],
+    [
+      8,
+      "sm",
+      [
+        "Supramentale"
+      ],
+      10.0,
+      "Deepest midline depression above the mandibular mental prominence."
+    ],
+    [
+      9,
+      "pg",
+      [
+        "Pogonion"
+      ],
+      13.0,
+      "Most anterior midline point of the bony chin."
+    ],
+    [
+      10,
+      "me",
+      [
+        "Menton"
+      ],
+      8.0,
+      "Lowest midline point of the mandibular symphysis; distinct from gnathion."
+    ],
+    [
+      11,
+      "fe",
+      [
+        "FrontalEminence_Dr",
+        "FrontalEminence_St"
+      ],
+      4.0,
+      "Lateral frontal eminence above the eyebrow midpoint, between metopion and ophryon levels."
+    ],
+    [
+      12,
+      "mso",
+      [
+        "Supraorbitale_Dr",
+        "Supraorbitale_St"
+      ],
+      8.5,
+      "Highest point of the superior orbital rim."
+    ],
+    [
+      13,
+      "or",
+      [
+        "Suborbitale_Dr",
+        "Suborbitale_St"
+      ],
+      6.25,
+      "Lowest point of the inferior orbital rim; NOT the infraorbital foramen."
+    ],
+    [
+      14,
+      "im",
+      [
+        "InferiorMalar_Dr",
+        "InferiorMalar_St"
+      ],
+      12.0,
+      "Lower maxillary surface aligned vertically with the superior/inferior orbital reference points."
+    ],
+    [
+      15,
+      "lo",
+      [
+        "LateralOrbit_Dr",
+        "LateralOrbit_St"
+      ],
+      11.5,
+      "Point 10 mm inferior to the orbit along its lateral margin's vertical line; NOT the lateral canthus."
+    ],
+    [
+      16,
+      "zy",
+      [
+        "Zygion_Dr",
+        "Zygion_St"
+      ],
+      7.0,
+      "Maximum lateral extent of the zygomatic arch, located instrumentally."
+    ],
+    [
+      17,
+      "sgl",
+      [
+        "Supraglenoid_Dr",
+        "Supraglenoid_St"
+      ],
+      6.25,
+      "Root of the zygomatic arch anterior to the tragus."
+    ],
+    [
+      18,
+      "go",
+      [
+        "Gonion_Dr",
+        "Gonion_St"
+      ],
+      10.5,
+      "Posteroinferior mandibular angle between body and ramus."
+    ],
+    [
+      19,
+      "ecm2_sup",
+      [
+        "SupraM2_Dr",
+        "SupraM2_St"
+      ],
+      18.0,
+      "Lateral buccal alveolar margin at the centre of the maxillary second molar."
+    ],
+    [
+      20,
+      "mm",
+      [
+        "Midmasseter_Dr",
+        "Midmasseter_St"
+      ],
+      17.5,
+      "Occlusal-plane point at the centre of the mandibular ramus."
+    ],
+    [
+      21,
+      "ecm2_inf",
+      [
+        "SubM2_Dr",
+        "SubM2_St"
+      ],
+      17.0,
+      "Lateral buccal alveolar margin at the centre of the mandibular second molar."
+    ]
+  ],
+  "paper_meta": {
+    "id": "var2026_table2",
+    "doi": "10.4995/var.2024.24796",
+    "table": 2,
+    "printed_page": 30,
+    "pdf_page": 5,
+    "types": 21,
+    "positions": 32,
+    "population": "Southwestern Native American reference used in a Cuban case study",
+    "sex_category": "female",
+    "body_build_category": "normal",
+    "original_data": "Rhine 1983, unpublished; cited via Taylor 2001",
+    "applicability": "Case-study reference: review population, individual variation and measurement direction.",
+    "gnm_correspondences_in_paper": false
+  },
+  "citation": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796",
+  "tissue_source": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+  "sources": {
+    "Nasion": "legacy-unvalidated",
+    "Rhinion": "legacy-unvalidated",
+    "Glabella": "legacy-unvalidated",
+    "Pogonion": "legacy-unvalidated",
+    "Gnathion": "legacy-unvalidated",
+    "Gonion_Dr": "legacy-unvalidated",
+    "Gonion_St": "legacy-unvalidated",
+    "Orbita_Dr_Ext": "legacy-unvalidated",
+    "Orbita_St_Ext": "legacy-unvalidated",
+    "Orbita_Dr_Int": "legacy-unvalidated",
+    "Orbita_St_Int": "legacy-unvalidated",
+    "Supraorbitale_Dr": "legacy-unvalidated",
+    "Supraorbitale_St": "legacy-unvalidated",
+    "Infraorbitale_Dr": "legacy-unvalidated",
+    "Infraorbitale_St": "legacy-unvalidated",
+    "Zygion_Dr": "legacy-unvalidated",
+    "Zygion_St": "legacy-unvalidated",
+    "Alare_Dr": "legacy-unvalidated",
+    "Alare_St": "legacy-unvalidated",
+    "Eurion_Dr": "legacy-unvalidated",
+    "Eurion_St": "legacy-unvalidated",
+    "Vertex_VarfCap": "legacy-unvalidated",
+    "Nasospinale_BazaNas": "legacy-unvalidated",
+    "Prosthion_BuzaSup": "legacy-unvalidated",
+    "Acanthion": "legacy-unvalidated",
+    "Piriform_Dr": "legacy-unvalidated",
+    "Piriform_St": "legacy-unvalidated",
+    "Supraglabella": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "Midphiltrum": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "Infradentale_BuzaInf": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "Supramentale": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "Menton": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "FrontalEminence_Dr": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "FrontalEminence_St": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "Suborbitale_Dr": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "Suborbitale_St": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "InferiorMalar_Dr": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "InferiorMalar_St": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "LateralOrbit_Dr": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "LateralOrbit_St": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "Supraglenoid_Dr": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "Supraglenoid_St": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "SupraM2_Dr": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "SupraM2_St": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "Midmasseter_Dr": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "Midmasseter_St": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "SubM2_Dr": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001",
+    "SubM2_St": "Rangel-de Lazaro et al. 2026, Table 2 p.30; DOI:10.4995/var.2024.24796; normal female; Southwestern Native American; Rhine 1983 via Taylor 2001"
+  },
+  "scalp_offset_mm": 5.0,
+  "baseline_commit": "24d3706b47d28d660dd700675f6f6e4536a8f886"
+}

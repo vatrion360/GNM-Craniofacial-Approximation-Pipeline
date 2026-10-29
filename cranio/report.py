@@ -6,6 +6,7 @@ import os
 
 import numpy as np
 from .validation import rmse, residual_metrics, sha256_file
+from .landmarks import default_tissue_records
 
 
 def write_stats(path, cfg, targets, skipped, scale, lam_used, fit_info,
@@ -105,6 +106,12 @@ def write_stats(path, cfg, targets, skipped, scale, lam_used, fit_info,
         lines.append("WARNINGS:")
         for w in warnings_list:
             lines.append(f"  [!] {w}")
+    catalogue = default_tissue_records()
+    lines.extend(['', 'Bundled tissue defaults (not attribution of case targets):', catalogue['interpretation']])
+    for table in catalogue['tables']:
+        lines.append(f"  {table['id']} revision {table['revision']}; provenance={table['provenance']}; SHA-256={table['sha256']}")
+        lines.append(f"    Citation: {table['citation'] or 'unknown / TODO(verify-source)'}")
+        lines.append(f"    {len(table['warnings'])} missing-data/availability diagnostics; see JSON bundled_tissue_defaults.")
     lines.append("\nInterpretation: marker residuals measure fit, not reconstruction accuracy.\nThe heatmap shows local displacement, NOT uncertainty or error to a known face.\nLocal correction uses the 3-D polyharmonic kernel (-r), with an affine tail.")
     from .export import atomic_text
     with atomic_text(path) as f:
@@ -164,6 +171,7 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
         "scientific_status": "research software; no subject-level forensic validation supplied",
         "software": software, "config": asdict(cfg), "inputs": inputs, "outputs": outputs,
         "marker_metadata": metadata,
+        "bundled_tissue_defaults": default_tissue_records(),
         "transform": {"convention": "world = scale * (model_mm @ rotation.T) + translation_mm",
                       "scale": float(scale), "rotation": rot.tolist(), "translation_mm": trans.tolist()},
         "identity_coefficients": coefficients.tolist(), "lambda": float(lam),

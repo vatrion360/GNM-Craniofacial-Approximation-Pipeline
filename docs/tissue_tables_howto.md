@@ -77,3 +77,60 @@ not printed at import time. The hash records source bytes, so a formatting-only
 change also changes it. `document` returns a detached copy; writing/reloading an
 edited document produces a new record. This infrastructure does not certify
 transcription, cohort suitability or anatomical correspondence.
+
+## Bundled migration (A1.2)
+
+| ID | Preserved content | Evidence status |
+| --- | --- | --- |
+| `legacy_hardcoded` | 27 marker depths, five facial region offsets and the scalp offset | Inherited implementation constants; citation, SD, cohort, estimator and direction unknown |
+| `var2026_table2` | 32 positions already transcribed in `paper_reference.py` | Existing case-study attribution retained; not a new PDF/source verification |
+
+The 48-marker union, label order, sides, initial source strings, confidence
+weights and Table 2 placement definitions remain unchanged. Overlapping legacy
+and Table 2 values remain distinct. Dense scalp defaults are now shared by the
+CLI, config and Blender; an explicit `--scalp-offset-mm` still takes precedence.
+The generic Blender property initializer is not a source measurement and is not
+added as an invented table row. Regional offsets retain `legacy_hardcoded`
+provenance; no claim of independent region-level measurements is made.
+
+Tables are read once when their registry module loads. Restart/reload the add-on
+after a curated package revision; do not edit installed table files during a
+case. Arbitrary imported tables are still data preparation only; a general
+selection/application interface belongs to A1.3. Existing saved/manual case
+values are retained, and **Apply Table 2 Tissue Depths** remains an explicit
+replacement operation. Offline fitting uses the CSV's world-mm targets, never
+rebuilds those targets from the bundled catalogue.
+
+The JSON report adds `bundled_tissue_defaults`, explicitly a catalogue, with
+IDs/revisions/hashes and all unknown-data diagnostics. It does not assert that
+all listed tables were applied. The TXT report provides a summary. Effective
+marker targets/source notes remain in `marker_metadata.marker_records`; the
+scalp override remains in `config.scalp_offset_mm`. The implementation hash now
+includes the schema and both data files. Frozen protocols require a deliberate
+new revision after this software/data change, even when the mesh is identical.
+
+### Reproduce the engineering comparison
+
+`tests/fixtures/tissue_defaults_24d3706.json` is a historical implementation
+snapshot, not an independently validated tissue table. Tests compare every
+migrated marker value/side/order/source and region/scalp value exactly.
+
+For a whole-pipeline comparison, obtain the official model separately, create a
+worktree at `24d3706b47d28d660dd700675f6f6e4536a8f886`, and run the **new** helper
+against each tree with the same pinned Python runtime and one BLAS thread:
+
+```bash
+# Linux/macOS shell; on PowerShell set $env:OPENBLAS_NUM_THREADS='1'
+export OPENBLAS_NUM_THREADS=1
+python tools/verify_tissue_migration.py --source-tree ../baseline-tree --npz /path/gnm_head.npz --output-dir /outside/repo/before
+python tools/verify_tissue_migration.py --source-tree . --npz /path/gnm_head.npz --output-dir /outside/repo/after
+```
+
+Compare the two `migration_manifest.json` objects for exact equality. The helper
+uses seed 1902, the 48 canonical labels, normalized Gaussian directions, and
+synthetic bone positions `mean_vertex - 2 * direction` mm. Targets are
+`bone + default_depth * direction`; weights come from the unchanged registry.
+It runs adaptive lambda with default identity fitting, then with optional local
+correction. Reports retain non-convergence/clipping diagnostics. These artificial
+targets exercise software compatibility, not CT reconstruction accuracy or
+scientific validity of any tissue default. Derived meshes stay outside Git.
