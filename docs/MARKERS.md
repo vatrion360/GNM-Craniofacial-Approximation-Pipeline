@@ -35,6 +35,14 @@ Suggested case metadata: case pseudonym, scan modality/resolution, source units,
 
 ## Validation
 
+V3 exports are written to a temporary file beside the destination, closed and
+read with the same CSV validator as the offline pipeline before atomic replacement.
+Serialization, validation or replacement failures preserve the previous destination
+and remove the temporary file. An empty or partly placed session can still be
+exported; model bounds, fit sufficiency and scientific review remain separate checks.
+Legacy v2 writing also uses atomic replacement; its legacy-index validation remains
+the reader's responsibility because it requires a mapping.
+
 The reader rejects duplicate labels or included target vertices, unknown legacy encodings, incomplete/malformed metadata, non-finite coordinates, incompatible units, invalid weights and inconsistent bone/skin distances. The pipeline additionally checks included vertex bounds, at least four usable noncollinear targets, file collisions and the model hash. Documentation-only rows are retained in `marker_metadata.marker_records`; they do not enter the fitting arrays.
 
 Three markers may orient a preview, but do not make a well-constrained approximation. Four is a numerical minimum, not an anatomical sufficiency criterion. Anatomically distributed midline and bilateral points are required for meaningful review.

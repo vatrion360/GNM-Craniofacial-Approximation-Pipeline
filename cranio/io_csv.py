@@ -7,6 +7,7 @@ from typing import NamedTuple
 import numpy as np
 from .landmarks import CONFIDENCE_WEIGHTS, DEFAULT_CONFIDENCE
 from .validation import finite_array
+from .export import atomic_text
 
 V2_MAGIC = "# gnm-marker-csv v2"
 V3_MAGIC = "# gnm-marker-csv v3"
@@ -157,9 +158,13 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
 
 
 def write_marker_csv_v3(csv_path, rows, metadata=None):
+    """Validate the serialized v3 interchange before atomically publishing it.
+
+    Model bounds, fit sufficiency and scientific approval remain separate.
+    """
     meta = dict(metadata or {})
     meta.update(version=3, units="mm", coordinate_space="world")
-    with open(csv_path, "w", newline="", encoding="utf-8") as stream:
+    with atomic_text(csv_path, validate=lambda path: read_marker_csv(path, {}, {})) as stream:
         stream.write(V3_MAGIC + "\n# " + json.dumps(meta, sort_keys=True, ensure_ascii=False,
                                                    allow_nan=False) + "\n")
         writer = csv.DictWriter(stream, fieldnames=V3_FIELDS, lineterminator="\n")
@@ -170,7 +175,7 @@ def write_marker_csv_v3(csv_path, rows, metadata=None):
 
 def write_marker_csv_v2(csv_path, rows, metadata=None):
     meta = {"version": 2, "units": "mm", **(metadata or {})}
-    with open(csv_path, "w", newline="", encoding="utf-8") as stream:
+    with atomic_text(csv_path) as stream:
         stream.write(V2_MAGIC + "\n# " + json.dumps(meta, ensure_ascii=False,
                                                   allow_nan=False) + "\n")
         writer = csv.writer(stream, lineterminator="\n")

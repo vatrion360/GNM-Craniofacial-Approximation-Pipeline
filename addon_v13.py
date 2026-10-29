@@ -996,7 +996,10 @@ class GNM_OT_session_report(Operator):
             for lbl, current, default in modified_depths:
                 lines.append(f"  {lbl}: {current:.2f} mm (default: {default:.2f} mm)")
         else:
-            lines.append("Tissue depths: all at the default values from the GNM table.")
+            lines.append("Tissue depths: all match the project's initial values; see per-marker sources below.")
+        lines.append("Tissue depth sources (operator-recorded; not independently verified):")
+        for marker in scene.gnm_markers:
+            lines.append(f"  {marker.label}: {marker.tissue_depth_mm:.2f} mm; source: {marker.tissue_source!r}")
         lines.append("")
 
         plane = _fit_midsagittal_plane(scene)
@@ -3637,9 +3640,7 @@ def _export_markers(scene, path):
     if scene.gnm_cranial_points:
         meta['craniometry'] = _core_module('blender_craniometry').document(scene, manifest, model_digest)
     _core_module('io_csv').write_marker_csv_v3(path, rows, meta)
-    # Validate exactly what the CLI will consume, including manual overrides.
-    backend = _core_module('backend').GNMBackend(model_path)
-    _core_module('io_csv').read_marker_csv(path, backend.index_to_label, backend.landmark_vertex_map)
+    # The shared writer validates the closed temporary before publishing it.
 
 
 _OFFLINE = {"process": None, "log": None, "scene": None, "folder": None}

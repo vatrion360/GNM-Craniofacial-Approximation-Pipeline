@@ -95,6 +95,27 @@ with tempfile.TemporaryDirectory() as directory:
                                                                           backend.landmark_vertex_map)
             assert targets[0].vertex == 12310
             assert meta['bone_positions_mm']['Nasion'] == [0, 0, 0]
+            original_csv = path.read_bytes()
+            other = scene.gnm_markers[1]
+            original_label = other.label
+            try:
+                other.label = item.label
+                try:
+                    addon._export_markers(scene, str(path))
+                except ValueError as exc:
+                    assert 'duplicate label' in str(exc)
+                else:
+                    raise AssertionError('duplicate export must fail')
+                assert path.read_bytes() == original_csv
+                assert not list(path.parent.glob(path.name+'.*.tmp'))
+            finally:
+                other.label = original_label
+            assert bpy.ops.gnm.session_report() == {'FINISHED'}
+            session_report = bpy.data.texts['GNM_Session_Report'].as_string()
+            assert 'GNM table' not in session_report
+            assert repr(item.tissue_source) in session_report
+            assert 'operator-recorded; not independently verified' in session_report
+            print('BLENDER_ATOMIC_MARKER_EXPORT_PASS')
             assert bpy.ops.gnm.apply_paper_tissues() == {'FINISHED'}
             bpy.context.view_layer.update()
             assert item.tissue_depth_mm == 7
