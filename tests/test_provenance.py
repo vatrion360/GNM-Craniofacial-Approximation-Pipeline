@@ -66,6 +66,10 @@ def test_report_replay_and_protocol_freeze(tmp_path, model_file, marker_file):
     report = json.loads(open(cfg.output_json).read())
     assert report['schema_version'] == 2 and report['solver']['converged'] and report['solver']['irls_layers'] == 1
     assert report['software']['implementation']['files']['cranio/optimize.py']
+    catalogue = report['bundled_tissue_defaults']
+    assert len(catalogue['tables']) == 2 and 'Actual marker targets' in catalogue['interpretation']
+    assert report['software']['implementation']['files']['cranio/data/tissue/legacy_hardcoded.json']
+    assert catalogue['tables'][0]['warnings']
     model, transform = GNMBackend(str(model_file)).load(), report['transform']
     replay = transform['scale']*(model.generate(report['identity_coefficients']) @ np.array(transform['rotation']).T)+transform['translation_mm']
     assert np.max(np.linalg.norm(replay-model.mu, axis=1)) < .001

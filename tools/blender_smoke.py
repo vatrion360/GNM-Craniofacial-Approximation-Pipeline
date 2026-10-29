@@ -36,6 +36,9 @@ with tempfile.TemporaryDirectory() as directory:
     empty, warnings = tissue.validate_table(tissue.empty_table('engineering_test'))
     assert empty['landmarks'] == {} and warnings
     print('BLENDER_TISSUE_SCHEMA_PASS')
+    for table_id in ('legacy_hardcoded', 'var2026_table2'):
+        assert tissue.load_table(table_id).warnings
+    print('BLENDER_TISSUE_DATA_PASS')
     for _ in range(2):
         addon.register()
         assert hasattr(bpy.context.scene, 'gnm_markers')
@@ -89,6 +92,8 @@ with tempfile.TemporaryDirectory() as directory:
             model = addon._load_gnm_model(scene.gnm_live.npz_path)
             assert model.vertex_count == 17821
             addon._ensure_cranio(scene.gnm_live.npz_path)
+            dense_ids, dense_offsets, _, _ = addon._build_dense_set(model, True)
+            assert len(dense_ids) and (dense_offsets == addon._MARKER_DATA.SCALP_OFFSET_MM).all()
             run_map_checks(addon, scene, model, directory)
             run_icp_score_check(addon)
             item.gnm_vertex_override = 12310

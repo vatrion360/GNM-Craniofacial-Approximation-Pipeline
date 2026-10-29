@@ -110,7 +110,9 @@ python -m cranio.evaluation --input examples/synthetic_markers.csv --npz models/
 
 `python -m cranio.tissue` provides opt-in data preparation; it does not apply a
 table to a case or overwrite manual marker values. Unknown SD/source metadata
-remain null with diagnostics. See [format and commands](docs/tissue_tables_howto.md).
+remain null with diagnostics. Bundled `legacy_hardcoded` and `var2026_table2`
+retain the previous depths and their distinct provenance; JSON/TXT reports
+identify the catalogue separately from actual case values. See [format and commands](docs/tissue_tables_howto.md).
 
 | Command | Purpose |
 | --- | --- |
