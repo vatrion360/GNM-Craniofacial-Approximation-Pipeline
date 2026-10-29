@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Mapping
 import json
 import numpy as np
-from .validation import finite_array
+from .validation import finite_array, has_documented_tissue_source
 
 PROTOCOL = 'table3-chords-v1'
 REFERENCE = 'https://doi.org/10.4995/var.2024.24796 (Table 3; definitions attributed to White et al. 2012)'
@@ -206,8 +206,7 @@ def skin_marker_issues(record: Mapping[str, object]) -> list[str]:
     if record.get('mapping_reviewed') is not True:
         issues.append('Skin correspondence reviewed is not confirmed')
     source = record.get('tissue_source', '')
-    if (not isinstance(source, str) or
-            source.strip().lower() in ('', 'unspecified', 'legacy-unvalidated')):
+    if not has_documented_tissue_source(source):
         issues.append(f"Tissue source / method = {source!r}; document the tissue-depth source or method")
     return issues
 

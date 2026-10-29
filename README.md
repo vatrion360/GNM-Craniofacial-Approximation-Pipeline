@@ -20,6 +20,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
 - [Contributing and CI](CONTRIBUTING.md)
+- [V19 task comparison and revised implementation plan (Romanian)](docs/TASKS_V19_REVIEW.md)
 - [Change log](CHANGELOG.md)
 
 ## Quick start
@@ -52,6 +53,8 @@ Outputs:
 | `face_report.json` | Completion record, input/output SHA-256, full settings, coefficients, transform, software versions, residuals and provenance |
 
 All exported coordinates are **world millimetres**. Existing outputs are refused unless `--overwrite` is explicit. `--strict` requires v3 markers, matching model checksum, non-default tissue source notes and no explicitly unreviewed skin correspondences among included targets; it is a provenance check, not scientific approval.
+
+Strict, frozen-protocol and craniometry checks reject blank tissue-source notes and the placeholders `unspecified` / `legacy-unvalidated`, ignoring surrounding whitespace and letter case. The original source text is retained for auditing. The JSON report distinguishes fixed lambda, the adaptive marker-count heuristic (including its count and bounds), and conditional fixed-pose landmark LOO; none is an independent validation result.
 
 Local correction is opt-in (`--local-correction`). Dense skull constraints are experimental and require a skull exported in the **same world-mm frame** (`--skull skull.obj --skull-normals-reviewed`). Read the workflow before enabling either.
 

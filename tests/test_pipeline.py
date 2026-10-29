@@ -21,6 +21,7 @@ def test_complete_offline_run(tmp_path, model_file, marker_file, monkeypatch):
     assert report['inputs']['model']['sha256'] == sha256_file(model_file)
     assert report['local_correction']['enabled'] is False
     assert report['lambda_selection']['independent_validation'] is False
+    assert report['lambda_selection']['method'] == 'fixed'
     assert len(report['identity_coefficients']) == 3
     assert run_pipeline(cfg) == 2  # Never silently replace a case.
 
@@ -84,3 +85,41 @@ def test_conditional_lambda_search_is_reported(tmp_path, model_file, marker_file
     report = json.loads(open(cfg.output_json).read())
     assert report['lambda_selection']['method'] == 'conditional fixed-pose landmark LOO'
     assert len(report['lambda_selection']['scores_model_space_mm']) == 8
+
+
+@pytest.mark.parametrize('source', ['   ', '\t', ' UnSpEcIfIeD ', ' LEGACY-UNVALIDATED '])
+def test_strict_rejects_disguised_placeholder_sources(tmp_path, model_file, marker_file, source):
+    marker_file.write_text(marker_file.read_text().replace('synthetic software fixture', source))
+    cfg = PipelineConfig(input=str(marker_file), npz=str(model_file),
+                         output=str(tmp_path/'face.obj'), strict=True)
+    assert run_pipeline(cfg) == 2
+    assert not (tmp_path/'face.obj').exists()
+    # Ordinary research runs remain usable, but the warning and original text
+    # must survive so an undocumented source never becomes silently approved.
+    cfg.strict = False
+    assert run_pipeline(cfg) == 0
+    report = json.loads(open(cfg.output_json).read())
+    assert any('Unreviewed tissue sources' in item for item in report['warnings'])
+    assert report['marker_metadata']['marker_records']['P0']['tissue_source'] == source
+
+
+def test_adaptive_lambda_report_replays_actual_included_count(tmp_path, model_file, marker_file):
+    cfg = PipelineConfig(input=str(marker_file), npz=str(model_file),
+                         output=str(tmp_path/'adaptive.obj'), regularization='adaptive',
+                         exclude=['P0', 'P1'], lambda_base=2.0)
+    assert run_pipeline(cfg) == 0
+    report = json.loads(open(cfg.output_json).read())
+    selection = report['lambda_selection']
+    assert selection['method'] == 'adaptive marker count'
+    settings = selection['adaptive']
+    assert settings['included_marker_count'] == len(report['landmarks']) == 10
+    expected = min(max(settings['base']*settings['reference_marker_count']/10,
+                       settings['minimum']), settings['maximum'])
+    assert report['lambda'] == expected
+    # Equivalent fixed lambda must produce the same mesh: the report correction
+    # must not change numerical fitting behaviour.
+    fixed = PipelineConfig(input=str(marker_file), npz=str(model_file),
+                           output=str(tmp_path/'fixed.obj'), regularization=str(expected),
+                           exclude=['P0', 'P1'])
+    assert run_pipeline(fixed) == 0
+    assert (tmp_path/'adaptive.obj').read_bytes() == (tmp_path/'fixed.obj').read_bytes()

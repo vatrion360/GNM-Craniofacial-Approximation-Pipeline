@@ -1,3 +1,9 @@
+# Unreleased
+
+- Share tissue-source presence validation across strict preflight, frozen protocols and craniometry. Reject whitespace-only or case-disguised reserved placeholders without rewriting the original source text.
+- Correct the JSON lambda-selection label for adaptive regularization; record the actual included marker count and heuristic parameters. Fitting mathematics and defaults are unchanged.
+- Add regression tests and a V19 comparison against the proposed V13.5 task list; CT validation remains separate from software acceptance.
+
 # 5.0.0rc10 / add-on 19.0.0
 
 - Add Blender-only presentation copies of completed live/offline fits, retaining the exact frozen neutral surface and any local correction.
