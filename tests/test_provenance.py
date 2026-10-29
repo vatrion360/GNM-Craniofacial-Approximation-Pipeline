@@ -83,6 +83,14 @@ def test_report_replay_and_protocol_freeze(tmp_path, model_file, marker_file):
     # Malformed provenance must fail explicitly, never overwrite duplicate
     # sources or escape the CLI's validation boundary with TypeError/KeyError.
     from copy import deepcopy
+    for source in (None, [], {}, 42, '', ' \t', ' UnSpEcIfIeD ', ' LEGACY-UNVALIDATED '):
+        invalid = deepcopy(meta)
+        invalid['marker_records'][targets[0].label]['tissue_source'] = source
+        with pytest.raises(ValueError, match='undocumented tissue source'):
+            validate_protocol(cfg, invalid, targets, sha256_file(model_file))
+    documented = deepcopy(meta)
+    documented['marker_records'][targets[0].label]['tissue_source'] = '  Case-specific CT measurement  '
+    assert validate_protocol(cfg, documented, targets, sha256_file(model_file))['status'] == 'freeze_matched'
     malformed = [
         ('case_metadata', []),
         ('bone_sources', {}),

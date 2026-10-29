@@ -140,6 +140,20 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
         if getattr(cfg, name):
             inputs[name] = dict(path=os.path.abspath(getattr(cfg, name)), sha256=sha256_file(getattr(cfg, name)))
     loo, history, dense_history = fit_info
+    mode = str(cfg.regularization).lower()
+    lambda_selection = {
+        "method": ("conditional fixed-pose landmark LOO" if mode == "auto"
+                   else "adaptive marker count" if mode == "adaptive" else "fixed"),
+        "scores_model_space_mm": loo,
+        "independent_validation": False,
+    }
+    if mode == "adaptive":
+        from .regularization import REFERENCE_MARKERS
+        lambda_selection["adaptive"] = {
+            "included_marker_count": len(targets), "reference_marker_count": REFERENCE_MARKERS,
+            "base": cfg.lambda_base, "minimum": cfg.lambda_min, "maximum": cfg.lambda_max,
+            "interpretation": "Count-based heuristic; not calibrated anatomical uncertainty",
+        }
     correction = np.linalg.norm(field, axis=1)
     report = {
         "schema_version": 2, "status": "completed", "units": "mm",
@@ -155,9 +169,7 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
         "metric_interpretation": "Training marker fit and displacement only; neither accuracy nor calibrated uncertainty.",
         "local_correction": {"enabled": not cfg.skip_tps, "kernel": "linear (-r), degree=1 in 3D",
                              "heatmap_max_mm": float(correction.max())},
-        "lambda_selection": {"method": "conditional fixed-pose landmark LOO" if loo else "fixed",
-                             "scores_model_space_mm": loo,
-                             "independent_validation": False},
+        "lambda_selection": lambda_selection,
         "iteration_history": history,
         "solver": fit_info.diagnostics,
         "geometry_quality": metadata.get("geometry_quality"),

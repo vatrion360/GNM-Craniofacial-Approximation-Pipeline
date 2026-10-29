@@ -33,7 +33,7 @@ from .optimize import (LossConfig, bounded_tps_correction, fit_identity,
                        robust_alignment, stability_warnings)
 from .report import write_stats
 from .report import write_run_json
-from .validation import rmse, sha256_file, validate_points
+from .validation import has_documented_tissue_source, rmse, sha256_file, validate_points
 from . import craniometry
 
 # Landmark-urile necesare diagnosticului de proiectie nazala (V13.6).
@@ -173,8 +173,8 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                 "--exclude: labels not found in the CSV: " + ", ".join(sorted(unknown)))
     records = _csv_meta.get("marker_records", {})
     warnings_list.extend(_csv_meta.get('landmark_audit', {}).get('warnings', []))
-    unreviewed = [t.label for t in targets if records.get(t.label, {}).get("tissue_source", "unspecified")
-                  in ("unspecified", "legacy-unvalidated", "")]
+    unreviewed = [t.label for t in targets if not has_documented_tissue_source(
+        records.get(t.label, {}).get("tissue_source"))]
     if unreviewed:
         warnings_list.append("Unreviewed tissue sources: " + ", ".join(unreviewed))
     unreviewed_map = [t.label for t in targets if records.get(t.label, {}).get('mapping_reviewed') is False]

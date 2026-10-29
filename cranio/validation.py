@@ -5,6 +5,17 @@ from pathlib import Path
 import numpy as np
 
 
+def has_documented_tissue_source(value: object) -> bool:
+    """Reject empty/legacy provenance labels without altering the recorded text.
+
+    This checks documentation presence only, not the scientific validity or
+    applicability of the stated source. Shared by strict, frozen-protocol and
+    craniometry checks so whitespace/case cannot bypass one of those gates.
+    """
+    return isinstance(value, str) and value.strip().casefold() not in (
+        '', 'unspecified', 'legacy-unvalidated')
+
+
 def sha256_file(path):
     digest = hashlib.sha256()
     with open(path, "rb") as stream:

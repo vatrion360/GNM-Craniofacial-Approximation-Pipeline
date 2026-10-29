@@ -4,7 +4,7 @@ from dataclasses import asdict
 import json
 from .export import atomic_text
 from .provenance import implementation_manifest
-from .validation import sha256_file, validate_outputs
+from .validation import has_documented_tissue_source, sha256_file, validate_outputs
 
 CASE_FIELDS = {'input', 'output', 'output_error_mesh', 'output_stats', 'output_json',
     'output_statistical', 'npz', 'skull', 'prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'overwrite', 'require_qc'}
@@ -84,7 +84,7 @@ def validate_protocol(cfg, metadata, targets, model_hash):
             raise ValueError(f'{target.label}: marker record must be a JSON object')
         if row.get('mapping_reviewed') is not True or row.get('bone_status') != 'observed':
             raise ValueError(f'{target.label}: protocol requires reviewed mapping on observed bone')
-        if row.get('tissue_source', '') in ('', 'unspecified', 'legacy-unvalidated'):
+        if not has_documented_tissue_source(row.get('tissue_source')):
             raise ValueError(f'{target.label}: undocumented tissue source')
         source_id = row.get('bone_source_id')
         if not isinstance(source_id, str):
