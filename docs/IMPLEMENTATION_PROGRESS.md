@@ -43,3 +43,24 @@ Base: `0a51bd5c6b1fdf77481875e7c0c60ebcf1c10727` (atomic-export task).
   version remains unreleased; this task does not introduce new tissue values.
 - Next planned lot: versioned tissue tables with provenance and explicit
   precedence for individual/manual case values; no invented SDs or thresholds.
+
+## A1.1 — Versioned tissue-table exchange
+
+Base: `24d3706b47d28d660dd700675f6f6e4536a8f886` (head-only identity task).
+
+- Added `cranio/tissue.py`, the bundled JSON schema, JSON/CSV round-trip tools,
+  source-byte hashes, null/unknown diagnostics and strict malformed-input checks.
+  Added 62 synthetic tests, installed-ZIP schema checks, package-data entries,
+  README command table and `tissue_tables_howto.md`.
+- Baseline: 251 passed, 1 Windows-only skip; Blender 4.5.0 Linux installed ZIP
+  passed with the reviewed official model and external Python. The local runtime
+  uses Python 3.12.14 / NumPy 2.3.5 / SciPy 1.17.0 / trimesh 5.1.0 / pytest 9.1.1.
+- After: 313 passed, 1 Windows-only skip. Ruff, installed Blender ZIP and
+  wheel/sdist builds passed. The wheel was installed and its schema loaded
+  outside the source tree.
+- No constants, fit defaults, model data or case values changed. No table
+  application, SD weighting or direction interpretation is introduced. Unknown
+  fields stay null; schema validity is not scientific source verification.
+- CT cases and interactive Windows acceptance remain manual. No new scientific
+  choices were made. Next task: migrate existing constants with exact replay
+  comparisons, keeping the existing manual-case precedence.

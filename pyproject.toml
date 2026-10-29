@@ -23,6 +23,9 @@ gnm-doctor = "cranio.doctor:main"
 packages = ["cranio", "cranio.backend"]
 py-modules = ["gnm_reconstruct"]
 
+[tool.setuptools.package-data]
+cranio = ["data/tissue/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["integration: requires the official model via GNM_MODEL_PATH"]
