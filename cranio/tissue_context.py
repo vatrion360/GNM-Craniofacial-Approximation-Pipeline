@@ -31,7 +31,9 @@ def case_posture(metadata, explicit=None):
     Different nonempty labels conflict instead of silently overriding each other.
     All raw declarations are retained, including unknown labels.
     """
-    case = metadata.get('case_metadata', {})
+    case = metadata.get('case_metadata')
+    if case is None:
+        case = {}
     if not isinstance(case, dict):
         raise ValueError('Case metadata must be a JSON object')
     declarations = dict(cli=explicit, csv=metadata.get('acquisition_posture'),

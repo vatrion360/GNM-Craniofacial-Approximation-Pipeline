@@ -141,3 +141,7 @@ def test_compact_ui_does_not_dump_unapplied_catalogue(table_file):
     rec=describe_context(load_table(table_file),{'acquisition_posture':'supine'},['P0'])
     text=context_text(rec,compact=True)
     assert 'shorth: 1' in text and 'P2' not in text and '75-shormax' not in text
+
+
+def test_null_case_document_leaves_posture_unknown():
+    assert case_posture({"case_metadata": None})["value"] is None
