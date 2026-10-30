@@ -25,7 +25,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from .validation import finite_array, validate_points, rmse, weighted_geometry
-from .fit_contract import FitInfo, FitResult, DEFAULT_MAX_ITER, DEFAULT_TOL, normalized_dense_weights
+from .fit_contract import FitInfo, FitResult, DEFAULT_MAX_ITER, DEFAULT_TOL, dense_fit_weights
 
 
 @dataclass
@@ -382,11 +382,14 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
             v_world = scale * ((mu + np.einsum("i,ivk->vk", c, basis)) @ rot.T) + trans
             sidx, dt_w, keep, mean_dist = dense_correspondences(v_world, dense)
             dense_stats.append((int(keep.sum()), mean_dist))
-            selected, w_d = normalized_dense_weights(weights, dense['last_relative_weights'], dense['weight_ratio'])
+            selected, w_d = dense_fit_weights(weights, dense)
             sidx, dt_w = sidx[selected], dt_w[selected]
             last_dense.clear()
             last_dense.update(dense['last_diagnostics'], used_vertex_indices=sidx.tolist(),
                               weights=w_d.tolist(), targets_world_mm=dt_w.tolist(), used_in_identity_solve=len(sidx) >= 10)
+            if 'depth_precision_factors' in dense:
+                last_dense.update(depth_base_weights=dense['last_depth_base_weights'].tolist(),
+                    depth_precision_factors=dense['last_depth_precision_factors'][selected].tolist())
             if len(sidx) >= 10:
                 dt_m = ((dt_w-trans) @ rot)/scale
                 sw = np.sqrt(np.repeat(w_d, 3))

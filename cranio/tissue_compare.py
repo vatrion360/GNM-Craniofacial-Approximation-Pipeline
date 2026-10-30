@@ -64,7 +64,22 @@ def run_comparison(config):
     targets = [t for t in targets if t.label not in cfg.exclude]
     for table in tables:
         apply_table(targets, metadata, table, cfg.tissue_labels, cfg.tissue_axis)
+        if cfg.depth_weighting == 'sd':
+            from .depth_weighting import marker_weights
+            marker_weights(table, [t.label for t in targets], [t.weight for t in targets])
     model = backend.load()
+    if cfg.depth_weighting == 'sd' and cfg.skull and not cfg.no_dense_fit and cfg.dense_weight > 0:
+        from .geometry import build_scalp_mask, build_face_dense_regions
+        from .depth_weighting import region_factors
+        scalp = build_scalp_mask(model.mu, model.vertex_groups, model.vertex_group_names)
+        faces = [] if cfg.no_face_dense else build_face_dense_regions(model.mu, model.vertex_groups, model.vertex_group_names)
+        regions = np.full(model.vertex_count, '', dtype=object)
+        regions[scalp] = 'scalp'
+        # Same face-first precedence as the deduplicated dense candidate set.
+        for name, indices, _ in reversed(faces):
+            regions[indices] = name
+        for table in tables:
+            region_factors(table, regions[regions != ''], cfg.dense_nose_weight)
     protected = [cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.case_metadata, cfg.craniometry,
                  *(table_path(s) for s in sources)]
     pinned = {str(Path(p).resolve()): sha256_file(p) for p in protected if p}
@@ -115,8 +130,8 @@ def run_comparison(config):
     unchanged()
     summary = dict(schema_version=1, status='completed', units='mm', reference_index=0, axis_policy=cfg.tissue_axis,
         source_direction_enforced=False, dense_regions_applied=False, color_scale_max_mm=color_max,
-        input_sha256=pinned, tables=results,
-        interpretation='Sensitivity to selected marker depths, NOT uncertainty or anatomical accuracy. Independent fits from original case targets. Corresponding vertices in the case world frame include pose/scale changes; no ICP. Six-decimal OBJ coordinates. All-vertex metrics include internal geometry; inspect skin metrics, QC, convergence and exclusions.')
+        input_sha256=pinned, tables=results, depth_weighting=cfg.depth_weighting,
+        interpretation='Sensitivity to selected marker depths and optional SD weights, NOT uncertainty or anatomical accuracy. Independent fits from original case targets. Corresponding vertices in the case world frame include pose/scale changes; no ICP. Six-decimal OBJ coordinates. All-vertex metrics include internal geometry; inspect skin metrics, QC, convergence and exclusions.')
     with atomic_text(destination/'summary.json') as stream:
         json.dump(summary, stream, indent=2, ensure_ascii=False, allow_nan=False)
         stream.write('\n')

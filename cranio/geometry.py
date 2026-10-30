@@ -158,6 +158,11 @@ def dense_correspondences(v_world, dense):
     candidates = np.flatnonzero(keep & (relative > 0))
     selected = candidates[balanced_indices(regions[candidates], dense.get('max_rows', DENSE_MAX_ROWS))]
     targets = dense['points'][nearest[selected]] + dense['offsets'][selected, None]*normals[selected]
+    if 'depth_precision_factors' in dense:
+        precision = finite_array(dense['depth_precision_factors'], 'dense depth factors', (len(idx),))
+        if np.any(precision <= 0):
+            raise ValueError('Dense depth factors must be positive')
+        dense['last_depth_precision_factors'] = precision[selected]
     dense['last_relative_weights'] = relative[selected]
     dense['last_distances'] = distances[selected]
     dense['last_region_stats'] = {str(name): (int(np.sum(keep & (regions == name))), int(np.sum(regions == name)),

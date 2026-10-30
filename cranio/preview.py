@@ -1,6 +1,6 @@
 """NumPy adapter around the same identity objective used by the CLI."""
 import numpy as np
-from .fit_contract import DEFAULT_MAX_ITER, DEFAULT_TOL, normalized_dense_weights
+from .fit_contract import DEFAULT_MAX_ITER, DEFAULT_TOL, dense_fit_weights
 from .geometry import dense_correspondences
 from .optimize import fit_identity, LossConfig
 from .identity import active_components
@@ -22,7 +22,7 @@ def fit_preview(model, snapshot, regularization, settings, dense=None, prior=Non
             initial = restricted
         world = model.generate(initial) @ pose[:3, :3].T + pose[:3, 3]
         di, dt, _, _ = dense_correspondences(world, dense)
-        mask, dw = normalized_dense_weights(weights, dense['last_relative_weights'], dense['weight_ratio'])
+        mask, dw = dense_fit_weights(weights, dense)
         di, dt = di[mask], dt[mask]
         if len(di) < 10:
             raise ValueError('Too few valid dense surface constraints')

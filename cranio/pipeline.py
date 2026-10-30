@@ -241,6 +241,12 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     targets_xyz = np.array([t[2] for t in targets], dtype=np.float64)
     validate_points(targets_xyz, "marker targets", minimum=4)
     weights = np.array([t[3] for t in targets], dtype=np.float64)
+    confidence_weights = weights.copy()  # TPS strengths are NOT inverse variances.
+    if cfg.depth_weighting == 'sd':
+        from .depth_weighting import marker_weights, region_factors
+        weights, weighting_record, weighting_warnings = marker_weights(tissue_table, labels, confidence_weights)
+        _csv_meta['depth_weighting'] = weighting_record
+        warnings_list.extend(weighting_warnings)
 
     def measurement_options():
         if document is None or cfg.measurement_weight == 0:
@@ -332,6 +338,12 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
             "in_fit": not cfg.no_dense_fit,
             "regions": np.asarray(region_names)[region_of_vertex], "max_rows": cfg.dense_max_rows, "nose_weight": cfg.dense_nose_weight,
         }
+        if cfg.depth_weighting == 'sd' and dense['in_fit'] and dense['weight_ratio'] > 0:
+            factors, region_records, region_warnings = region_factors(tissue_table, dense['regions'], dense['nose_weight'])
+            dense['depth_precision_factors'] = factors
+            dense['depth_base_marker_weights'] = confidence_weights.copy()
+            weighting_record['regions'] = region_records
+            warnings_list.extend(region_warnings)
         # Harta vertex->regiune pentru coloana "Regiune" din tabelul markeri.
         vertex_region = build_vertex_region_map(len(mu), scalp_idx,
                                                 face_regions)
@@ -406,6 +418,9 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
             lm_idx = lm_idx[keep]
             targets_xyz = targets_xyz[keep]
             weights = weights[keep]
+            confidence_weights = confidence_weights[keep]
+            if dense is not None and 'depth_base_marker_weights' in dense:
+                dense['depth_base_marker_weights'] = confidence_weights.copy()
             res_align = res_align[keep]
             logger.info(f"    [!] Auto-excluded {len(excluded_auto)} markers "
                   f"(residual > {thresh_ex:.1f} mm): "
@@ -492,7 +507,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         # Reziduurile markerilor se scaleaza cu increderea: un marker
         # imprecis (ex. Supraorbitale 0.5) devine constrangere PARTIALA,
         # nu trage mesh-ul pana la tinta lui (posibil gresita).
-        res_vecs = [(targets_xyz - lm_world) * weights[:, None]]
+        res_vecs = [(targets_xyz - lm_world) * confidence_weights[:, None]]
         n_scalp_centres = n_face_centres = 0
         if dense is not None and not cfg.no_dense_tps:
             from scipy.spatial import cKDTree
@@ -661,7 +676,13 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         extra_parts.append(f"Tissue table: {selection['table']['id']} revision {selection['table']['revision']}; "
                            f"citation={selection['table']['citation']}; SHA256={tissue_table.sha256}; "
                            f"status={selection['status']}; replaced={', '.join(selection['replaced_labels']) or 'none'}; "
-                           f"axis={cfg.tissue_axis}; source direction NOT enforced; dense settings unchanged.")
+                           f"axis={cfg.tissue_axis}; source direction NOT enforced; dense offsets unchanged.")
+    if cfg.depth_weighting == 'sd':
+        weighting_record['retained_labels'] = labels
+        extra_parts.append('Depth weighting: base_weight / SD_mm^2; missing SD retains base weight with warnings. '
+                           'Dense budget uses original marker confidence before regional SD factors. '
+                           'TPS displacement multipliers retain original confidence. Sensitivity analysis, not calibrated uncertainty. '
+                           'Per-row base/effective weights and table references are in the JSON record.')
     if extra_parts:
         extra = "\n".join(extra_parts)
     lm_regions = None
