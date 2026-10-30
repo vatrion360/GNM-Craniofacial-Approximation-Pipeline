@@ -27,6 +27,22 @@ def normalized_dense_weights(marker_weights, relative_weights, ratio=.5, markerl
     return keep, mass*q/q.sum()
 
 
+def dense_fit_weights(marker_weights, dense):
+    """Preserve the legacy dense budget, then optionally apply tissue precision.
+
+    Precision follows normalization so uniform SD does not cancel out. Original
+    marker confidence defines the budget, preserving missing-SD fallback rows.
+    """
+    base = dense.get('depth_base_marker_weights', marker_weights)
+    keep, weights = normalized_dense_weights(base, dense['last_relative_weights'], dense['weight_ratio'])
+    if 'depth_precision_factors' in dense:
+        from .depth_weighting import multiply_weights
+        factors = finite_array(dense['last_depth_precision_factors'], 'selected depth factors', keep.shape)
+        dense['last_depth_base_weights'] = weights.copy()
+        weights = multiply_weights(weights, factors[keep])
+    return keep, weights
+
+
 def balanced_indices(regions, budget):
     """Sample face/scalp deterministically, redistributing unused budget."""
     regions = np.asarray(regions)

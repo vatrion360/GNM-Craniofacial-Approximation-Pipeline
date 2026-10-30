@@ -125,3 +125,58 @@ pre-A1.3 source is recorded in `TISSUE_SELECTION_BENCHMARK.json`.
 No subject CT accuracy, cohort applicability, direction equivalence, SD weighting
 or calibrated uncertainty is established by these tests. CT validation remains
 with the project author. No new anatomical constants or model weights are added.
+
+## Optional SD weighting (A1.4, offline CLI)
+
+`--depth-weighting sd --tissue-table ID_OR_JSON` multiplies the existing fit
+weight of each included marker by `1 / sd_mm^2` from the matching landmark row.
+This applies to pose and identity fitting; the existing Huber layer still acts
+on residuals in world millimetres. SD is not converted to a standard error.
+The default is `--depth-weighting none`: no change to previous fits.
+
+Selection of an SD reference does **not** replace target coordinates or depths.
+Target replacement still requires explicit `--tissue-labels` and
+`--tissue-axis existing`. Weighting also applies to unreplaced/manual targets:
+using a table's spread for those targets is an explicit sensitivity assumption,
+not a measurement of individual placement uncertainty. Review applicability.
+
+Dense rows use matching `regions` entries. Their original total budget is based
+on the original marker confidence sum and existing dense ratio/nasal weights.
+The selected rows are normalized first and **then** multiplied by regional
+`1 / sd_mm^2`, without renormalization. This prevents uniform regional SD from
+cancelling out and preserves fallback weights. Automatic marker exclusion
+updates this original-confidence budget. Disabled dense fitting, zero dense
+strength and zero-strength nasal rows do not consume regional SDs. Dense depth
+offsets themselves remain unchanged.
+
+If a row or SD is missing, its existing base weight is retained and a warning is
+recorded. The current schema has no separate table-default weight, so A1.4 uses
+the existing case confidence / normalized dense weight as the explicit fallback.
+Both bundled tables currently have unknown SDs; this flag cannot create
+uncertainty data. A used SD of zero, or a factor/effective weight that cannot be
+represented as finite positive float64, produces a clear error. No epsilon,
+variance floor, population range or replacement SD is guessed.
+
+The statistical fit uses one scalar on all three coordinate residuals. Tissue
+thickness SD is not a full 3-D placement covariance; correlations, directional
+errors and calibration are not modelled here. Changing weight scale changes
+regularization balance and may change selected lambda and optional
+measurement/distance penalties. Existing conditional LOO and Huber procedures
+are retained; this option is **sensitivity weighting, not calibrated uncertainty**.
+Use the statistical mesh to assess its direct effect. The subsequent optional
+TPS uses original confidence strengths for prescribed marker displacements,
+not inverse variance, and dense TPS corrections are unchanged. Thus final
+local correction can reduce differences seen in the statistical result.
+
+JSON `marker_metadata.depth_weighting` records the table hash, row data, SD,
+factors, fallback reasons, original/effective marker weights and retained labels.
+`solver.dense` records selected dense base/effective weights and factors when
+used; `solver.final_irls_weights` includes the subsequent robust weights.
+The ordinary landmark weight field still means original case confidence.
+TXT reports name the mode and warnings. Frozen protocols include the mode and
+source table hash. `--tissue-compare` passes the mode to every independent fit
+and names it in its summary; differences are sensitivity maps, not accuracy.
+
+This step exposes the switch in the **offline CLI only**. The shared NumPy
+solver/preview adapter accepts the same prepared weights, but there is no new
+live Blender checkbox or automatic change to scene marker values.

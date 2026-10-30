@@ -34,6 +34,7 @@ class PipelineConfig:
     tissue_labels: List[str] = field(default_factory=list)
     tissue_axis: str = 'unconfigured'
     tissue_compare: Optional[str] = None
+    depth_weighting: str = 'none'
 
     # Fit statistic
     regularization: str = "auto"          # "auto" (LOO-CV) sau valoare fixa
@@ -87,6 +88,10 @@ class PipelineConfig:
 
 
     def validate(self):
+        if self.depth_weighting not in ('none', 'sd'):
+            raise ValueError('Unknown depth weighting mode')
+        if self.depth_weighting == 'sd' and not (self.tissue_table or self.tissue_compare):
+            raise ValueError('SD depth weighting requires a tissue table')
         if self.tissue_axis not in ('unconfigured', 'existing'):
             raise ValueError('Unknown tissue axis policy')
         if self.tissue_table and self.tissue_compare:

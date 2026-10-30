@@ -131,6 +131,7 @@ Undo and audit history. Existing manual values change only through explicit Appl
 
 | Fit option | Default | Effect |
 | --- | --- | --- |
+| `--depth-weighting {none,sd}` | `none` | Offline only: optional `1/SD_mm²` multipliers from the selected table; missing SD retains base weight with warning; sensitivity, not calibrated uncertainty |
 | `--tissue-table ID_OR_JSON` | None | Select/report a table; does not by itself replace targets |
 | `--tissue-labels LABEL ...` | Empty | Explicit authorization to replace these case depths/targets |
 | `--tissue-axis existing` | Unconfigured | Accept current bone-to-skin axes as a sensitivity assumption |
