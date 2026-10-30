@@ -100,6 +100,32 @@ def run_direction_checks(addon):
                 direction_source=path,source_acknowledged=True) == 1
             bpy.context.view_layer.update()
             np.testing.assert_allclose(item.target_empty.matrix_world.translation, [-4.,3.,4.], atol=2e-6)
+            # With a registered source hash, changed evaluated geometry must fail.
+            mesh = bpy.data.meshes.new('Direction test surface')
+            mesh.from_pydata([(0,0,0),(10,0,0),(0,10,0)], [], [(0,1,2)])
+            obj = bpy.data.objects.new('Direction test bone', mesh)
+            scene.collection.objects.link(obj)
+            row = scene.gnm_bone_sources.add()
+            row.uid, row.enabled, row.source_object = 'direction_source', True, obj
+            bpy.context.view_layer.update()
+            digest = addon._core_module('blender_sources').evaluated_geometry(obj, bpy.context.evaluated_depsgraph_get())[2]
+            item.bone_empty['gnm_bone_source_id'] = row.uid
+            item.bone_empty['gnm_source_sha256_at_placement'] = digest
+            manifest['landmarks']['Nasion']['bone_source_geometry_sha256'] = digest
+            path.write_text(json.dumps(manifest))
+            assert adapter.apply_selected_table(addon,bpy.context,table_path,
+                direction_source=path,source_acknowledged=True) == 1
+            before = np.array(item.target_empty.matrix_world.translation)
+            obj.location.x = 1.
+            bpy.context.view_layer.update()
+            try:
+                adapter.apply_selected_table(addon,bpy.context,table_path,
+                    direction_source=path,source_acknowledged=True)
+            except ValueError as exc:
+                assert 'source changed' in str(exc)
+            else:
+                raise AssertionError('Changed source geometry accepted')
+            np.testing.assert_array_equal(item.target_empty.matrix_world.translation, before)
             print('BLENDER_TISSUE_SOURCE_DIRECTIONS_PASS')
         finally:
             bpy.context.window.scene = bpy.data.scenes[previous]

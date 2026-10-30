@@ -113,6 +113,8 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     if cfg.tissue_directions:
         from .tissue_directions import load_directions
         directions = load_directions(cfg.tissue_directions)
+        if directions.sha256 != input_hashes[cfg.tissue_directions]:
+            raise ValueError('Direction manifest changed during loading')
     warnings_list = []
 
     backend = GNMBackend(cfg.npz)

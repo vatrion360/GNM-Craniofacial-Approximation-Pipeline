@@ -17,6 +17,7 @@ def apply_selected_table(addon, context, source, axis_acknowledged=False, direct
     if not selected:
         raise ValueError('Select at least one marker using the depth adjustment checkboxes')
     targets, records = [], {}
+    source_digests = {}  # Per-transaction only: evaluate each selected surface once.
     for i, item in enumerate(selected):
         if not item.is_placed:
             raise ValueError(f'{item.label}: place bone and skin endpoints first')
@@ -24,8 +25,12 @@ def apply_selected_table(addon, context, source, axis_acknowledged=False, direct
             normals = addon._core_module('blender_marker_normals')
             obj = normals.marker_source(context.scene, item)
             source_row = next((s for s in context.scene.gnm_bone_sources if s.enabled and s.source_object == obj), None)
-            _, _, digest, _, _ = addon._core_module('blender_sources').evaluated_geometry(
-                obj, context.evaluated_depsgraph_get(), source_row.flip_normals if source_row else False)
+            flip = source_row.flip_normals if source_row else False
+            key = (obj.as_pointer(), bool(flip))
+            if key not in source_digests:
+                source_digests[key] = addon._core_module('blender_sources').evaluated_geometry(
+                    obj, context.evaluated_depsgraph_get(), flip)[2]
+            digest = source_digests[key]
             if digest != item.bone_empty['gnm_source_sha256_at_placement']:
                 raise ValueError(f'{item.label}: source changed since placement; review/re-place before applying directions')
         bone = np.asarray(item.bone_empty.matrix_world.translation, dtype=float)
