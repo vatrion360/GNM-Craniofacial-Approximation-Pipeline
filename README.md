@@ -24,6 +24,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Versioned tissue tables: JSON/CSV exchange](docs/tissue_tables_howto.md)
 - [Contributing and CI](CONTRIBUTING.md)
 - [Optional head-only identity fitting](docs/IDENTITY_SUBSPACE.md)
+- [Opt-in marker-error propagation and its limits](docs/UNCERTAINTY.md)
 - [V19 task comparison and revised implementation plan (Romanian)](docs/TASKS_V19_REVIEW.md)
 - [Change log](CHANGELOG.md)
 
@@ -144,6 +145,25 @@ follow reviewed sampled bone normals and are not replaced by selected-marker tab
 | `--tissue-axis {existing,source}` | Unconfigured | Preserve current axes explicitly, or use reviewed world-frame source directions |
 | `--tissue-directions FILE` | None | Manifest required for source mode; normal, vertical or explicit in-sagittal-plane vectors; no inferred frame |
 | `--tissue-compare ID1,ID2,...` | None | Independent per-table fits, corresponding-vertex difference PLYs and summary; fresh output prefix required |
+
+## Marker-error propagation
+
+Optional A2.1 simulations use `python -m cranio.uncertainty`; they refit the shared
+marker-only statistical solver with explicitly supplied placement/depth errors.
+No missing SD is invented and no calibrated confidence is claimed. JSON retains
+convergence/clipping diagnostics and paired prior scenarios. Existing fitting
+defaults are unchanged; this is a separate command, not an uncertainty overlay
+for a dense/TPS final fit. See the full
+[options table, input schema and limitations](docs/UNCERTAINTY.md).
+
+| Sampling option | Default | Effect |
+|---|---|---|
+| `--samples`, `--seed` | 200, 0 | Reproducible PCG64 perturbations |
+| `--max-iter` | 30 | Explicitly adjustable iteration budget; unchanged convergence tolerances |
+| `--placement FILE` | Unconfigured | Supplied per-coordinate placement SDs and sources |
+| `--allow-partial` | Off | Conditional sensitivity with unknown errors held fixed and listed |
+| `--depth-labels LABEL ...` | Empty | Selected table mean/SD depths with explicit axis policy |
+| `--prior-variants off on` | off | Separate paired scenarios; `on` requires `--prior` |
 
 ## Development
 

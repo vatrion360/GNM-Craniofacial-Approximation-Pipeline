@@ -26,6 +26,7 @@ from blender_performance_checks import run_performance_checks
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
 from blender_tissue_checks import run_tissue_checks, run_tissue_undo_checks
 from blender_context_checks import run_context_checks
+from blender_uncertainty_checks import run_uncertainty_checks
 from blender_direction_checks import run_direction_checks
 from blender_postfit_checks import run_postfit_checks
 
@@ -57,6 +58,7 @@ with tempfile.TemporaryDirectory() as directory:
         run_depth_checks(addon)
         run_tissue_checks(addon)
         run_context_checks(addon)
+        run_uncertainty_checks(addon)
         scene = bpy.context.scene
         scene.unit_settings.system = 'METRIC'
         scene.unit_settings.scale_length = .001
