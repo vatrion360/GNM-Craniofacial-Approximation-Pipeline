@@ -140,13 +140,8 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     targets, skipped, _csv_meta = read_marker_csv(
         cfg.input, backend.index_to_label, label_to_vertex)
     label_to_vertex = dict(label_to_vertex, **{target.label: target.vertex for target in targets})
-    if cfg.case_metadata:
-        import json
-        with open(cfg.case_metadata, encoding='utf-8') as stream:
-            case = json.load(stream)
-        if not isinstance(case, dict):
-            raise ValueError('Case metadata must be a JSON object')
-        _csv_meta['case_metadata'] = case
+    from .tissue_context import with_case_metadata
+    _csv_meta = with_case_metadata(_csv_meta, cfg.case_metadata)
     document = _csv_meta.get('craniometry')
     if document is not None:
         craniometry.validate_document(document)
@@ -187,8 +182,9 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                 "--exclude: labels not found in the CSV: " + ", ".join(sorted(unknown)))
     if tissue_table is not None:
         from .tissue_application import apply_table
-        targets, _csv_meta, selection = apply_table(targets, _csv_meta, tissue_table, cfg.tissue_labels, cfg.tissue_axis, directions)
+        targets, _csv_meta, selection = apply_table(targets, _csv_meta, tissue_table, cfg.tissue_labels, cfg.tissue_axis, directions, cfg.case_posture)
         warnings_list.extend(tissue_table.warnings)
+        warnings_list.extend(selection['context']['warnings'])
         if selection['replaced_labels']:
             warnings_list.append(selection['interpretation'])
             from .marker_audit import require_unique_landmarks, audit_landmarks
@@ -679,6 +675,8 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
             f"sigma (prior_soft_weight = {loss_cfg.prior_soft_weight:g}).")
     if tissue_table is not None:
         selection = _csv_meta['tissue_application']
+        from .tissue_context import context_text
+        extra_parts.append(context_text(selection['context']))
         extra_parts.append(f"Tissue table: {selection['table']['id']} revision {selection['table']['revision']}; "
                            f"citation={selection['table']['citation']}; SHA256={tissue_table.sha256}; "
                            f"status={selection['status']}; replaced={', '.join(selection['replaced_labels']) or 'none'}; "

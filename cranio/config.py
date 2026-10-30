@@ -31,6 +31,7 @@ class PipelineConfig:
 
     # Explicit scenarios: no table or replacement by default.
     tissue_table: Optional[str] = None
+    case_posture: Optional[str] = None
     tissue_labels: List[str] = field(default_factory=list)
     tissue_axis: str = 'unconfigured'
     tissue_directions: Optional[str] = None
@@ -89,6 +90,8 @@ class PipelineConfig:
 
 
     def validate(self):
+        from .tissue_context import normalized_posture
+        normalized_posture(self.case_posture)
         if self.depth_weighting not in ('none', 'sd'):
             raise ValueError('Unknown depth weighting mode')
         if self.depth_weighting == 'sd' and not (self.tissue_table or self.tissue_compare):

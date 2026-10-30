@@ -309,6 +309,8 @@ def _tissue_selection_changed(self, context):
 
 class GNMSettings(PropertyGroup):
     case_id: StringProperty(name='Pseudonymous case ID')
+    acquisition_posture: StringProperty(name='Case acquisition posture', default='',
+        description='Optional declared posture; leave empty if unknown. No CT inference or geometric correction')
     observer_id: StringProperty(name='Observer ID')
     protocol_id: StringProperty(name='Protocol / revision')
     offline_dense: BoolProperty(name='Include registered bones offline', default=False)
@@ -579,8 +581,9 @@ class GNM_OT_apply_tissue_table(Operator):
             self.report({'ERROR'}, str(exc))
             return {'CANCELLED'}
         policy = ('reviewed source directions applied' if directions else 'current axes retained, source directions not enforced')
-        settings.tissue_status = f'Replaced {count} selected depths; {policy}. Undo restores values.'
-        self.report({'INFO'}, settings.tissue_status)
+        warnings, summary = _core_module('blender_tissue').latest_context_messages(context.scene)
+        settings.tissue_status = f'Replaced {count} selected depths; {policy}. Undo restores values.\n' + summary
+        self.report({'WARNING'} if warnings else {'INFO'}, '; '.join(warnings) if warnings else f'Replaced {count} selected depths')
         return {'FINISHED'}
 
 
@@ -1514,6 +1517,7 @@ class GNM_PT_panel(Panel):
         tissue_box = layout.box()
         tissue_box.label(text='Versioned tissue-table scenario')
         tissue_box.prop(settings, 'tissue_table')
+        tissue_box.prop(settings, 'acquisition_posture')
         if settings.tissue_table == 'FILE':
             tissue_box.prop(settings, 'tissue_table_path')
         tissue_box.label(text='Uses the same selection checkboxes above')
@@ -3698,7 +3702,8 @@ def _export_markers(scene, path):
                        tissue_depth_mm=item.tissue_depth_mm)
         rows.append(row)
     _case_token(scene)
-    meta = {'case_id': scene.gnm_settings.case_id, 'observer_id': scene.gnm_settings.observer_id,
+    meta = {'acquisition_posture': scene.gnm_settings.acquisition_posture or None,
+            'case_id': scene.gnm_settings.case_id, 'observer_id': scene.gnm_settings.observer_id,
             'protocol_id': scene.gnm_settings.protocol_id, 'bone_sources': manifest,
             'mandible_articulation_reviewed': scene.gnm_settings.mandible_aligned, "addon_version": '.'.join(map(str, bl_info['version'])),
             "blender_version": bpy.app.version_string,

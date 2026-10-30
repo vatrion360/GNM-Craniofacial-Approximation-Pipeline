@@ -43,7 +43,7 @@ def apply_selected_table(addon, context, source, axis_acknowledged=False, direct
     if direction_source is not None:
         from .tissue_directions import load_directions
         directions = load_directions(direction_source)
-    _, _, plan = apply_table(targets, dict(version=3, marker_records=records), load_table(source),
+    _, _, plan = apply_table(targets, dict(version=3, marker_records=records, acquisition_posture=context.scene.gnm_settings.acquisition_posture), load_table(source),
                             [m.label for m in selected], 'source' if directions else 'existing', directions)
     by_label = {r['label']: r for r in plan['replacements']}
     shared = {k: v for k, v in plan.items() if k != 'replacements'}
@@ -56,3 +56,17 @@ def apply_selected_table(addon, context, source, axis_acknowledged=False, direct
     return _apply_changes(addon, context, selected, lambda item: by_label[item.label]['after_mm'],
                           audit_for, record_unchanged=True,
                           direction_for=(lambda item: by_label[item.label]['axis_world']) if directions else None)
+
+
+def latest_context_messages(scene):
+    """Read the just-applied audit, without file I/O or recomputing a fit."""
+    from .blender_marker_depths import history
+    from .tissue_context import context_text
+    for item in scene.gnm_markers:
+        if item.adjust_depth_selected:
+            entries = history(item)
+            if entries:
+                context = entries[-1].get('application', {}).get('context')
+                if context:
+                    return context['warnings'], context_text(context, compact=True)
+    return [], ''

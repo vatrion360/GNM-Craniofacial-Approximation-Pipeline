@@ -14,7 +14,7 @@ def table_source(table, row, axis_policy='existing'):
     return f"{data['citation']}; table={data['id']}@{data['revision']}; {axis_policy}-axis scenario; SHA256={table.sha256}"
 
 
-def apply_table(targets, metadata, table, labels=(), axis_policy='unconfigured', directions=None):
+def apply_table(targets, metadata, table, labels=(), axis_policy='unconfigured', directions=None, case_posture=None):
     """Plan all replacements before returning detached records; never mutate inputs.
 
     Selection without labels preserves case values. Explicit labels authorize
@@ -87,5 +87,7 @@ def apply_table(targets, metadata, table, labels=(), axis_policy='unconfigured',
         record['interpretation'] = ('Selected depths applied along explicitly reviewed source-direction vectors. '
             'Direction geometry, table hash and bone anchors checked; no automatic anatomical frame or normal inference. '
             'Operator review is not independent source validation. Dense offsets/directions remain unchanged.')
+    from .tissue_context import describe_context
+    record['context'] = describe_context(table, metadata, list(planned), case_posture)
     result_meta['tissue_application'] = record
     return result, result_meta, record

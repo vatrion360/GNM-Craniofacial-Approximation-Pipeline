@@ -124,6 +124,10 @@ identify the catalogue separately from actual case values. See [format and comma
 | `import-csv --input FILE --output FILE` | Validate CSV and write JSON |
 | `--overwrite` | Explicitly replace an output; never replace an input |
 
+Selected-table reports name the supplied estimator for each row and compare
+recorded posture labels. No posture is inferred from CT and no shorth/75-shormax
+is derived from a mean. See [posture/estimator reporting](docs/TISSUE_CONTEXT.md).
+
 For explicit scenarios in fitting, see [selection/application and comparison](docs/TISSUE_SCENARIOS.md).
 Selecting a table alone preserves case values. Replacing selected values requires
 explicit labels and either acceptance of existing axes or a reviewed source-direction
@@ -133,6 +137,7 @@ follow reviewed sampled bone normals and are not replaced by selected-marker tab
 
 | Fit option | Default | Effect |
 | --- | --- | --- |
+| `--case-posture TEXT` | Unknown | Declared acquisition posture; selected-table mismatch/unknown warnings only, no geometric correction |
 | `--depth-weighting {none,sd}` | `none` | Offline only: optional `1/SD_mm²` multipliers from the selected table; missing SD retains base weight with warning; sensitivity, not calibrated uncertainty |
 | `--tissue-table ID_OR_JSON` | None | Select/report a table; does not by itself replace targets |
 | `--tissue-labels LABEL ...` | Empty | Explicit authorization to replace these case depths/targets |
