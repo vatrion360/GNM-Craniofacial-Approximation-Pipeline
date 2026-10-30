@@ -39,19 +39,32 @@ def apply_adjustment(addon, context, percent: float, mode: str) -> int:
     independent of active-row and fit flags. A 100% decrease keeps the direction
     on the bone object for later direct depth edits. Increasing zero stays zero.
     """
+    adjusted_depth(0., percent, mode)
+    def audit_for(row, timestamp):
+        record = dict(utc=timestamp, method='manual_percentage', percent=percent, mode=mode,
+            before_mm=row['old_depth'], after_mm=float(row['item'].tissue_depth_mm),
+            previous_tissue_source=row['old_source'])
+        prefix = 'manual-percentage; base source: '
+        source = (row['old_source'] if row['old_source'].startswith(prefix)
+                  else prefix + (row['old_source'] or 'not recorded'))
+        return record, source
+    return _apply_changes(addon, context,
+        [m for m in context.scene.gnm_markers if m.adjust_depth_selected],
+        lambda item: adjusted_depth(float(item.tissue_depth_mm), percent, mode), audit_for)
+
+
+def _apply_changes(addon, context, selected, depth_for, audit_for, record_unchanged=False):
+    """Shared all-or-nothing main-thread RNA/geometry transaction for depth edits."""
     from mathutils import Vector
 
     scene = context.scene
-    selected = [m for m in scene.gnm_markers if m.adjust_depth_selected]
     if not selected:
         raise ValueError('Select at least one marker using the adjustment checkboxes')
-    # Validate even a zero-percent operation, but do not record a no-op.
-    adjusted_depth(0., percent, mode)
     if scene.library or scene.override_library:
         raise ValueError('Use a local editable scene for marker adjustment')
     planned = []
     for item in selected:
-        value = adjusted_depth(float(item.tissue_depth_mm), percent, mode)
+        value = adjusted_depth(depth_for(item), 0., 'INCREASE')
         records = history(item)
         direction = None
         if bool(item.bone_empty) != bool(item.target_empty):
@@ -65,6 +78,11 @@ def apply_adjustment(addon, context, percent: float, mode: str) -> int:
             if not all(math.isfinite(v) for row in obj.matrix_world for v in row):
                 raise ValueError(f'{item.label}: non-finite marker transform')
         for obj in (item.target_empty, item.peg_object):
+            if obj:
+                uses = sum(obj == candidate for marker in scene.gnm_markers
+                           for candidate in (marker.bone_empty, marker.target_empty, marker.peg_object))
+                if uses != 1:
+                    raise ValueError(f'{item.label}: shared target/peg would change another marker; repair object ownership')
             if obj and (obj.parent or obj.constraints or obj.animation_data):
                 raise ValueError(f'{item.label}: detach target/peg parents, constraints or animation first')
         if item.is_placed:
@@ -76,7 +94,7 @@ def apply_adjustment(addon, context, percent: float, mode: str) -> int:
             if not all(math.isfinite(v) for v in direction) or direction.length < 1e-12:
                 raise ValueError(f'{item.label}: missing marker direction; re-place it first')
             direction.normalize()
-        if value == item.tissue_depth_mm:
+        if value == item.tissue_depth_mm and not record_unchanged:
             continue
         planned.append(dict(item=item, value=value, direction=direction, history=records,
             old_depth=float(item.tissue_depth_mm), old_source=item.tissue_source,
@@ -96,13 +114,9 @@ def apply_adjustment(addon, context, percent: float, mode: str) -> int:
             if item.is_placed:
                 normals.set_direction(item, row['direction'], scene.gnm_settings.peg_thickness_mm)
             # Read back RNA float precision for the authoritative audit value.
-            record = dict(utc=timestamp, method='manual_percentage', percent=percent, mode=mode,
-                before_mm=row['old_depth'], after_mm=float(item.tissue_depth_mm),
-                previous_tissue_source=row['old_source'])
+            record, source = audit_for(row, timestamp)
             item.depth_adjustment_history = json.dumps(row['history'] + [record], allow_nan=False)
-            prefix = 'manual-percentage; base source: '
-            item.tissue_source = (row['old_source'] if row['old_source'].startswith(prefix)
-                                  else prefix + (row['old_source'] or 'not recorded'))
+            item.tissue_source = source
     except Exception:
         # RNA update exceptions are normally swallowed by Blender; this path
         # calls the geometry adapter explicitly so failures can roll back.

@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add opt-in tissue-table selection, explicit selected-marker replacement on current case axes, and independent offline table comparisons with statistical/final vertex-difference PLYs. Preserve manual values unless explicitly selected for replacement; record sources, input hashes and before/after history. Blender application supports rollback and Undo/Redo. No source-direction enforcement or uncertainty calibration is implied.
+
 - Migrate existing marker and dense-region/scalp depths to two versioned data files; retain exact values, default sets and manual case precedence. Include data/schema hashes and an explicitly labelled default catalogue in audit reports.
 
 - Add opt-in versioned tissue-table JSON/CSV validation and exchange, exact-file provenance hashes and explicit missing-data diagnostics. No new tissue values, weights or automatic case changes. Package the schema in the wheel and Blender ZIP.

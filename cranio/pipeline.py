@@ -90,6 +90,9 @@ def _nasal_diagnostic_report(bone_positions, skull_points, v_final):
 def run_pipeline(cfg: PipelineConfig) -> int:
     """Public API: user input failures return 2, including missing dependencies."""
     try:
+        if cfg.tissue_compare:
+            from .tissue_compare import run_comparison
+            return run_comparison(cfg)
         return _run_pipeline(cfg)
     except (ValueError, OSError, ImportError, np.linalg.LinAlgError) as exc:
         logger.error(f"[FATAL ERROR] {exc}")
@@ -101,6 +104,11 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     cfg.fill_default_outputs()
     cfg.validate()
     input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.protocol, cfg.case_metadata, cfg.craniometry) if path}
+    tissue_table = None
+    if cfg.tissue_table:
+        from .tissue import load_table, table_path
+        tissue_table = load_table(cfg.tissue_table)
+        input_hashes[str(table_path(cfg.tissue_table))] = tissue_table.sha256
     warnings_list = []
 
     backend = GNMBackend(cfg.npz)
@@ -171,6 +179,18 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         if unknown:
             warnings_list.append(
                 "--exclude: labels not found in the CSV: " + ", ".join(sorted(unknown)))
+    if tissue_table is not None:
+        from .tissue_application import apply_table
+        targets, _csv_meta, selection = apply_table(targets, _csv_meta, tissue_table, cfg.tissue_labels, cfg.tissue_axis)
+        warnings_list.extend(tissue_table.warnings)
+        if selection['replaced_labels']:
+            warnings_list.append(selection['interpretation'])
+            from .marker_audit import require_unique_landmarks, audit_landmarks
+            require_unique_landmarks([t.label for t in targets], [t.vertex for t in targets], [t.xyz for t in targets])
+            _csv_meta['landmark_audit'] = audit_landmarks([t.label for t in targets], [t.vertex for t in targets],
+                bones={k: v for k, v in _csv_meta.get('bone_positions_mm', {}).items() if k in {t.label for t in targets}})
+        else:
+            warnings_list.append('Tissue table selected only: no replacement labels; all case targets preserved')
     records = _csv_meta.get("marker_records", {})
     warnings_list.extend(_csv_meta.get('landmark_audit', {}).get('warnings', []))
     unreviewed = [t.label for t in targets if not has_documented_tissue_source(
@@ -636,6 +656,12 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         extra_parts.append(
             f"Soft latent prior active beyond +/-{loss_cfg.prior_soft_sigma:g} "
             f"sigma (prior_soft_weight = {loss_cfg.prior_soft_weight:g}).")
+    if tissue_table is not None:
+        selection = _csv_meta['tissue_application']
+        extra_parts.append(f"Tissue table: {selection['table']['id']} revision {selection['table']['revision']}; "
+                           f"citation={selection['table']['citation']}; SHA256={tissue_table.sha256}; "
+                           f"status={selection['status']}; replaced={', '.join(selection['replaced_labels']) or 'none'}; "
+                           f"axis={cfg.tissue_axis}; source direction NOT enforced; dense settings unchanged.")
     if extra_parts:
         extra = "\n".join(extra_parts)
     lm_regions = None

@@ -112,10 +112,17 @@ def parse_args(argv=None) -> PipelineConfig:
     parser.add_argument('--skull-flip-normals', action="store_true")
     parser.add_argument('--geometry-qc', default='basic')
     parser.add_argument('--require-qc', action="store_true")
+    parser.add_argument('--tissue-table', help='Bundled ID or local JSON; selection alone preserves all targets')
+    parser.add_argument('--tissue-labels', nargs='+', default=[], help='Explicit labels whose case depths/targets may be replaced')
+    parser.add_argument('--tissue-axis', choices=('unconfigured', 'existing'), default='unconfigured',
+                        help='Explicit existing-axis sensitivity assumption; source directions are NOT enforced')
+    parser.add_argument('--tissue-compare', help='Comma-separated table IDs/JSON paths; needs tissue-labels and fresh output prefix')
     args = parser.parse_args(argv)
 
     return PipelineConfig(
         input=args.input,
+        tissue_table=args.tissue_table, tissue_labels=args.tissue_labels,
+        tissue_axis=args.tissue_axis, tissue_compare=args.tissue_compare,
         prior=args.prior,
         landmark_map=args.landmark_map,
         protocol=args.protocol,

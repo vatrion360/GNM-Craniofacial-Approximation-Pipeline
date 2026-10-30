@@ -94,3 +94,37 @@ Base: `6cbb445812d4b050100a0f285995cc0e4bdb5bdb` (A1.1).
   legacy heuristics instead of conflating their provenance. The task's requested
   real-case comparisons remain with the user; synthetic engineering replay is
   provided here. No new scientific values, weights or thresholds were selected.
+
+## A1.3 — Explicit selected-marker scenarios and table comparison
+
+Base: `6bcf3c81e3f7153725c1b2516fb546cc27b3107d` (A1.2).
+
+- Added shared `tissue_application.py`, offline `tissue_compare.py`, Blender
+  adapter/dropdown/Apply operator, CLI/config controls, audit records and custom
+  table hashes in frozen protocols. Added `TISSUE_SCENARIOS.md`, command tables,
+  30 synthetic pytest cases and actual Blender checks.
+- Selection alone preserves all case values. Explicit labels/checkboxes plus
+  explicit existing-axis acknowledgement authorize selected replacements,
+  including manual measurements. No source frame, anatomical depth or SD is
+  invented. Source direction is not enforced and is labelled as an assumption.
+- Comparisons refit each table from the same original case, use a fresh output
+  directory, keep ordinary QC gates and publish the summary only after success.
+  Statistical/final corresponding-vertex differences are separate. Inputs are
+  hashed across runs. Dense offsets/weights are unchanged. Frozen multi-table
+  experiments require separately reviewed per-scenario protocols.
+- Shared Blender geometry transaction preserves Undo/Redo, history and rollback;
+  shared target/peg ownership is rejected to avoid moving unselected markers.
+  External fitting consumes already edited CSV targets without double application.
+- Before: 319 passed, 1 Windows-only skip. After: 349 passed, 1 Windows-only skip,
+  official GNM enabled. Ruff passed. Actual installed-ZIP Blender 4.5.0 Linux
+  passed including source/geometry history, rollback, persistence, CSV and Undo.
+  Runtime: Python 3.12.14 / NumPy 2.3.5 / SciPy 1.17.0 / trimesh 5.1.0 /
+  pytest 9.1.1. Wheel/sdist build and installed-wheel import checked separately.
+- Default-path replay against the base produced identical numerical manifests
+  and OBJ/PLY bytes with/without local correction. Both artificial cases retained
+  non-convergence at the iteration limit; see TISSUE_SELECTION_BENCHMARK.json.
+- Deviation/limit: A1.3 exposes only explicit existing-axis sensitivity, since
+  source-direction enforcement belongs to A1.5 and bundled directions are null.
+  Dense tissue-table application is not claimed. Historical Table 2 bulk Apply
+  remains unchanged. SD weighting, direction enforcement, uncertainty and CT
+  validation are not completed by this task; CT assessment stays with the user.

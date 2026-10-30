@@ -149,6 +149,10 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
     for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry'):
         if getattr(cfg, name):
             inputs[name] = dict(path=os.path.abspath(getattr(cfg, name)), sha256=sha256_file(getattr(cfg, name)))
+    if cfg.tissue_table:
+        from .tissue import table_path
+        inputs['tissue_table'] = dict(path=str(table_path(cfg.tissue_table).resolve()),
+                                     sha256=metadata['tissue_application']['table']['sha256'])
     loo, history, dense_history = fit_info
     mode = str(cfg.regularization).lower()
     lambda_selection = {
