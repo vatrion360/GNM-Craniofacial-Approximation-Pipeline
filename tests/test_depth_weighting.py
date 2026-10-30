@@ -239,3 +239,31 @@ def test_protocol_freezes_sd_mode(tmp_path, model_file, marker_file, sd_table):
     frozen = frozen_from_report(report, 'synthetic/v1', 'a'*64)
     assert frozen['settings']['depth_weighting'] == 'sd'
     assert frozen['optional_inputs']['tissue_table'] == load_table(sd_table).sha256
+
+
+def test_larger_sd_reduces_identity_ridge_pull_with_hand_solution(sd_table):
+    from cranio.optimize import _ridge_solve
+    # One coefficient drives x on two synthetic vertices: targets 0 and 4.
+    # beta = sum(w*x) / (sum(w) + lambda): 1/2.25 versus 4/3.
+    design = np.array([[1.], [0.], [0.], [1.], [0.], [0.]])
+    offset = np.array([0., 0., 0., 4., 0., 0.])
+    weighted, _, _ = marker_weights(load_table(sd_table), ['absent', 'P1'], [1., 1.])
+    a = _ridge_solve(design, offset, np.repeat(weighted, 3), 1., 1)
+    b = _ridge_solve(design, offset, np.ones(6), 1., 1)
+    assert a[0] == pytest.approx(1/2.25) and b[0] == pytest.approx(4/3)
+
+
+def test_missing_sd_preserves_dense_fit_exactly():
+    mu, dense = sphere_problem()
+    basis = np.random.default_rng(10).normal(size=(3, len(mu), 3))
+    ids = np.arange(0, len(mu), 2)
+    weights = np.linspace(.5, 1., len(ids))
+    targets = mu[ids]+[0., 1., 2.]
+    baseline = fit_identity(mu, basis, ids, targets, weights, lam=30., dense=copy.deepcopy(dense))
+    factors, _, warnings = region_factors(load_table('legacy_hardcoded'), dense['regions'], .7)
+    assert warnings
+    dense.update(depth_precision_factors=factors, depth_base_marker_weights=weights.copy())
+    weighted = fit_identity(mu, basis, ids, targets, weights, lam=30., dense=dense)
+    for before, after in zip(baseline[:5], weighted[:5]):
+        assert_array_equal(before, after)
+    assert_array_equal(baseline.residuals_mm, weighted.residuals_mm)
