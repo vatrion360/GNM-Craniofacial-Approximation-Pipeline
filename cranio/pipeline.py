@@ -103,12 +103,16 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     """Ruleaza pipeline-ul complet. Returneaza 0 (succes) sau 2 (fatal)."""
     cfg.fill_default_outputs()
     cfg.validate()
-    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.protocol, cfg.case_metadata, cfg.craniometry) if path}
+    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.protocol, cfg.case_metadata, cfg.craniometry, cfg.tissue_directions) if path}
     tissue_table = None
     if cfg.tissue_table:
         from .tissue import load_table, table_path
         tissue_table = load_table(cfg.tissue_table)
         input_hashes[str(table_path(cfg.tissue_table))] = tissue_table.sha256
+    directions = None
+    if cfg.tissue_directions:
+        from .tissue_directions import load_directions
+        directions = load_directions(cfg.tissue_directions)
     warnings_list = []
 
     backend = GNMBackend(cfg.npz)
@@ -181,7 +185,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                 "--exclude: labels not found in the CSV: " + ", ".join(sorted(unknown)))
     if tissue_table is not None:
         from .tissue_application import apply_table
-        targets, _csv_meta, selection = apply_table(targets, _csv_meta, tissue_table, cfg.tissue_labels, cfg.tissue_axis)
+        targets, _csv_meta, selection = apply_table(targets, _csv_meta, tissue_table, cfg.tissue_labels, cfg.tissue_axis, directions)
         warnings_list.extend(tissue_table.warnings)
         if selection['replaced_labels']:
             warnings_list.append(selection['interpretation'])
@@ -676,7 +680,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         extra_parts.append(f"Tissue table: {selection['table']['id']} revision {selection['table']['revision']}; "
                            f"citation={selection['table']['citation']}; SHA256={tissue_table.sha256}; "
                            f"status={selection['status']}; replaced={', '.join(selection['replaced_labels']) or 'none'}; "
-                           f"axis={cfg.tissue_axis}; source direction NOT enforced; dense offsets unchanged.")
+                           f"axis={cfg.tissue_axis}; source direction enforced={selection['source_direction_enforced']}; dense offsets/directions unchanged.")
     if cfg.depth_weighting == 'sd':
         weighting_record['retained_labels'] = labels
         extra_parts.append('Depth weighting: base_weight / SD_mm^2; missing SD retains base weight with warnings. '

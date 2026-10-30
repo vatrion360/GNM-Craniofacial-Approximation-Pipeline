@@ -116,15 +116,16 @@ def parse_args(argv=None) -> PipelineConfig:
                         help='Optional table SD_mm inverse-square sensitivity weights; missing SD retains base weight')
     parser.add_argument('--tissue-table', help='Bundled ID or local JSON; selection alone preserves all targets')
     parser.add_argument('--tissue-labels', nargs='+', default=[], help='Explicit labels whose case depths/targets may be replaced')
-    parser.add_argument('--tissue-axis', choices=('unconfigured', 'existing'), default='unconfigured',
-                        help='Explicit existing-axis sensitivity assumption; source directions are NOT enforced')
+    parser.add_argument('--tissue-axis', choices=('unconfigured', 'existing', 'source'), default='unconfigured',
+                        help='Existing-axis sensitivity assumption or explicit reviewed source-direction manifest')
+    parser.add_argument('--tissue-directions', help='Reviewed world-mm direction manifest JSON; requires tissue-axis source')
     parser.add_argument('--tissue-compare', help='Comma-separated table IDs/JSON paths; needs tissue-labels and fresh output prefix')
     args = parser.parse_args(argv)
 
     return PipelineConfig(
         input=args.input,
         tissue_table=args.tissue_table, tissue_labels=args.tissue_labels,
-        tissue_axis=args.tissue_axis, tissue_compare=args.tissue_compare, depth_weighting=args.depth_weighting,
+        tissue_axis=args.tissue_axis, tissue_directions=args.tissue_directions, tissue_compare=args.tissue_compare, depth_weighting=args.depth_weighting,
         prior=args.prior,
         landmark_map=args.landmark_map,
         protocol=args.protocol,

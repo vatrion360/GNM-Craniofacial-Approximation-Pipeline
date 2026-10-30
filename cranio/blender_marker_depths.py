@@ -53,7 +53,7 @@ def apply_adjustment(addon, context, percent: float, mode: str) -> int:
         lambda item: adjusted_depth(float(item.tissue_depth_mm), percent, mode), audit_for)
 
 
-def _apply_changes(addon, context, selected, depth_for, audit_for, record_unchanged=False):
+def _apply_changes(addon, context, selected, depth_for, audit_for, record_unchanged=False, direction_for=None):
     """Shared all-or-nothing main-thread RNA/geometry transaction for depth edits."""
     from mathutils import Vector
 
@@ -88,8 +88,9 @@ def _apply_changes(addon, context, selected, depth_for, audit_for, record_unchan
         if item.is_placed:
             if not addon._is_mm_scene(scene):
                 raise ValueError('Expected metric scene scale 0.001: 1 Blender coordinate = 1 mm')
-            direction = item.target_empty.matrix_world.translation - item.bone_empty.matrix_world.translation
-            if direction.length < 1e-9:
+            direction = (Vector(direction_for(item)) if direction_for is not None else
+                         item.target_empty.matrix_world.translation - item.bone_empty.matrix_world.translation)
+            if direction_for is None and direction.length < 1e-9:
                 direction = Vector(item.bone_empty.get('gnm_normal', (0, 0, 0)))
             if not all(math.isfinite(v) for v in direction) or direction.length < 1e-12:
                 raise ValueError(f'{item.label}: missing marker direction; re-place it first')

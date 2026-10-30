@@ -33,6 +33,7 @@ class PipelineConfig:
     tissue_table: Optional[str] = None
     tissue_labels: List[str] = field(default_factory=list)
     tissue_axis: str = 'unconfigured'
+    tissue_directions: Optional[str] = None
     tissue_compare: Optional[str] = None
     depth_weighting: str = 'none'
 
@@ -92,7 +93,7 @@ class PipelineConfig:
             raise ValueError('Unknown depth weighting mode')
         if self.depth_weighting == 'sd' and not (self.tissue_table or self.tissue_compare):
             raise ValueError('SD depth weighting requires a tissue table')
-        if self.tissue_axis not in ('unconfigured', 'existing'):
+        if self.tissue_axis not in ('unconfigured', 'existing', 'source'):
             raise ValueError('Unknown tissue axis policy')
         if self.tissue_table and self.tissue_compare:
             raise ValueError('Choose tissue-table OR tissue-compare')
@@ -102,8 +103,12 @@ class PipelineConfig:
             raise ValueError('Duplicate tissue replacement labels')
         if self.tissue_labels and not (self.tissue_table or self.tissue_compare):
             raise ValueError('tissue-labels requires a table')
-        if self.tissue_labels and self.tissue_axis != 'existing':
-            raise ValueError('Explicit --tissue-axis existing required for replacement')
+        if self.tissue_labels and self.tissue_axis == 'unconfigured':
+            raise ValueError('Explicit --tissue-axis existing or source required for replacement')
+        if self.tissue_axis == 'source' and (not self.tissue_directions or not self.tissue_labels):
+            raise ValueError('Source direction mode requires --tissue-directions and --tissue-labels')
+        if self.tissue_directions and self.tissue_axis != 'source':
+            raise ValueError('--tissue-directions requires --tissue-axis source')
         tissue_inputs = []
         if self.tissue_table:
             from .tissue import table_path
@@ -118,7 +123,7 @@ class PipelineConfig:
             raise ValueError(f"Model not found: {self.npz}; see docs/INSTALL.md")
         if self.skull and not os.path.isfile(self.skull):
             raise ValueError(f"Skull not found: {self.skull}")
-        for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry'):
+        for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'tissue_directions'):
             if getattr(self, name) and not os.path.isfile(getattr(self, name)):
                 raise ValueError(f'{name} not found: {getattr(self, name)}')
         if self.skull and not self.skull_normals_reviewed:
@@ -153,14 +158,14 @@ class PipelineConfig:
             if not math.isfinite(value) or value <= 0:
                 raise ValueError("regularization must be 'auto', 'adaptive' or finite and positive")
         from .validation import validate_outputs
-        validate_outputs([self.input, self.npz, self.skull, self.prior, self.landmark_map, self.protocol, self.case_metadata, self.craniometry, *tissue_inputs],
+        validate_outputs([self.input, self.npz, self.skull, self.prior, self.landmark_map, self.protocol, self.case_metadata, self.craniometry, self.tissue_directions, *tissue_inputs],
                          [self.output, self.output_error_mesh, self.output_stats,
                           self.output_json, self.output_statistical], self.overwrite)
 
     def fill_default_outputs(self):
         """Completeaza caile de iesire implicite din numele intrarii."""
         for name in ("input", "npz", "skull", "output", "output_stats", "output_error_mesh",
-                     "output_json", "output_statistical", "prior", "landmark_map", "protocol", "case_metadata", "craniometry", "tissue_table"):
+                     "output_json", "output_statistical", "prior", "landmark_map", "protocol", "case_metadata", "craniometry", "tissue_table", "tissue_directions"):
             value = getattr(self, name)
             if value is not None:
                 setattr(self, name, os.fspath(value))

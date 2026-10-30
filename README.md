@@ -19,6 +19,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
+- [Reviewed tissue measurement directions](docs/TISSUE_DIRECTIONS.md)
 - [Explicit tissue scenarios and comparison](docs/TISSUE_SCENARIOS.md)
 - [Versioned tissue tables: JSON/CSV exchange](docs/tissue_tables_howto.md)
 - [Contributing and CI](CONTRIBUTING.md)
@@ -125,16 +126,18 @@ identify the catalogue separately from actual case values. See [format and comma
 
 For explicit scenarios in fitting, see [selection/application and comparison](docs/TISSUE_SCENARIOS.md).
 Selecting a table alone preserves case values. Replacing selected values requires
-explicit labels and acceptance of existing marker axes; source directions are
-not enforced. Blender offers the same operation on checked, placed markers with
-Undo and audit history. Existing manual values change only through explicit Apply.
+explicit labels and either acceptance of existing axes or a reviewed source-direction
+manifest. Blender offers both policies on checked, placed markers with
+Undo and audit history. Existing manual values change only through explicit Apply. Dense offsets still
+follow reviewed sampled bone normals and are not replaced by selected-marker tables.
 
 | Fit option | Default | Effect |
 | --- | --- | --- |
 | `--depth-weighting {none,sd}` | `none` | Offline only: optional `1/SD_mm²` multipliers from the selected table; missing SD retains base weight with warning; sensitivity, not calibrated uncertainty |
 | `--tissue-table ID_OR_JSON` | None | Select/report a table; does not by itself replace targets |
 | `--tissue-labels LABEL ...` | Empty | Explicit authorization to replace these case depths/targets |
-| `--tissue-axis existing` | Unconfigured | Accept current bone-to-skin axes as a sensitivity assumption |
+| `--tissue-axis {existing,source}` | Unconfigured | Preserve current axes explicitly, or use reviewed world-frame source directions |
+| `--tissue-directions FILE` | None | Manifest required for source mode; normal, vertical or explicit in-sagittal-plane vectors; no inferred frame |
 | `--tissue-compare ID1,ID2,...` | None | Independent per-table fits, corresponding-vertex difference PLYs and summary; fresh output prefix required |
 
 ## Development

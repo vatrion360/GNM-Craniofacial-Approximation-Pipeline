@@ -112,3 +112,7 @@ Selected**. Punctul de pe os și grosimea tisulară rămân aceleași. Se schimb
 tijei și poziția țintei. Reexportă CSV-ul pentru următoarea rulare offline.
 La margini și pe os foarte subțire verifică o rază mai mică; normala geometrică
 trebuie să respecte și direcția de măsurare cerută de protocolul anatomic.
+
+A separate optional [source-direction table scenario](TISSUE_DIRECTIONS.md) can
+apply explicitly reviewed normal/vertical/sagittal vectors. It does not recompute
+this estimator or equate a geometric normal with every tissue measurement method.
