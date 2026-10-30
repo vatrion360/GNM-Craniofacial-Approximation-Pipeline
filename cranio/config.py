@@ -29,6 +29,12 @@ class PipelineConfig:
     npz: str = field(default_factory=default_npz_path)
     skull: Optional[str] = None
 
+    # Explicit scenarios: no table or replacement by default.
+    tissue_table: Optional[str] = None
+    tissue_labels: List[str] = field(default_factory=list)
+    tissue_axis: str = 'unconfigured'
+    tissue_compare: Optional[str] = None
+
     # Fit statistic
     regularization: str = "auto"          # "auto" (LOO-CV) sau valoare fixa
     identity_subspace: str = 'all'
@@ -81,6 +87,24 @@ class PipelineConfig:
 
 
     def validate(self):
+        if self.tissue_axis not in ('unconfigured', 'existing'):
+            raise ValueError('Unknown tissue axis policy')
+        if self.tissue_table and self.tissue_compare:
+            raise ValueError('Choose tissue-table OR tissue-compare')
+        if not isinstance(self.tissue_labels, list) or any(not isinstance(x, str) or not x for x in self.tissue_labels):
+            raise ValueError('tissue_labels must be a list of nonempty labels')
+        if len(set(self.tissue_labels)) != len(self.tissue_labels):
+            raise ValueError('Duplicate tissue replacement labels')
+        if self.tissue_labels and not (self.tissue_table or self.tissue_compare):
+            raise ValueError('tissue-labels requires a table')
+        if self.tissue_labels and self.tissue_axis != 'existing':
+            raise ValueError('Explicit --tissue-axis existing required for replacement')
+        tissue_inputs = []
+        if self.tissue_table:
+            from .tissue import table_path
+            tissue_inputs.append(table_path(self.tissue_table))
+            if not tissue_inputs[0].is_file():
+                raise ValueError(f'Tissue table not found: {self.tissue_table}')
         if self.identity_subspace not in ('all', 'head'):
             raise ValueError('identity_subspace must be all or head')
         if not self.input or not os.path.isfile(self.input):
@@ -124,14 +148,14 @@ class PipelineConfig:
             if not math.isfinite(value) or value <= 0:
                 raise ValueError("regularization must be 'auto', 'adaptive' or finite and positive")
         from .validation import validate_outputs
-        validate_outputs([self.input, self.npz, self.skull, self.prior, self.landmark_map, self.protocol, self.case_metadata, self.craniometry],
+        validate_outputs([self.input, self.npz, self.skull, self.prior, self.landmark_map, self.protocol, self.case_metadata, self.craniometry, *tissue_inputs],
                          [self.output, self.output_error_mesh, self.output_stats,
                           self.output_json, self.output_statistical], self.overwrite)
 
     def fill_default_outputs(self):
         """Completeaza caile de iesire implicite din numele intrarii."""
         for name in ("input", "npz", "skull", "output", "output_stats", "output_error_mesh",
-                     "output_json", "output_statistical", "prior", "landmark_map", "protocol", "case_metadata", "craniometry"):
+                     "output_json", "output_statistical", "prior", "landmark_map", "protocol", "case_metadata", "craniometry", "tissue_table"):
             value = getattr(self, name)
             if value is not None:
                 setattr(self, name, os.fspath(value))

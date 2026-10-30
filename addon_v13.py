@@ -301,12 +301,28 @@ def _normal_settings_changed(self, context):
         context.scene.gnm_settings.normal_status = 'Preview the selected marker before reorienting'
 
 
+def _tissue_selection_changed(self, context):
+    self.tissue_axis_existing = False
+    self.tissue_status = 'Selection alone preserves case values; review source and axes before Apply'
+
+
 class GNMSettings(PropertyGroup):
     case_id: StringProperty(name='Pseudonymous case ID')
     observer_id: StringProperty(name='Observer ID')
     protocol_id: StringProperty(name='Protocol / revision')
     offline_dense: BoolProperty(name='Include registered bones offline', default=False)
     local_correction: BoolProperty(name='Local correction offline', default=False)
+
+    tissue_table: EnumProperty(name='Tissue table', items=[
+        ('NONE', 'Keep case values', 'No application'),
+        ('legacy_hardcoded', 'Inherited defaults (unverified)', 'Legacy values without verified source or SD'),
+        ('var2026_table2', 'VAR Table 2 reference', 'Existing normal-female case-study transcription; review applicability'),
+        ('FILE', 'Local JSON table', 'Versioned tissue schema; review citation and cohort')],
+        default='NONE', update=_tissue_selection_changed)
+    tissue_table_path: StringProperty(name='Table JSON', subtype='FILE_PATH', update=_tissue_selection_changed)
+    tissue_axis_existing: BoolProperty(name='Use current axes as an explicit assumption', default=False,
+        description='Source directions are NOT enforced; selected manual depths will be replaced')
+    tissue_status: StringProperty(default='Keep case values; table application is explicit')
 
     marker_set: EnumProperty(name="Marker set", items=[
         ('EXTENDED_48', "Extended 48", "Existing 27 plus 21 additional Table 2 positions"),
@@ -384,7 +400,7 @@ class GNMMarkerItem(PropertyGroup):
     gnm_index: IntProperty()
     label: StringProperty()
     tissue_depth_mm: FloatProperty(default=5.0, min=0.0, update=_update_tissue_depth)
-    adjust_depth_selected: BoolProperty(name='Select for percentage adjustment', default=False,
+    adjust_depth_selected: BoolProperty(name='Select for depth operation', default=False,
         description='Select this row for the bulk depth edit; independent of Include in fit')
     depth_adjustment_history: StringProperty(default='[]', options={'HIDDEN'})
     tissue_source: StringProperty(name="Tissue source / method", default="legacy-unvalidated", update=_marker_fit_changed)
@@ -525,6 +541,32 @@ class GNM_OT_apply_paper_tissues(Operator):
                 item.tissue_source = paper.TISSUE_SOURCE
                 count += 1
         self.report({'INFO'}, f"Updated {count} Table 2 sites; review study applicability and placement direction.")
+        return {'FINISHED'}
+
+
+class GNM_OT_apply_tissue_table(Operator):
+    bl_idname = 'gnm.apply_tissue_table'
+    bl_label = 'Replace Selected Depths from Table'
+    bl_description = 'Replace selected placed markers, including manual depths; bones/current axes stay fixed. Undo restores values'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return bool(context.scene.gnm_settings.tissue_table != 'NONE' and
+                    any(m.adjust_depth_selected for m in context.scene.gnm_markers))
+
+    def execute(self, context):
+        settings = context.scene.gnm_settings
+        source = bpy.path.abspath(settings.tissue_table_path) if settings.tissue_table == 'FILE' else settings.tissue_table
+        try:
+            count = _core_module('blender_tissue').apply_selected_table(
+                sys.modules[__name__], context, source, settings.tissue_axis_existing)
+        except (ValueError, OSError, RuntimeError) as exc:
+            settings.tissue_status = str(exc)
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        settings.tissue_status = f'Replaced {count} selected depths; current axes retained, source directions not enforced. Undo restores values.'
+        self.report({'INFO'}, settings.tissue_status)
         return {'FINISHED'}
 
 
@@ -1454,6 +1496,18 @@ class GNM_PT_panel(Panel):
         adjust.label(text='Manual scenario; not a calibrated BMI model')
         for line in textwrap.wrap(settings.depth_adjust_status, width=48):
             adjust.label(text=line)
+
+        tissue_box = layout.box()
+        tissue_box.label(text='Versioned tissue-table scenario')
+        tissue_box.prop(settings, 'tissue_table')
+        if settings.tissue_table == 'FILE':
+            tissue_box.prop(settings, 'tissue_table_path')
+        tissue_box.label(text='Uses the same selection checkboxes above')
+        tissue_box.label(text='Replaces selected manual depths; bones stay fixed')
+        tissue_box.prop(settings, 'tissue_axis_existing')
+        tissue_box.operator('gnm.apply_tissue_table', icon='PRESET')
+        for line in textwrap.wrap(settings.tissue_status, width=48):
+            tissue_box.label(text=line)
 
         placed_count = sum(1 for m in scene.gnm_markers if m.is_placed)
         total_count = len(scene.gnm_markers)
@@ -3835,7 +3889,7 @@ _classes = (
     GNM_OT_recenter_on_plane, GNM_OT_asymmetry_report, GNM_OT_session_report,
     GNM_OT_capturi_standardizate, GNM_OT_mirror_reconstruct, GNM_OT_export_csv,
     GNM_UL_markers, GNM_PT_panel, GNM_OT_run_offline, GNM_OT_cancel_offline,
-    GNM_OT_check_python, GNM_OT_apply_paper_tissues,
+    GNM_OT_check_python, GNM_OT_apply_paper_tissues, GNM_OT_apply_tissue_table,
     GNM_OT_select_depth_markers, GNM_OT_adjust_marker_depths,
     # V13:
     GNMLiveSettings, GNM_OT_setup_dual_viewports, GNM_OT_toggle_skull_overlay,

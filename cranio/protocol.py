@@ -7,7 +7,7 @@ from .provenance import implementation_manifest
 from .validation import has_documented_tissue_source, sha256_file, validate_outputs
 
 CASE_FIELDS = {'input', 'output', 'output_error_mesh', 'output_stats', 'output_json',
-    'output_statistical', 'npz', 'skull', 'prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'overwrite', 'require_qc'}
+    'output_statistical', 'npz', 'skull', 'prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'overwrite', 'require_qc', 'tissue_table'}
 
 
 def scientific_settings(config):
@@ -30,7 +30,7 @@ def frozen_from_report(report, protocol_id, split_sha256):
         model_sha256=report['inputs']['model']['sha256'], source_sha256=report['software']['implementation']['source_sha256'],
         runtime_versions={key: report['software'][key] for key in ('numpy', 'scipy', 'trimesh')},
         settings=scientific_settings(report['config']), skull_required='skull' in report['inputs'],
-        optional_inputs={key: report['inputs'].get(key, {}).get('sha256') for key in ('prior', 'landmark_map')},
+        optional_inputs={key: report['inputs'].get(key, {}).get('sha256') for key in ('prior', 'landmark_map', 'tissue_table')},
         scope='Engineering freeze; preregistration and independent CT validation remain required')
 
 
@@ -41,10 +41,14 @@ def validate_protocol(cfg, metadata, targets, model_hash):
         protocol = json.load(stream)
     if not isinstance(protocol, dict) or protocol.get('schema_version') != 1:
         raise ValueError('Unsupported frozen protocol schema')
+    from .tissue import table_path
+    optional_inputs = {key: sha256_file(getattr(cfg, key)) if getattr(cfg, key) else None
+                       for key in ('prior', 'landmark_map')}
+    optional_inputs['tissue_table'] = sha256_file(table_path(cfg.tissue_table)) if cfg.tissue_table else None
     expected = dict(model_sha256=model_hash, source_sha256=implementation_manifest()['source_sha256'],
         runtime_versions={key: version(key) for key in ('numpy', 'scipy', 'trimesh')},
         settings=scientific_settings(cfg), skull_required=bool(cfg.skull),
-        optional_inputs={key: sha256_file(getattr(cfg, key)) if getattr(cfg, key) else None for key in ('prior', 'landmark_map')})
+        optional_inputs=optional_inputs)
     from .craniometry import control_protocol
     expected['craniometry_policy'] = control_protocol(metadata.get('craniometry')) if cfg.measurement_weight > 0 else None
     for name, value in expected.items():
