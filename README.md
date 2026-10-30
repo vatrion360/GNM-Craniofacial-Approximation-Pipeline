@@ -165,6 +165,19 @@ for a dense/TPS final fit. See the full
 | `--depth-labels LABEL ...` | Empty | Selected table mean/SD depths with explicit axis policy |
 | `--prior-variants off on` | off | Separate paired scenarios; `on` requires `--prior` |
 
+Export a **converged** A2.1 record with
+`python -m cranio.uncertainty_export --ensemble marker_ensemble.json --npz models/gnm_head.npz --output-dir outputs/spread`.
+Each prior scenario gets a world-mm mean OBJ, numerical SD/spread PLY and actual
+representative sample OBJs. The JSON summary preserves provenance and warnings;
+these are uncalibrated simulated dispersions, not confidence bounds or CT accuracy.
+See [definitions, regions and export rules](docs/UNCERTAINTY_EXPORTS.md).
+
+| Ensemble export option | Default | Effect |
+|---|---|---|
+| `--variants {3,4,5}` | 3 | Select actual replay samples in beta space; fewer if insufficient distinct samples |
+| `--regions FILE` | None | Explicit model-hash-bound vertex sets; otherwise only all vertices, including internal geometry |
+| `--output-dir DIR` | Required/new | Separate completed bundle; no overwrite or sample realignment |
+
 ## Development
 
 ```bash

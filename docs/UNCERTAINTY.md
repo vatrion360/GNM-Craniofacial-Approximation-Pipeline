@@ -131,9 +131,11 @@ There is no sample re-alignment to suppress pose variability. Identical inputs,
 seed and numerical environment give identical records; cross-platform bit
 identity is not promised. Timings/timestamps are excluded from the record.
 
-A2.2 (mean mesh, SD fields, variants), A2.3 (analytic comparison under an explicit
-linear/fixed-pose model) and A2.4 (external calibration) are subsequent tasks.
-No coverage, 95% interval or calibrated confidence is claimed here.
+[A2.2](UNCERTAINTY_EXPORTS.md) now exports mean meshes, numerical SD/spread fields
+and representative samples from this JSON, requiring converged scenarios.
+A2.3 (analytic comparison under an explicit linear/fixed-pose model) and A2.4
+(external calibration) remain subsequent tasks. No coverage, 95% interval or
+calibrated confidence is claimed here.
 
 ## Developer checks
 

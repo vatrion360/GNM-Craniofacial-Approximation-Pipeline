@@ -17,3 +17,11 @@ def run_uncertainty_checks(addon):
     assert result['calibration_status'] == 'uncalibrated'
     assert len(result['variants']['off']['samples']) == 2
     print('BLENDER_UNCERTAINTY_NUMPY_PASS')
+    # Summary must use the same world-frame sample geometry, without SciPy.
+    outputs = addon._core_module('uncertainty_export').summarize_ensemble(model, result)
+    rows = result['variants']['off']['samples']
+    vertices = np.array([r['scale']*(model.generate(r['coefficients']) @ np.array(r['rotation']).T)
+                         + r['translation_mm'] for r in rows])
+    np.testing.assert_allclose(outputs['off']['mean'], vertices.mean(axis=0), atol=1e-12)
+    np.testing.assert_allclose(outputs['off']['sd_xyz'], vertices.std(axis=0, ddof=1), atol=1e-12)
+    print('BLENDER_UNCERTAINTY_SUMMARY_PASS')
