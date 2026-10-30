@@ -25,6 +25,7 @@ from blender_craniometry_checks import run_craniometry_checks
 from blender_performance_checks import run_performance_checks
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
 from blender_tissue_checks import run_tissue_checks, run_tissue_undo_checks
+from blender_direction_checks import run_direction_checks
 from blender_postfit_checks import run_postfit_checks
 
 archive = root / 'dist' / 'gnm_cranio-5.0.0rc10.zip'
@@ -235,6 +236,7 @@ with tempfile.TemporaryDirectory() as directory:
             run_postfit_checks(addon)
         run_depth_undo_checks(addon)
         run_tissue_undo_checks(addon)
+        run_direction_checks(addon)
     finally:
         addon.unregister()
     assert not bpy.app.timers.is_registered(addon._offline_poll)

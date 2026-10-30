@@ -1,7 +1,8 @@
 # Explicit tissue-table selection and comparison (A1.3)
 
 This is **sensitivity analysis**, not uncertainty estimation or anatomical
-validation. Source-direction application (A1.5) is not implemented here. Existing
+validation. [A1.5 source-direction mode](TISSUE_DIRECTIONS.md) is an additional
+explicit option; the existing-axis workflow below retains its semantics. Existing
 bundled tables have unknown measurement directions. Nothing substitutes an
 assumed world vertical, GNM normal or statistically inferred direction.
 
@@ -41,7 +42,7 @@ explicit sensitivity assumption; this does not establish equivalence to the
 source's measurement method. Review the table cohort, definitions and source
 before interpreting a scenario. SD/estimator metadata does not change weights.
 Dense facial regions, scalp offset, bone geometry and skin correspondences stay
-unchanged. General source-direction support and SD weighting are later tasks.
+unchanged. Source-direction manifests and optional SD weighting are separate explicit modes.
 
 Unknown/legacy provenance remains `unspecified`/`legacy-unvalidated`; merely
 selecting a table does not satisfy strict provenance gates. The TXT report names
@@ -122,7 +123,7 @@ and custom-table protocol hashes. Actual Blender checks cover RNA geometry,
 rollback, persistence, export and Undo/Redo. Default-path replay against the
 pre-A1.3 source is recorded in `TISSUE_SELECTION_BENCHMARK.json`.
 
-No subject CT accuracy, cohort applicability, direction equivalence, SD weighting
+No subject CT accuracy, cohort applicability, direction equivalence
 or calibrated uncertainty is established by these tests. CT validation remains
 with the project author. No new anatomical constants or model weights are added.
 
@@ -136,7 +137,7 @@ The default is `--depth-weighting none`: no change to previous fits.
 
 Selection of an SD reference does **not** replace target coordinates or depths.
 Target replacement still requires explicit `--tissue-labels` and
-`--tissue-axis existing`. Weighting also applies to unreplaced/manual targets:
+`--tissue-axis existing` (or reviewed source mode). Weighting also applies to unreplaced/manual targets:
 using a table's spread for those targets is an explicit sensitivity assumption,
 not a measurement of individual placement uncertainty. Review applicability.
 

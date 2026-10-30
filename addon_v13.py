@@ -303,6 +303,7 @@ def _normal_settings_changed(self, context):
 
 def _tissue_selection_changed(self, context):
     self.tissue_axis_existing = False
+    self.tissue_source_reviewed = False
     self.tissue_status = 'Selection alone preserves case values; review source and axes before Apply'
 
 
@@ -320,6 +321,12 @@ class GNMSettings(PropertyGroup):
         ('FILE', 'Local JSON table', 'Versioned tissue schema; review citation and cohort')],
         default='NONE', update=_tissue_selection_changed)
     tissue_table_path: StringProperty(name='Table JSON', subtype='FILE_PATH', update=_tissue_selection_changed)
+    tissue_axis_mode: EnumProperty(name='Depth direction', items=[
+        ('EXISTING', 'Current marker axes', 'Existing-axis sensitivity scenario'),
+        ('SOURCE', 'Reviewed source directions', 'Apply explicit directions from a reviewed manifest')],
+        default='EXISTING', update=_tissue_selection_changed)
+    tissue_directions_path: StringProperty(name='Direction JSON', subtype='FILE_PATH', update=_tissue_selection_changed)
+    tissue_source_reviewed: BoolProperty(name='I reviewed the direction definitions and frame', default=False)
     tissue_axis_existing: BoolProperty(name='Use current axes as an explicit assumption', default=False,
         description='Source directions are NOT enforced; selected manual depths will be replaced')
     tissue_status: StringProperty(default='Keep case values; table application is explicit')
@@ -547,7 +554,7 @@ class GNM_OT_apply_paper_tissues(Operator):
 class GNM_OT_apply_tissue_table(Operator):
     bl_idname = 'gnm.apply_tissue_table'
     bl_label = 'Replace Selected Depths from Table'
-    bl_description = 'Replace selected placed markers, including manual depths; bones/current axes stay fixed. Undo restores values'
+    bl_description = 'Replace selected placed markers, including manual depths; bones stay fixed; direction follows selected policy. Undo restores values'
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -559,13 +566,20 @@ class GNM_OT_apply_tissue_table(Operator):
         settings = context.scene.gnm_settings
         source = bpy.path.abspath(settings.tissue_table_path) if settings.tissue_table == 'FILE' else settings.tissue_table
         try:
+            directions = None
+            if settings.tissue_axis_mode == 'SOURCE':
+                if not settings.tissue_directions_path:
+                    raise ValueError('Select a reviewed direction manifest JSON')
+                directions = bpy.path.abspath(settings.tissue_directions_path)
             count = _core_module('blender_tissue').apply_selected_table(
-                sys.modules[__name__], context, source, settings.tissue_axis_existing)
+                sys.modules[__name__], context, source, settings.tissue_axis_existing,
+                directions, settings.tissue_source_reviewed)
         except (ValueError, OSError, RuntimeError) as exc:
             settings.tissue_status = str(exc)
             self.report({'ERROR'}, str(exc))
             return {'CANCELLED'}
-        settings.tissue_status = f'Replaced {count} selected depths; current axes retained, source directions not enforced. Undo restores values.'
+        policy = ('reviewed source directions applied' if directions else 'current axes retained, source directions not enforced')
+        settings.tissue_status = f'Replaced {count} selected depths; {policy}. Undo restores values.'
         self.report({'INFO'}, settings.tissue_status)
         return {'FINISHED'}
 
@@ -1504,7 +1518,12 @@ class GNM_PT_panel(Panel):
             tissue_box.prop(settings, 'tissue_table_path')
         tissue_box.label(text='Uses the same selection checkboxes above')
         tissue_box.label(text='Replaces selected manual depths; bones stay fixed')
-        tissue_box.prop(settings, 'tissue_axis_existing')
+        tissue_box.prop(settings, 'tissue_axis_mode')
+        if settings.tissue_axis_mode == 'SOURCE':
+            tissue_box.prop(settings, 'tissue_directions_path')
+            tissue_box.prop(settings, 'tissue_source_reviewed')
+        else:
+            tissue_box.prop(settings, 'tissue_axis_existing')
         tissue_box.operator('gnm.apply_tissue_table', icon='PRESET')
         for line in textwrap.wrap(settings.tissue_status, width=48):
             tissue_box.label(text=line)

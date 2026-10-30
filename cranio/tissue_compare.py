@@ -62,8 +62,12 @@ def run_comparison(config):
     backend = GNMBackend(cfg.npz)
     targets, _, metadata = read_marker_csv(cfg.input, backend.index_to_label, backend.landmark_vertex_map)
     targets = [t for t in targets if t.label not in cfg.exclude]
+    directions = None
+    if cfg.tissue_directions:
+        from .tissue_directions import load_directions
+        directions = load_directions(cfg.tissue_directions)
     for table in tables:
-        apply_table(targets, metadata, table, cfg.tissue_labels, cfg.tissue_axis)
+        apply_table(targets, metadata, table, cfg.tissue_labels, cfg.tissue_axis, directions)
         if cfg.depth_weighting == 'sd':
             from .depth_weighting import marker_weights
             marker_weights(table, [t.label for t in targets], [t.weight for t in targets])
@@ -80,7 +84,7 @@ def run_comparison(config):
             regions[indices] = name
         for table in tables:
             region_factors(table, regions[regions != ''], cfg.dense_nose_weight)
-    protected = [cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.case_metadata, cfg.craniometry,
+    protected = [cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.case_metadata, cfg.craniometry, cfg.tissue_directions,
                  *(table_path(s) for s in sources)]
     pinned = {str(Path(p).resolve()): sha256_file(p) for p in protected if p}
     children, outputs = [], [destination/'summary.json']
@@ -129,7 +133,7 @@ def run_comparison(config):
             qc=report['geometry_quality'], excluded_markers=report['skipped'], auto_excluded=report['auto_excluded']))
     unchanged()
     summary = dict(schema_version=1, status='completed', units='mm', reference_index=0, axis_policy=cfg.tissue_axis,
-        source_direction_enforced=False, dense_regions_applied=False, color_scale_max_mm=color_max,
+        source_direction_enforced=cfg.tissue_axis == 'source', dense_regions_applied=False, color_scale_max_mm=color_max,
         input_sha256=pinned, tables=results, depth_weighting=cfg.depth_weighting,
         interpretation='Sensitivity to selected marker depths and optional SD weights, NOT uncertainty or anatomical accuracy. Independent fits from original case targets. Corresponding vertices in the case world frame include pose/scale changes; no ICP. Six-decimal OBJ coordinates. All-vertex metrics include internal geometry; inspect skin metrics, QC, convergence and exclusions.')
     with atomic_text(destination/'summary.json') as stream:

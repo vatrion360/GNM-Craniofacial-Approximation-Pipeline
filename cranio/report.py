@@ -146,7 +146,7 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
               "model": {"path": os.path.abspath(cfg.npz), "sha256": model_hash}}
     if cfg.skull:
         inputs["skull"] = {"path": os.path.abspath(cfg.skull), "sha256": sha256_file(cfg.skull)}
-    for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry'):
+    for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'tissue_directions'):
         if getattr(cfg, name):
             inputs[name] = dict(path=os.path.abspath(getattr(cfg, name)), sha256=sha256_file(getattr(cfg, name)))
     if cfg.tissue_table:
