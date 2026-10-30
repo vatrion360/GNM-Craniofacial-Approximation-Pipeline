@@ -1,5 +1,9 @@
 # Versioned tissue tables: data exchange (A1.1)
 
+The data-exchange module described here does not move markers. The separate
+[A1.3 scenario workflow](TISSUE_SCENARIOS.md) now provides explicit selected-marker
+application and offline comparison; source-direction enforcement remains pending.
+
 This module validates structure, not scientific accuracy or applicability. It
 performs no fitting, table selection in Blender, marker movement, weighting,
 direction conversion or uncertainty simulation. A loaded/imported table never
@@ -95,8 +99,8 @@ provenance; no claim of independent region-level measurements is made.
 
 Tables are read once when their registry module loads. Restart/reload the add-on
 after a curated package revision; do not edit installed table files during a
-case. Arbitrary imported tables are still data preparation only; a general
-selection/application interface belongs to A1.3. Existing saved/manual case
+case. Importing a table alone is data preparation; the separate explicit
+application workflow is described in [A1.3](TISSUE_SCENARIOS.md). Existing saved/manual case
 values are retained, and **Apply Table 2 Tissue Depths** remains an explicit
 replacement operation. Offline fitting uses the CSV's world-mm targets, never
 rebuilds those targets from the bundled catalogue.

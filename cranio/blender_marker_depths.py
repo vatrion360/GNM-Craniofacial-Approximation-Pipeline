@@ -78,6 +78,11 @@ def _apply_changes(addon, context, selected, depth_for, audit_for, record_unchan
             if not all(math.isfinite(v) for row in obj.matrix_world for v in row):
                 raise ValueError(f'{item.label}: non-finite marker transform')
         for obj in (item.target_empty, item.peg_object):
+            if obj:
+                uses = sum(obj == candidate for marker in scene.gnm_markers
+                           for candidate in (marker.bone_empty, marker.target_empty, marker.peg_object))
+                if uses != 1:
+                    raise ValueError(f'{item.label}: shared target/peg would change another marker; repair object ownership')
             if obj and (obj.parent or obj.constraints or obj.animation_data):
                 raise ValueError(f'{item.label}: detach target/peg parents, constraints or animation first')
         if item.is_placed:

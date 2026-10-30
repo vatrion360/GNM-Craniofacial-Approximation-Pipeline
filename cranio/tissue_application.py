@@ -52,7 +52,8 @@ def apply_table(targets, metadata, table, labels=(), axis_policy='unconfigured')
         bone = finite_array(old['bone_xyz_mm'], label+' bone', (3,))
         point = finite_array(by_label[label].xyz, label+' target', (3,))
         distance = float(np.linalg.norm(point-bone))
-        if not np.isfinite(distance) or distance <= 0:
+        # Engineering guard inherited from the Blender depth transaction (legacy_hardcoded).
+        if not np.isfinite(distance) or distance < 1e-9:
             raise ValueError(f'{label}: zero/invalid bone-to-target axis; re-place marker')
         axis, value = (point-bone)/distance, float(row['central_mm'])
         new = finite_array(bone+value*axis, label+' new target', (3,))
