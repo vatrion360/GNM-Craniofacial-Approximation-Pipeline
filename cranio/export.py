@@ -4,10 +4,13 @@
 import numpy as np
 
 
-def export_obj(path, vertices, triangles):
-    """OBJ simplu (vertecsi in mm, spatiul world Blender)."""
+def export_obj(path, vertices, triangles, *, comments=()):
+    """World-mm OBJ; optional provenance comments leave legacy bytes unchanged."""
     with atomic_text(path) as f:
         f.write("# GNM Reconstructie Craniofaciala - mesh reconstruit (mm)\n")
+        for comment in comments:
+            for line in str(comment).splitlines():
+                f.write('# '+line+'\n')
         for v in vertices:
             f.write(f"v {v[0]:.6f} {v[1]:.6f} {v[2]:.6f}\n")
         for t in triangles:
