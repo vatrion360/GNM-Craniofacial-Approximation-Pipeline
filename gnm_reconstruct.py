@@ -114,6 +114,7 @@ def parse_args(argv=None) -> PipelineConfig:
     parser.add_argument('--require-qc', action="store_true")
     parser.add_argument('--depth-weighting', choices=('none', 'sd'), default='none',
                         help='Optional table SD_mm inverse-square sensitivity weights; missing SD retains base weight')
+    parser.add_argument('--case-posture', help='Explicit case acquisition posture label; unknown by default, never inferred from CT')
     parser.add_argument('--tissue-table', help='Bundled ID or local JSON; selection alone preserves all targets')
     parser.add_argument('--tissue-labels', nargs='+', default=[], help='Explicit labels whose case depths/targets may be replaced')
     parser.add_argument('--tissue-axis', choices=('unconfigured', 'existing', 'source'), default='unconfigured',
@@ -124,7 +125,7 @@ def parse_args(argv=None) -> PipelineConfig:
 
     return PipelineConfig(
         input=args.input,
-        tissue_table=args.tissue_table, tissue_labels=args.tissue_labels,
+        case_posture=args.case_posture, tissue_table=args.tissue_table, tissue_labels=args.tissue_labels,
         tissue_axis=args.tissue_axis, tissue_directions=args.tissue_directions, tissue_compare=args.tissue_compare, depth_weighting=args.depth_weighting,
         prior=args.prior,
         landmark_map=args.landmark_map,

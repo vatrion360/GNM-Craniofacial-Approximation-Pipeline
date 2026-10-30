@@ -7,7 +7,7 @@ from .provenance import implementation_manifest
 from .validation import has_documented_tissue_source, sha256_file, validate_outputs
 
 CASE_FIELDS = {'input', 'output', 'output_error_mesh', 'output_stats', 'output_json',
-    'output_statistical', 'npz', 'skull', 'prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'overwrite', 'require_qc', 'tissue_table', 'tissue_directions'}
+    'output_statistical', 'npz', 'skull', 'prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'overwrite', 'require_qc', 'tissue_table', 'tissue_directions', 'case_posture'}
 
 
 def scientific_settings(config):

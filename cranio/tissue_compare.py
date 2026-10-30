@@ -61,13 +61,15 @@ def run_comparison(config):
     tables = [load_table(s) for s in sources]
     backend = GNMBackend(cfg.npz)
     targets, _, metadata = read_marker_csv(cfg.input, backend.index_to_label, backend.landmark_vertex_map)
+    from .tissue_context import with_case_metadata
+    metadata = with_case_metadata(metadata, cfg.case_metadata)
     targets = [t for t in targets if t.label not in cfg.exclude]
     directions = None
     if cfg.tissue_directions:
         from .tissue_directions import load_directions
         directions = load_directions(cfg.tissue_directions)
     for table in tables:
-        apply_table(targets, metadata, table, cfg.tissue_labels, cfg.tissue_axis, directions)
+        apply_table(targets, metadata, table, cfg.tissue_labels, cfg.tissue_axis, directions, cfg.case_posture)
         if cfg.depth_weighting == 'sd':
             from .depth_weighting import marker_weights
             marker_weights(table, [t.label for t in targets], [t.weight for t in targets])
@@ -129,6 +131,7 @@ def run_comparison(config):
                                 ply=str(path.relative_to(destination)), sha256=sha256_file(path))
         results.append(dict(index=i, table=table.record(), report=str(Path(child.output_json).relative_to(destination)),
             report_sha256=sha256_file(child.output_json), selected_labels=report['marker_metadata']['tissue_application']['replaced_labels'],
+            tissue_context=report['marker_metadata']['tissue_application']['context'],
             differences_to_first=entries, lambda_used=report['lambda'], solver_converged=report['solver']['converged'],
             qc=report['geometry_quality'], excluded_markers=report['skipped'], auto_excluded=report['auto_excluded']))
     unchanged()
