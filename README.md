@@ -178,6 +178,20 @@ See [definitions, regions and export rules](docs/UNCERTAINTY_EXPORTS.md).
 | `--regions FILE` | None | Explicit model-hash-bound vertex sets; otherwise only all vertices, including internal geometry |
 | `--output-dir DIR` | Required/new | Separate completed bundle; no overwrite or sample realignment |
 
+## Conditional linear covariance diagnostic
+
+`python -m cranio.linear_uncertainty` compares analytic covariance with independent
+Monte Carlo least-squares draws under an explicitly fixed pose and Gaussian model.
+It distinguishes posterior covariance from repeated-data estimator variation;
+it does not calibrate the nonlinear fit or alter existing defaults.
+See [required assumptions, formulas and limits](docs/LINEAR_UNCERTAINTY.md).
+
+| Diagnostic option | Default | Effect |
+|---|---|---|
+| `--input`, `--npz`, `--assumptions`, `--output` | Required | Case/model, documented noise/prior/pose, new JSON output |
+| `--draws`, `--seed` | 10000, 0 | Independent reproducible Gaussian least-squares checks |
+| `--identity-subspace {all,head}` | `all` | Explicit active coefficients; others remain zero |
+
 ## Development
 
 ```bash

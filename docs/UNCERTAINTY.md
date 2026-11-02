@@ -133,8 +133,8 @@ identity is not promised. Timings/timestamps are excluded from the record.
 
 [A2.2](UNCERTAINTY_EXPORTS.md) now exports mean meshes, numerical SD/spread fields
 and representative samples from this JSON, requiring converged scenarios.
-A2.3 (analytic comparison under an explicit linear/fixed-pose model) and A2.4
-(external calibration) remain subsequent tasks. No coverage, 95% interval or
+The [A2.3 analytic check](LINEAR_UNCERTAINTY.md) conditions on an explicit linear/fixed-pose
+model; it is not a direct validation of this nonlinear ensemble. A2.4 external calibration remains pending. No coverage, 95% interval or
 calibrated confidence is claimed here.
 
 ## Developer checks

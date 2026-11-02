@@ -123,5 +123,6 @@ Source warnings, omitted error terms, partial-analysis status and coefficient
 clipping remain visible. Nonconvergence blocks export rather than changing the
 sample population. Outputs are **uncalibrated simulated dispersion**, not full
 dense/TPS final-fit uncertainty, known facial accuracy or calibrated confidence.
-A2.3 analytic comparison and A2.4 external calibration remain separate tasks.
+The [A2.3 conditional linear diagnostic](LINEAR_UNCERTAINTY.md) is a separate statistical model.
+A2.4 external calibration remains pending.
 No CT-derived validity claim is added by this exporter.
