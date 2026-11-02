@@ -214,3 +214,36 @@ def default_tissue_records():
     from .paper_reference import _PAPER_TABLE
     return {'interpretation': 'Bundled default catalogue only. Actual marker targets/sources come from case CSV; loading does not overwrite manual values. Dense scalp offset comes from case config.',
             'tables': [_LEGACY_TABLE.record(), _PAPER_TABLE.record()]}
+
+
+# A4.1: optional bone references, separate from tissue-depth/skin-fit markers.
+# TODO(verify-source): missing definitions and all new mappings remain unconfigured.
+from .paper_reference import CITATION as PAPER_DEFINITION_CITATION
+
+REFERENCE_CATALOG_REVISION = 'extended-bone-references-v1'
+BONE_REFERENCE_EXTENSIONS = {}
+for _code, _name, _side, _marker, _frame_only in (
+    ('ss', 'Subspinale (A)', 0, None, False),
+    ('sm', 'Supramentale (B)', 0, 'Supramentale', False),
+    ('id', 'Infradentale', 0, 'Infradentale_BuzaInf', False),
+    ('me', 'Menton', 0, 'Menton', False),
+    ('po_R', 'Porion right', -1, None, True),
+    ('po_L', 'Porion left', 1, None, True),
+    ('or_R', 'Orbitale / existing Suborbitale right', -1, 'Suborbitale_Dr', False),
+    ('or_L', 'Orbitale / existing Suborbitale left', 1, 'Suborbitale_St', False),
+    ('co_R', 'Condylion right', -1, None, False),
+    ('co_L', 'Condylion left', 1, None, False),
+    ('zm_R', 'Zygomaxillare right', -1, None, False),
+    ('zm_L', 'Zygomaxillare left', 1, None, False),
+):
+    BONE_REFERENCE_EXTENSIONS[_code] = dict(
+        name=_name, side=_side, definition_text=PAPER_DEFINITIONS.get(_marker),
+        definition_source=(PAPER_DEFINITION_CITATION + '; Table 2 site definition; no depth assignment')
+            if _marker is not None else None,
+        definition_status='needs_expert_review', existing_marker=_marker,
+        # True means the catalogue identifies an EXISTING potential skin marker;
+        # it does not certify its vertex, direction or tissue-table applicability.
+        skin_correspondent=_marker is not None, reference_frame_only=_frame_only,
+        fit_target=False, gnm_vertex=None, tissue_depth_mm=None, sd_mm=None,
+        mapping_status='reuse_existing_requires_review' if _marker is not None else 'not_configured',
+        revision=REFERENCE_CATALOG_REVISION)
