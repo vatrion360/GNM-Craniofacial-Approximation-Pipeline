@@ -16,6 +16,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Scientific rationale and primary references](docs/SCIENCE.md)
 - [Perpendicular marker placement and local normals](docs/MARKER_NORMALS.md)
 - [Table 3 cranial measurements and reviewed skin-distance controls](docs/CRANIOMETRY.md)
+- [Optional extended bone references and definition review](docs/EXTENDED_BONE_REFERENCES.md)
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
@@ -78,6 +79,20 @@ Install `dist/gnm_cranio-5.0.0rc10.zip` through Blender's **Install from Disk** 
 Select the local model, import the skull with explicit source units, place/review markers, and export v3 CSV. For **Run Offline Fit and Import**, select the external Python executable from the environment above and a case output folder. The add-on runs the CLI in a separate process, records a log, then imports the completed world-mm OBJ. Each run gets a new case subfolder. The default button uses marker-only statistical fitting with lambda based on the actual included marker count; explicit dense and local-correction switches are available in the panel and CLI. Register all preserved bone sources, review their normals and confirm mandibular articulation before including mandibular constraints.
 
 Use **Extended 48**, **Paper 32** or **Legacy 27**, then **Add Missing Markers**. Existing placements, tissue values and manual picks are retained. The paper's normal-female reference can be applied explicitly with **Apply Table 2 Tissue Depths**; review applicability before case use. Sites marked **Include in fit = off** remain documented but do not affect pose or identity fitting. The default Pogonion candidate is corrected from lower-lip vertex 12284 to chin candidate 12261; review previous cases.
+
+The craniometry panel also offers **Add Extended Bone References (+12)**:
+34 bone positions instead of the standard 22, while the 48 tissue markers and
+14 chords remain unchanged. This opt-in catalogue adds Subspinale, mandibular
+references, Porion, orbital-rim references, Condylion and Zygomaxillare. Known
+counterparts reuse existing marker labels; unconfigured definitions require
+operator text and source before confirmation. No new tissue depths, GNM indices
+or fitting constraints are guessed. See [placement, review and compatibility](docs/EXTENDED_BONE_REFERENCES.md).
+
+| Bone-reference control | Default | Effect |
+|---|---|---|
+| Add 22 Bone References / 14 Measurements | Existing initialization | Original reference set, current case work preserved |
+| Add Extended Bone References (+12) | Off until clicked | Add the optional references without new skin targets |
+| Case landmark definition / Definition source | Empty when unconfigured | Required before confirming a new reference; edits invalidate review |
 
 For a manual depth scenario, check one or more rows using the **left-hand adjustment checkboxes**, enter **Change (%)**, choose **Increase** or **Decrease**, and press **Apply to Selected Depths**. The operation changes the current mm values in that same list and moves existing skin targets along their current axes. Selection is independent of **Include in fit**. Repeated applications compound; use Undo to revert. Only Blender provides this control; an exported CSV contains the edited targets without any additional offline multiplier.
 

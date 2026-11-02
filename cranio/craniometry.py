@@ -9,6 +9,7 @@ from typing import Mapping
 import json
 import numpy as np
 from .validation import finite_array, has_documented_tissue_source
+from .landmarks import BONE_REFERENCE_EXTENSIONS
 
 PROTOCOL = 'table3-chords-v1'
 REFERENCE = 'https://doi.org/10.4995/var.2024.24796 (Table 3; definitions attributed to White et al. 2012)'
@@ -38,6 +39,25 @@ for _code, _name, _hint in (
         POINTS[f'{_code}_{_side}'] = (_name + (' right' if _side == 'R' else ' left'), _hint)
 
 
+# Keep the original 22-entry registry and its ordering for unchanged sessions.
+# Only an explicit Blender action initializes the additional rows.
+ALL_POINTS = dict(POINTS)
+ALL_POINTS.update({code: (entry['name'], entry['definition_text'] or
+    'Definition not configured. Supply an expert-reviewed definition and source before confirmation.')
+    for code, entry in BONE_REFERENCE_EXTENSIONS.items()})
+
+
+def require_reference_definition(code, point):
+    """A confirmed extension needs a case-recorded definition/source, not a guess."""
+    if code not in BONE_REFERENCE_EXTENSIONS:
+        return
+    for field in ('definition_text', 'definition_source'):
+        value = point.get(field)
+        if (not has_documented_tissue_source(value) or value.strip().casefold() in
+                ('todo(verify-source)', 'needs_expert_review', 'not_configured', '[de completat]')):
+            raise ValueError(f'{code}: supply documented {field} before confirming this reference')
+
+
 @dataclass(frozen=True)
 class Measurement:
     key: str
@@ -64,7 +84,7 @@ MEASUREMENTS = (
     Measurement('l-o', 'Occipital chord', 'l', 'o', False),
 )
 BY_KEY = {row.key: row for row in MEASUREMENTS}
-ALIASES = {'ftm-ftm': 'fmt-fmt', 'ftm_R': 'fmt_R', 'ftm_L': 'fmt_L'}
+ALIASES = {'ftm-ftm': 'fmt-fmt', 'ftm_R': 'fmt_R', 'ftm_L': 'fmt_L', 'A': 'ss', 'B': 'sm'}
 
 
 def empty_document(case_id=''):
@@ -97,7 +117,7 @@ def validate_document(document):
             or document.get('coordinate_space') != 'world'):
         raise ValueError('Craniometry requires table3-chords-v1 in world mm')
     points, bindings = {}, {}
-    for kind, registry, output, key in (('points', POINTS, points, 'code'), ('bindings', BY_KEY, bindings, 'measurement')):
+    for kind, registry, output, key in (('points', ALL_POINTS, points, 'code'), ('bindings', BY_KEY, bindings, 'measurement')):
         rows = document.get(kind, [])
         if not isinstance(rows, list):
             raise ValueError(f'Craniometry {kind} must be a list')
@@ -126,6 +146,11 @@ def validate_document(document):
         if digest and not _sha(digest):
             raise ValueError(f'{code}: invalid source geometry SHA-256')
         _bool(point.get('definition_reviewed', False), f'{code} definition_reviewed')
+        if code in BONE_REFERENCE_EXTENSIONS:
+            for field in ('definition_text', 'definition_source'):
+                _text(point.get(field, ''), f'{code} {field}')
+            if point.get('definition_reviewed', False):
+                require_reference_definition(code, point)
     for key, binding in bindings.items():
         _bool(binding.get('enabled', False), f'{key} enabled')
         _bool(binding.get('mapping_reviewed', False), f'{key} mapping_reviewed')

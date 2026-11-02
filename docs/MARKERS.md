@@ -70,3 +70,12 @@ manual percentage edits (UTC, operation, percentage, before/after mm and previou
 tissue source). The edited values are already reflected in placed targets and
 depths. The offline pipeline must not apply the percentage again. This provenance
 does not validate an anatomical or BMI relationship. See [the Blender workflow](MARKER_DEPTH_ADJUSTMENT.md).
+
+
+## Optional extended bone-reference metadata (A4.1)
+
+The opt-in catalogue stores additional bone records inside `craniometry` metadata,
+not as new skin-target CSV rows. Definition text/source and review state accompany
+each new position. CSV v3 and the original marker sets remain unchanged. Earlier
+software may reject the newly registered bone codes; use the updated package for
+extended documents. See [the catalogue and workflow](EXTENDED_BONE_REFERENCES.md).

@@ -27,6 +27,12 @@ def changed(self, context):
             _api._request_refit(context.scene)
 
 
+def definition_changed(self, context):
+    # Editing an anatomical definition/source invalidates the previous case review.
+    self.definition_reviewed = False
+    changed(self, context)
+
+
 class GNMCranialPoint(PropertyGroup):
     code: StringProperty()
     bone_empty: PointerProperty(type=bpy.types.Object)
@@ -37,6 +43,8 @@ class GNMCranialPoint(PropertyGroup):
         ('reconstructed', 'Reconstructed / inferred', ''), ('unspecified', 'Unspecified', '')],
         default='unspecified', update=changed)
     definition_reviewed: BoolProperty(default=False)
+    definition_text: StringProperty(name='Case landmark definition', update=definition_changed)
+    definition_source: StringProperty(name='Definition source / protocol', update=definition_changed)
     review_xyz: FloatVectorProperty(size=3)
     notes: StringProperty(name='Localization / construction notes', update=changed)
     skin_vertex: IntProperty(name='Reviewed GNM skin vertex', default=-1, min=-1, max=17820)
@@ -71,14 +79,18 @@ class GNMCranialSettings(PropertyGroup):
     last_fit: StringProperty(default='')
 
 
-def initialize(scene):
+def initialize(scene, *, extended=False):
     """Idempotently add registry entries without replacing existing case work."""
     for marker in scene.gnm_markers:
         marker.name = marker.label
-    for code in core.POINTS:
+    for code in (core.ALL_POINTS if extended else core.POINTS):
         if not any(point.code == code for point in scene.gnm_cranial_points):
             point = scene.gnm_cranial_points.add()
             point.name = point.code = code
+            entry = core.BONE_REFERENCE_EXTENSIONS.get(code)
+            if entry is not None:
+                point.definition_text = entry['definition_text'] or ''
+                point.definition_source = entry['definition_source'] or ''
     for spec in core.MEASUREMENTS:
         if not any(row.measurement == spec.key for row in scene.gnm_cranial_bindings):
             row = scene.gnm_cranial_bindings.add()
@@ -97,6 +109,12 @@ def _xyz(scene, point):
 
 
 def _review_current(scene, point):
+    if point.code in core.BONE_REFERENCE_EXTENSIONS:
+        try:
+            core.require_reference_definition(point.code, dict(
+                definition_text=point.definition_text, definition_source=point.definition_source))
+        except ValueError:
+            return False
     xyz = _xyz(scene, point)
     return bool(xyz is not None and point.definition_reviewed and np.linalg.norm(np.asarray(xyz)-point.review_xyz) < 1e-4)
 
@@ -124,6 +142,12 @@ def document(scene, manifest=None, model_hash=None):
         doc['points'].append(dict(code=point.code, xyz_mm=xyz, status=status,
             definition_reviewed=_review_current(scene, point), notes=point.notes,
             source_id=point.source_id, source_geometry_sha256=point.source_sha256))
+        if point.code in core.BONE_REFERENCE_EXTENSIONS:
+            entry = core.BONE_REFERENCE_EXTENSIONS[point.code]
+            doc['points'][-1].update(definition_text=point.definition_text,
+                definition_source=point.definition_source, catalog_revision=entry['revision'],
+                skin_correspondent=entry['skin_correspondent'], reference_frame_only=entry['reference_frame_only'],
+                existing_marker=entry['existing_marker'], mapping_status=entry['mapping_status'], fit_target=False)
     fields = ('measurement', 'enabled', 'marker_a', 'marker_b', 'target_mode', 'target_mm',
               'sigma_mm', 'influence', 'method', 'mapping_reviewed')
     doc['bindings'] = [{name: getattr(row, name) for name in fields} for row in scene.gnm_cranial_bindings]
@@ -218,13 +242,13 @@ class GNM_OT_craniometry(Operator):
     bl_idname = 'gnm.craniometry'
     bl_label = 'Cranial Measurements'
     bl_options = {'REGISTER', 'UNDO'}
-    action: EnumProperty(items=[(x, x, '') for x in ('INIT', 'LINK', 'REVIEW', 'CLEAR', 'EXPORT', 'SKIN', 'SEGMENT')])
+    action: EnumProperty(items=[(x, x, '') for x in ('INIT', 'INIT_EXTENDED', 'LINK', 'REVIEW', 'CLEAR', 'EXPORT', 'SKIN', 'SEGMENT')])
 
     def execute(self, context):
         scene = context.scene
         try:
-            if self.action == 'INIT':
-                initialize(scene)
+            if self.action in ('INIT', 'INIT_EXTENDED'):
+                initialize(scene, extended=self.action == 'INIT_EXTENDED')
             elif self.action == 'SEGMENT':
                 toggle_segment()
             elif self.action == 'EXPORT':
@@ -249,6 +273,10 @@ class GNM_OT_craniometry(Operator):
                     if not scene.gnm_markers:
                         raise ValueError('Select an existing bone marker in the main panel')
                     item = scene.gnm_markers[min(scene.gnm_marker_active_index, len(scene.gnm_markers)-1)]
+                    entry = core.BONE_REFERENCE_EXTENSIONS.get(point.code)
+                    if entry is not None and item.label != entry['existing_marker']:
+                        raise ValueError('This reference can link only its catalogued existing marker; '
+                                         'otherwise place it as a separate bone reference')
                     if item.bone_empty is None:
                         raise ValueError('Selected marker has no bone placement')
                     _detach(point)
@@ -262,6 +290,8 @@ class GNM_OT_craniometry(Operator):
                         raise ValueError('Place the reference and record its bone status first')
                     if point.code == 'ns' and not point.notes.strip():
                         raise ValueError('Document the nasospinale construction / protocol variant')
+                    core.require_reference_definition(point.code, dict(
+                        definition_text=point.definition_text, definition_source=point.definition_source))
                     # Review confirms anatomy at this position; it does not rewrite a stale source hash.
                     point.review_xyz, point.definition_reviewed = xyz, True
                 elif self.action == 'SKIN':
@@ -276,6 +306,9 @@ class GNM_OT_craniometry(Operator):
 def create_skin_control(context, point):
     """Explicit custom marker; no inherited vertex/depth is assigned to new anatomy."""
     scene = context.scene
+    if point.code in core.BONE_REFERENCE_EXTENSIONS:
+        raise ValueError('Extended references do not create new skin markers. '
+                         'Use the existing marker list when a catalogued counterpart is available.')
     if point.code in ('ba', 'o') or not _review_current(scene, point) or point.bone_status != 'observed':
         raise ValueError('Custom skin controls need reviewed preserved external bone anatomy')
     if point.skin_vertex < 0 or point.skin_depth_mm <= 0 or not point.tissue_source.strip():
@@ -386,9 +419,12 @@ def toggle_segment():
 
 class GNM_UL_cranial_points(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0):
-        layout.label(text=item.code+'  '+core.POINTS[item.code][0],
+        layout.label(text=item.code+'  '+core.ALL_POINTS[item.code][0],
                      icon='CHECKMARK' if _review_current(context.scene, item) else 'QUESTION')
         layout.label(text='missing' if _xyz(context.scene, item) is None else item.bone_status)
+        entry = core.BONE_REFERENCE_EXTENSIONS.get(item.code)
+        if entry is not None and entry['existing_marker'] is None:
+            layout.label(text='! no skin mapping', icon='INFO')
 
 
 class GNM_UL_cranial_measurements(UIList):
@@ -436,6 +472,7 @@ class GNM_PT_craniometry(Panel):
         scene, layout = context.scene, self.layout
         settings = scene.gnm_craniometry
         layout.operator('gnm.craniometry', text='Add 22 Bone References / 14 Measurements').action = 'INIT'
+        layout.operator('gnm.craniometry', text='Add Extended Bone References (+12)').action = 'INIT_EXTENDED'
         if not _api._is_mm_scene(scene):
             layout.label(text='Set Metric scale 0.001 to measure in mm', icon='ERROR')
             return
@@ -443,8 +480,18 @@ class GNM_PT_craniometry(Panel):
             return
         layout.template_list('GNM_UL_cranial_points', '', scene, 'gnm_cranial_points', settings, 'active_point', rows=5)
         point = selected_point(scene)
-        for line in textwrap.wrap(core.POINTS[point.code][1], width=48):
+        for line in textwrap.wrap(core.ALL_POINTS[point.code][1], width=48):
             layout.label(text=line)
+        entry = core.BONE_REFERENCE_EXTENSIONS.get(point.code)
+        if entry is not None:
+            layout.label(text='Bone reference only; excluded from face fitting', icon='INFO')
+            layout.label(text='Definition requires expert review')
+            layout.prop(point, 'definition_text')
+            layout.prop(point, 'definition_source')
+            if entry['existing_marker']:
+                layout.label(text='Existing marker: '+entry['existing_marker'])
+            else:
+                layout.label(text='! No GNM mapping or tissue depth configured')
         row = layout.row(align=True)
         row.operator('gnm.place_cranial_point')
         row.operator('gnm.craniometry', text='Link Selected Marker').action = 'LINK'
@@ -453,8 +500,9 @@ class GNM_PT_craniometry(Panel):
         row = layout.row(align=True)
         row.operator('gnm.craniometry', text='Confirm Definition / Position').action = 'REVIEW'
         row.operator('gnm.craniometry', text='Clear').action = 'CLEAR'
-        layout.prop(settings, 'show_new_skin')
-        if settings.show_new_skin:
+        if entry is None:
+            layout.prop(settings, 'show_new_skin')
+        if entry is None and settings.show_new_skin:
             box = layout.box()
             box.prop(point, 'skin_vertex'); box.prop(point, 'skin_depth_mm'); box.prop(point, 'tissue_source')
             box.operator('gnm.craniometry', text='Create Skin Marker (Excluded Until Reviewed)').action = 'SKIN'
