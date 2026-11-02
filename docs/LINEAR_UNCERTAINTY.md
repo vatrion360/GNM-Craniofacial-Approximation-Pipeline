@@ -132,6 +132,7 @@ profile/dense constraints, local TPS or tissue-table applicability. These omissi
 can dominate the real error. Unconstrained Gaussian coefficient draws are not
 anatomically approved face variants. The module does not export such meshes.
 
-A2.4 calibration on independent CT cases remains separate and is to be performed
-by the project operator. Neither this diagnostic nor its synthetic tests establish
+The [A2.4 empirical harness](UNCERTAINTY_CALIBRATION.md) handles operator-reviewed
+measurements of A2.2 ensemble spread. It does not calibrate this conditional
+Gaussian diagnostic. Actual CT calibration remains operator work. Neither this diagnostic nor its synthetic tests establish
 coverage or facial identification performance. See [execution report](TASK_A2_3.md).

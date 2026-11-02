@@ -124,5 +124,5 @@ clipping remain visible. Nonconvergence blocks export rather than changing the
 sample population. Outputs are **uncalibrated simulated dispersion**, not full
 dense/TPS final-fit uncertainty, known facial accuracy or calibrated confidence.
 The [A2.3 conditional linear diagnostic](LINEAR_UNCERTAINTY.md) is a separate statistical model.
-A2.4 external calibration remains pending.
+The [A2.4 empirical harness](UNCERTAINTY_CALIBRATION.md) accepts operator-reviewed measurements; actual CT calibration remains pending.
 No CT-derived validity claim is added by this exporter.

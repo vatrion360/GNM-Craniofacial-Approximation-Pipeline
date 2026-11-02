@@ -192,6 +192,21 @@ See [required assumptions, formulas and limits](docs/LINEAR_UNCERTAINTY.md).
 | `--draws`, `--seed` | 10000, 0 | Independent reproducible Gaussian least-squares checks |
 | `--identity-subspace {all,head}` | `all` | Explicit active coefficients; others remain zero |
 
+## Empirical error-limit calibration (manual reference measurements)
+
+`python -m cranio.calibration` consumes your reviewed per-vertex error/spread
+CSVs. It fits an explicitly configured multiplier on calibration subjects and
+reports coverage on disjoint validation subjects. No CT processing or anatomical
+validation is inferred, and no mesh or original SD field is changed. Results
+remain exploratory. See [protocol, input schema and limitations](docs/UNCERTAINTY_CALIBRATION.md).
+
+| Calibration option | Default | Effect |
+|---|---|---|
+| `template`, `fit`, `evaluate` | Required action | Empty configuration, empirical scale fitting, or frozen-scale evaluation |
+| `--manifest` | Unconfigured | Reviewed inputs; coverage/quantile/pooling choices must be explicit |
+| `--calibration` | None | Frozen record, required only for evaluate |
+| `--output` | Required/new | Deterministic report; no overwrite |
+
 ## Development
 
 ```bash

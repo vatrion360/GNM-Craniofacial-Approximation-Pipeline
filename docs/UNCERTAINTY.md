@@ -134,7 +134,7 @@ identity is not promised. Timings/timestamps are excluded from the record.
 [A2.2](UNCERTAINTY_EXPORTS.md) now exports mean meshes, numerical SD/spread fields
 and representative samples from this JSON, requiring converged scenarios.
 The [A2.3 analytic check](LINEAR_UNCERTAINTY.md) conditions on an explicit linear/fixed-pose
-model; it is not a direct validation of this nonlinear ensemble. A2.4 external calibration remains pending. No coverage, 95% interval or
+model; it is not a direct validation of this nonlinear ensemble. The [A2.4 empirical harness](UNCERTAINTY_CALIBRATION.md) accepts operator-reviewed measurements; actual CT calibration remains pending. No coverage, 95% interval or
 calibrated confidence is claimed here.
 
 ## Developer checks

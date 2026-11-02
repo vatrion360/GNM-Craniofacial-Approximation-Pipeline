@@ -1,0 +1,2 @@
+# These example CSV bytes are SHA-256 pinned in the adjacent manifest.
+examples/calibration_synthetic/*.csv text eol=lf
