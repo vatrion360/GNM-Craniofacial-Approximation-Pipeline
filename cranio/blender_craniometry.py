@@ -119,7 +119,7 @@ def _review_current(scene, point):
     return bool(xyz is not None and point.definition_reviewed and np.linalg.norm(np.asarray(xyz)-point.review_xyz) < 1e-4)
 
 
-def document(scene, manifest=None, model_hash=None):
+def document(scene, manifest=None, model_hash=None, *, include_frame=True):
     """Current points plus preserved placement hashes; moved points lose review."""
     if not _api._is_mm_scene(scene):
         raise ValueError('Craniometry requires Metric scale 0.001 (1 coordinate = 1 mm)')
@@ -152,6 +152,8 @@ def document(scene, manifest=None, model_hash=None):
               'sigma_mm', 'influence', 'method', 'mapping_reviewed')
     doc['bindings'] = [{name: getattr(row, name) for name in fields} for row in scene.gnm_cranial_bindings]
     core.measure(doc)
+    if include_frame and hasattr(scene, "gnm_reference_frame"):
+        _api._core_module("blender_reference_frame").attach_snapshot(scene, doc)
     return doc
 
 

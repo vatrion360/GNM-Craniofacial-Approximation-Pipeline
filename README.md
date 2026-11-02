@@ -17,6 +17,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Perpendicular marker placement and local normals](docs/MARKER_NORMALS.md)
 - [Table 3 cranial measurements and reviewed skin-distance controls](docs/CRANIOMETRY.md)
 - [Optional extended bone references and definition review](docs/EXTENDED_BONE_REFERENCES.md)
+- [Opt-in anatomical reference frame and standardized views](docs/REFERENCE_FRAME.md)
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
@@ -242,3 +243,19 @@ blender --background --factory-startup --python-exit-code 1 --python tools/blend
 ## License and credit
 
 Project code: Apache-2.0, original project by VATRION. GNM assets/code: Google and contributors, under their own Apache-2.0 distribution. See [NOTICE](NOTICE) and [references](docs/references.bib). No human-subject data or demographic priors are bundled.
+
+## Optional anatomical reference frame (A4.2)
+
+Observed/reviewed Porion L/R, a selected Orbitale and explicit cranial median
+references define a frame for views and captures. The fit and world-mm coordinates
+remain unchanged. See [configuration, assumptions and stale-frame checks](docs/REFERENCE_FRAME.md).
+
+| Control / command | Default | Behavior |
+|---|---|---|
+| Frame configuration JSON | Blank template, no computed frame | Explicit protocol, side, superior cue and median points |
+| Compute Reviewed Frame | Manual action | Validate observation/review/source hashes; save transforms and residuals |
+| Front / 3/4 / Right / Left | Manual action | Orient viewport only |
+| Use reviewed frame for standardized captures | Off | Anatomical camera axes and superior roll; stale frames refused |
+| `placement_error` in frame config | `null` | Optional sourced SDs, sample count and seed; conditional sensitivity only |
+| `python -m cranio.reference_frame template` | Explicit command | Write blank config, refuse overwrite |
+| `python -m cranio.reference_frame compute` | Explicit command | `--input` craniometry JSON, `--config`, `--output` frame JSON |
