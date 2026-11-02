@@ -33,3 +33,8 @@ def run_uncertainty_checks(addon):
     projected = linear.propagate_covariance(np.ones((2, 3, 1)), diagnostic.posterior_covariance)
     np.testing.assert_allclose(projected['sd_xyz_mm'], 1.2)
     print('BLENDER_LINEAR_COVARIANCE_PASS')
+    calibration = addon._core_module('calibration')
+    factor = calibration.fit_multiplier([1., 2., 3., 4.], [1., 1., 1., 1.], .75)
+    assert factor == 4.
+    assert calibration.coverage_metrics([0., 1., 3.], [0., 0., 1.], 2.)['coverage'] == 1/3
+    print('BLENDER_CALIBRATION_NUMPY_PASS')

@@ -1,0 +1,48 @@
+{
+  "cases": [
+    {
+      "case_id": "synthetic_0",
+      "conditioning": "skull_only",
+      "ensemble_sha256": "6a28a03ccf0a14274cf902aff7c4f9014df1d6fe19a38c3513e056e5b66322e7",
+      "measurements": "case_0.csv",
+      "measurements_sha256": "8083e1013e5c1c02b1ec72d2afa82114be69564b77bb47e02af9512a12e5ded4",
+      "reference_sha256": "7e66127fa1c8a4c4f4a28891a33ff57e7188219b0ed882856de5425147afe434",
+      "split": "calibration",
+      "subject_id": "synthetic_subject_0"
+    },
+    {
+      "case_id": "synthetic_1",
+      "conditioning": "skull_only",
+      "ensemble_sha256": "c7ec50cf20a6b560f3ba77a65cac133da27dcc50af4c3abbe8695c100df635f1",
+      "measurements": "case_1.csv",
+      "measurements_sha256": "d9cef429f6e9547e41f39fdb106b73659088d8e8968a47cc80292c6c7d950fef",
+      "reference_sha256": "59514a46c62b53a9013435af1f9d1e3a8a1abc77971ef9b2df3b9fb173bce366",
+      "split": "calibration",
+      "subject_id": "synthetic_subject_1"
+    },
+    {
+      "case_id": "synthetic_2",
+      "conditioning": "skull_only",
+      "ensemble_sha256": "91dbfe23ea97b669df0e5b6eb673fb83437564cf5d2e834a1ec3485f8966990f",
+      "measurements": "case_2.csv",
+      "measurements_sha256": "7e7995571de84d82b2c2840142834524635731ca1f1349e575125bb01c2dc4b5",
+      "reference_sha256": "fbf99c107d50098a9fd960cee528abac88d56959afcc2f5583f5d5d3020d7a01",
+      "split": "validation",
+      "subject_id": "synthetic_subject_2"
+    }
+  ],
+  "protocol": {
+    "alignment_protocol": "Synthetic common frame; no registration or human data.",
+    "error_definition": "euclidean_correspondence",
+    "fit_settings_sha256": "8f5ef4c8ed4f5a257b2f6bda9a754bebd92722cb43a3293675e0b25597dac5ee",
+    "model_sha256": "988b95fea10a38475dc37db83cf1cd409b95b424fb4a8eae489c8c544eef91d8",
+    "pooling": "pooled_vertices",
+    "prediction_kind": "statistical_ensemble_mean",
+    "quantile_method": "higher",
+    "region_definition_sha256": "3b79f814c3cf76aca4bb445427deadc26cabf6023cf559aee8038ac6f5b59cb8",
+    "source": "Synthetic engineering fixture only. Non-CSV hashes identify synthetic labels, not actual GNM or CT assets. Coverage 0.75 is a test input, not a recommendation.",
+    "target_coverage": 0.75,
+    "units": "world_mm"
+  },
+  "schema_version": 1
+}
