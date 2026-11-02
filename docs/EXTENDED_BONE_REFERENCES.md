@@ -97,9 +97,9 @@ and displacement PLY output with and without the extended bone metadata.
 
 ## Limits and next stage
 
-This task does not compute a Frankfort frame, generate new GNM candidate maps,
-calculate jaw/prognathism features or validate anatomical placement. Those belong
-to subsequent tasks. Null definitions/mappings are deliberate pending scientific
+A4.2 now provides an [explicit reference-frame workflow](REFERENCE_FRAME.md)
+using these reviewed bone references. New GNM candidate maps, jaw/prognathism
+features and anatomical validation remain separate tasks. Null definitions/mappings are deliberate pending scientific
 inputs, not anatomical estimates. A reviewed location on reconstructed bone is
 still reconstructed evidence, and missing opposite-side anatomy is not filled.
 See [execution and deviations](TASK_A4_1.md).

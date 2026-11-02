@@ -1110,14 +1110,19 @@ class GNM_OT_session_report(Operator):
         self.report({"INFO"}, f"Session report generated - see Text Editor > {text_name}.")
         return {"FINISHED"}
 
+def _render_documentation_still():
+    bpy.ops.render.render(write_still=True)
+
+
 class GNM_OT_capturi_standardizate(Operator):
     bl_idname = "gnm.capturi_standardizate"
     bl_label = "Generate Standardized Captures (Front/3-4/Profile)"
     bl_description = (
         "Creates an orthographic camera and a fixed light, positioned relative "
         "to the skull's estimated axes (not global coordinates), and renders 3 "
-        "consistent captures: front, 3/4 and profile. Requires at least Glabella "
-        "or Nasion, plus both Eurion_R and Eurion_L markers"
+        "consistent captures: front, 3/4 and profile. With the explicit reference "
+        "frame switch, uses reviewed Frankfort axes; otherwise requires Glabella "
+        "or Nasion plus both Eurion_R and Eurion_L markers"
     )
     bl_options = {"REGISTER", "UNDO"}
     directory: StringProperty(subtype="DIR_PATH")
@@ -1157,7 +1162,17 @@ class GNM_OT_capturi_standardizate(Operator):
             self.report({"ERROR"}, "Choose a destination folder.")
             return {"CANCELLED"}
 
-        axes = _estimate_facial_axes(scene)
+        frame = None
+        if scene.gnm_reference_frame.use_for_captures:
+            try:
+                frame = _core_module('blender_reference_frame').current_record(scene)
+                right, forward, up = np.asarray(frame['geometry']['axes_world']).T
+                axes = (Vector(frame['geometry']['origin_mm']), Vector(right), Vector(up), Vector(forward))
+            except (ValueError, TypeError, KeyError, OSError) as exc:
+                self.report({'ERROR'}, str(exc))
+                return {'CANCELLED'}
+        else:
+            axes = _estimate_facial_axes(scene)
         if axes is None:
             self.report({"ERROR"},
                         "Cannot estimate face orientation - place at least Glabella or "
@@ -1166,6 +1181,9 @@ class GNM_OT_capturi_standardizate(Operator):
         center, right_axis, up_axis, forward_axis = axes
 
         max_dim = max(src_obj.dimensions)
+        if frame is not None:
+            max_dim = 2 * max((src_obj.matrix_world @ Vector(corner) - center).length
+                              for corner in src_obj.bound_box)
         cam_distance = max_dim * 3.0
         light_distance = max_dim * 4.0
 
@@ -1174,6 +1192,8 @@ class GNM_OT_capturi_standardizate(Operator):
             cam_data = bpy.data.cameras.new("GNM_Camera_Documentare")
         cam_data.type = 'ORTHO'
         cam_data.ortho_scale = max_dim * 1.4
+        if frame is not None:
+            cam_data.clip_end = cam_distance + max_dim
 
         cam_obj = bpy.data.objects.get("GNM_Camera_Documentare")
         if cam_obj is None:
@@ -1198,19 +1218,21 @@ class GNM_OT_capturi_standardizate(Operator):
             ("profile", right_axis),
         ]
 
-        saved_files = []
-        for suffix, direction in views:
-            cam_obj.location = center + direction * cam_distance
-            look_dir = center - cam_obj.location
-            cam_obj.rotation_mode = "QUATERNION"
-            cam_obj.rotation_quaternion = look_dir.to_track_quat('-Z', 'Y')
-
-            filepath = os.path.join(self.directory, f"{src_obj.name}_{suffix}.png")
-            scene.render.filepath = filepath
-            bpy.ops.render.render(write_still=True)
-            saved_files.append(filepath)
-
-        scene.camera = original_camera
+        if frame is not None:
+            cam_obj['gnm_reference_frame_json'] = json.dumps(frame, sort_keys=True, allow_nan=False)
+        elif 'gnm_reference_frame_json' in cam_obj:
+            del cam_obj['gnm_reference_frame_json']
+        try:
+            for suffix, direction in views:
+                cam_obj.location = center + direction * cam_distance
+                look_dir = center - cam_obj.location
+                cam_obj.rotation_mode = "QUATERNION"
+                cam_obj.rotation_quaternion = (Matrix(_core_module('reference_frame').camera_basis(frame, suffix).tolist()).to_quaternion()
+                    if frame is not None else look_dir.to_track_quat('-Z', 'Y'))
+                scene.render.filepath = os.path.join(self.directory, f"{src_obj.name}_{suffix}.png")
+                _render_documentation_still()
+        finally:
+            scene.camera = original_camera
 
         self.report({"INFO"}, f"3 captures saved in {self.directory} (front/three-quarter/profile).")
         return {"FINISHED"}
@@ -3934,6 +3956,7 @@ def register():
     bpy.types.Scene.gnm_restoration_regions = CollectionProperty(type=GNMRestorationRegion)
     bpy.types.Scene.gnm_restoration_active_index = IntProperty(default=0)
     _core_module('blender_craniometry').register(sys.modules[__name__])
+    _core_module('blender_reference_frame').register(sys.modules[__name__])
     _core_module('blender_postfit').register(sys.modules[__name__])
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
@@ -3946,6 +3969,7 @@ def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
     _core_module('blender_postfit').unregister()
+    _core_module('blender_reference_frame').unregister()
     _core_module('blender_craniometry').unregister()
     _core_module('blender_marker_normals').clear_preview()
     try:

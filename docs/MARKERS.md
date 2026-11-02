@@ -79,3 +79,12 @@ not as new skin-target CSV rows. Definition text/source and review state accompa
 each new position. CSV v3 and the original marker sets remain unchanged. Earlier
 software may reject the newly registered bone codes; use the updated package for
 extended documents. See [the catalogue and workflow](EXTENDED_BONE_REFERENCES.md).
+
+### Optional reference-frame snapshot
+
+A4.2 adds `craniometry.reference_frame` only after explicit frame computation.
+It retains world-mm transforms, selected bone observations/configuration, provenance,
+residuals and optional conditional placement sensitivity. Blender marks changed
+inputs `stale` on export and blocks their use for views/captures. This metadata
+does not transform CSV targets or change offline fitting. See [reference-frame
+workflow](REFERENCE_FRAME.md); old CSV formats and frame-free exports are unchanged.
