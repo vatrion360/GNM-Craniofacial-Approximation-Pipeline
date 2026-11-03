@@ -25,6 +25,7 @@ from blender_craniometry_checks import run_craniometry_checks
 from blender_extended_reference_checks import run_extended_reference_checks
 from blender_reference_frame_checks import run_reference_frame_checks
 from blender_feature_checks import run_feature_checks
+from blender_sensitivity_checks import run_sensitivity_checks
 from blender_articulation_checks import run_articulation_checks, run_articulation_undo
 from blender_profile_checks import run_profile_options, run_profile_external
 from blender_performance_checks import run_performance_checks
@@ -64,6 +65,7 @@ with tempfile.TemporaryDirectory() as directory:
         run_feature_checks(addon, directory)
         run_profile_options(addon, directory)
         run_articulation_checks(addon, directory)
+        run_sensitivity_checks(addon, directory)
         run_performance_checks(addon)
         run_depth_checks(addon)
         run_tissue_checks(addon)
