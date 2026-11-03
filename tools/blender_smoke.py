@@ -24,6 +24,7 @@ from blender_normal_checks import run_normal_checks
 from blender_craniometry_checks import run_craniometry_checks
 from blender_extended_reference_checks import run_extended_reference_checks
 from blender_reference_frame_checks import run_reference_frame_checks
+from blender_feature_checks import run_feature_checks
 from blender_performance_checks import run_performance_checks
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
 from blender_tissue_checks import run_tissue_checks, run_tissue_undo_checks
@@ -58,6 +59,7 @@ with tempfile.TemporaryDirectory() as directory:
         run_craniometry_checks(addon, directory)
         run_extended_reference_checks(addon, directory)
         run_reference_frame_checks(addon, directory)
+        run_feature_checks(addon, directory)
         run_performance_checks(addon)
         run_depth_checks(addon)
         run_tissue_checks(addon)

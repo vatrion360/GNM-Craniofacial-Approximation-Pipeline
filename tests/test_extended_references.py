@@ -19,7 +19,7 @@ def test_catalog_preserves_default_markers_and_bone_order():
     assert len(LANDMARK_ORDER) == len(LANDMARK_INFO) == 48
     assert len(set(LANDMARK_ORDER)) == 48
     assert len(marker_labels('LEGACY_27')) == 27 and len(marker_labels('PAPER_32')) == 32
-    assert len(cm.POINTS) == 22 and len(cm.ALL_POINTS) == 34 and len(cm.MEASUREMENTS) == 14
+    assert len(cm.POINTS) == 22 and len(cm.ALL_POINTS) == 38 and len(cm.MEASUREMENTS) == 14
     assert list(cm.ALL_POINTS)[:22] == list(cm.POINTS)
     assert set(EXT).isdisjoint(cm.POINTS)
     for code in ('ba', 'b', 'op', 'ft_R', 'ft_L'):

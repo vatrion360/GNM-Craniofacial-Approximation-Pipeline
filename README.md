@@ -18,6 +18,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Table 3 cranial measurements and reviewed skin-distance controls](docs/CRANIOMETRY.md)
 - [Optional extended bone references and definition review](docs/EXTENDED_BONE_REFERENCES.md)
 - [Opt-in anatomical reference frame and standardized views](docs/REFERENCE_FRAME.md)
+- [Protocol-defined cranial features and conditional intervals](docs/CRANIAL_FEATURES.md)
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
@@ -259,3 +260,18 @@ remain unchanged. See [configuration, assumptions and stale-frame checks](docs/R
 | `placement_error` in frame config | `null` | Optional sourced SDs, sample count and seed; conditional sensitivity only |
 | `python -m cranio.reference_frame template` | Explicit command | Write blank config, refuse overwrite |
 | `python -m cranio.reference_frame compute` | Explicit command | `--input` craniometry JSON, `--config`, `--output` frame JSON |
+
+## Optional cranial features (A4.3)
+
+Bone measurements are exported separately from face fitting. Definitions,
+projection choices, mandibular assumptions, placement SDs and thresholds require
+explicit configuration/review. [Workflow and geometric conventions](docs/CRANIAL_FEATURES.md).
+
+| Control / command | Default | Behavior |
+|---|---|---|
+| Add Feature Bone References | Not initialized | Extend 22/34 bone rows to 38; reuse pr/pg/go skin-marker associations without new targets |
+| Cranial Features → Write Blank Protocol | Explicit action | Null definitions, no norms/error values |
+| Compute / Export Reviewed Features | Explicit action | Write fresh JSON and Blender text; unavailable features remain explicit |
+| `python -m cranio.features template` | Explicit command | `--output` blank configuration |
+| `python -m cranio.features compute` | Explicit command | `--input` craniometry JSON, `--config`, `--output` results JSON |
+| `uncertainty` / `thresholds` | `null` / `null` | Conditional placement intervals / sourced descriptive labels only when configured |

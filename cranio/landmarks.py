@@ -247,3 +247,21 @@ for _code, _name, _side, _marker, _frame_only in (
         fit_target=False, gnm_vertex=None, tissue_depth_mm=None, sd_mm=None,
         mapping_status='reuse_existing_requires_review' if _marker is not None else 'not_configured',
         revision=REFERENCE_CATALOG_REVISION)
+
+
+# A4.3: optional bone counterparts; reuse existing skin sites, never duplicate them.
+FEATURE_REFERENCE_EXTENSIONS = {}
+for _code, _name, _side, _marker in (
+    ('pr', 'Prosthion (bone)', 0, 'Prosthion_BuzaSup'),
+    ('pg', 'Pogonion (bone)', 0, 'Pogonion'),
+    ('go_R', 'Gonion right', -1, 'Gonion_Dr'),
+    ('go_L', 'Gonion left', 1, 'Gonion_St'),
+):
+    FEATURE_REFERENCE_EXTENSIONS[_code] = dict(
+        name=_name, side=_side, definition_text=PAPER_DEFINITIONS[_marker],
+        definition_source=PAPER_DEFINITION_CITATION + '; Table 2 bone site; no depth assignment',
+        definition_status='needs_expert_review', existing_marker=_marker,
+        skin_correspondent=True, reference_frame_only=False, fit_target=False,
+        gnm_vertex=None, tissue_depth_mm=None, sd_mm=None,
+        mapping_status='reuse_existing_requires_review', revision='feature-bone-references-v1')
+REFERENCE_EXTENSIONS = {**BONE_REFERENCE_EXTENSIONS, **FEATURE_REFERENCE_EXTENSIONS}
