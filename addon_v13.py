@@ -1103,6 +1103,9 @@ class GNM_OT_session_report(Operator):
         else:
             lines.append("CSV export: none yet in this session.")
 
+        articulation = _core_module('blender_articulation').snapshot(scene)
+        if articulation is not None:
+            lines.extend(['', 'Mandibular articulation (operator assumption):', json.dumps(articulation, indent=2, ensure_ascii=False)])
         text_name = "GNM_Session_Report"
         existing_text = bpy.data.texts.get(text_name)
         if existing_text:
@@ -2504,6 +2507,7 @@ def _included_fit_markers(scene):
 def _build_snapshot(scene):
     """Colecteaza perechile (eticheta, vertex, tinta-piele, pondere) pentru
     markerii plasati si mapati. Ruleaza pe MAIN thread (citeste bpy)."""
+    _core_module('blender_articulation').require_review(scene)
     labels, verts, tgts, ws = [], [], [], []
     for item, vid in _included_fit_markers(scene):
         p = item.target_empty.matrix_world.translation
@@ -3691,6 +3695,7 @@ def _is_mm_scene(scene):
 
 
 def _export_markers(scene, path):
+    _core_module('blender_articulation').require_review(scene, deep=True)
     _bind_case(scene)
     if not _is_mm_scene(scene):
         raise ValueError("Expected metric scene scale 0.001: 1 Blender coordinate = 1 mm")
@@ -3753,6 +3758,9 @@ def _export_markers(scene, path):
             "plane_marker_labels": [item.label for item in _plane_markers(scene)],
             "restoration_regions": _restoration_records(scene),
             "target_construction": "bone plus operator-reviewed depth/direction; local normal is initial heuristic"}
+    articulation = _core_module('blender_articulation').snapshot(scene)
+    if articulation is not None:
+        meta['mandible_pose'] = articulation
     if scene.gnm_cranial_points:
         meta['craniometry'] = _core_module('blender_craniometry').document(scene, manifest, model_digest)
     _core_module('io_csv').write_marker_csv_v3(path, rows, meta)
@@ -3987,6 +3995,7 @@ def register():
     _core_module('blender_craniometry').register(sys.modules[__name__])
     _core_module('blender_reference_frame').register(sys.modules[__name__])
     _core_module('blender_features').register(sys.modules[__name__])
+    _core_module('blender_articulation').register(sys.modules[__name__])
     _core_module('blender_postfit').register(sys.modules[__name__])
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
@@ -3999,6 +4008,7 @@ def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
     _core_module('blender_postfit').unregister()
+    _core_module('blender_articulation').unregister()
     _core_module('blender_features').unregister()
     _core_module('blender_reference_frame').unregister()
     _core_module('blender_craniometry').unregister()

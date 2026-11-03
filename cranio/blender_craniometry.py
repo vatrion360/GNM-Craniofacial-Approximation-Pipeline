@@ -132,6 +132,9 @@ def document(scene, manifest=None, model_hash=None, *, include_frame=True):
         path = bpy.path.abspath(scene.gnm_live.npz_path)
         model_hash = _api._core_module('validation').sha256_file(path) if os.path.isfile(path) else ''
     doc['model_sha256'] = model_hash
+    articulation = _api._core_module('blender_articulation').snapshot(scene)
+    if articulation is not None:
+        doc['mandible_pose'] = articulation
     for point in scene.gnm_cranial_points:
         xyz = _xyz(scene, point)
         status = point.bone_status if xyz is not None else 'missing'
