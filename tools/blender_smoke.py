@@ -25,6 +25,7 @@ from blender_craniometry_checks import run_craniometry_checks
 from blender_extended_reference_checks import run_extended_reference_checks
 from blender_reference_frame_checks import run_reference_frame_checks
 from blender_feature_checks import run_feature_checks
+from blender_articulation_checks import run_articulation_checks, run_articulation_undo
 from blender_profile_checks import run_profile_options, run_profile_external
 from blender_performance_checks import run_performance_checks
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
@@ -62,6 +63,7 @@ with tempfile.TemporaryDirectory() as directory:
         run_reference_frame_checks(addon, directory)
         run_feature_checks(addon, directory)
         run_profile_options(addon, directory)
+        run_articulation_checks(addon, directory)
         run_performance_checks(addon)
         run_depth_checks(addon)
         run_tissue_checks(addon)
@@ -247,6 +249,7 @@ with tempfile.TemporaryDirectory() as directory:
             print('MODEL LOAD/EXPORT NOT TESTED: set GNM_MODEL_PATH')
         if os.environ.get('GNM_MODEL_PATH'):
             run_postfit_checks(addon)
+        run_articulation_undo(addon)
         run_depth_undo_checks(addon)
         run_tissue_undo_checks(addon)
         run_direction_checks(addon)

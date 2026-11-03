@@ -294,3 +294,24 @@ No automatic gap completion, anatomical mapping or depth/SD imputation. Incompat
 losses/TPS/frozen protocols fail clearly. Reports distinguish baseline solver
 history from final profile-refined coefficients and residuals. This is experimental
 constraint fitting, not validated reconstruction accuracy.
+
+## Optional mandibular articulation (A4.5)
+
+Blender can preview and apply a rigid pose to selected registered mandibular
+fragments and their source-bound markers. Pose assumptions, geometry diagnostics
+and provenance are recorded explicitly. [Workflow and limits](docs/MANDIBLE_ARTICULATION.md).
+
+| Control | Default | Behavior |
+|---|---|---|
+| Articulate Mandible: Wireframe Preview | Explicit action | Independent copies, native G/R handles; cursor-defined pivot |
+| Lower/upper dentition and condyle/fossa objects | Unset | Observed references selected by operator; absent sides stay unavailable |
+| Check | Explicit action | Point distances, BVH intersection candidates, conditional containment, sampled gaps |
+| Explicit contact tolerance | Off | Optional user-set mm threshold; no anatomical default |
+| Apply / Cancel | Explicit actions | Rigid move with provenance and rollback / discard preview |
+| Record Reviewed Pose | Required after Apply | Assumption and fresh checks; collision flags need an override reason |
+| Export Pose Session JSON | Explicit action | Pose history/current review; safe no-overwrite export |
+
+Source-bound bone/skin targets move together; depths remain unchanged. Review is
+invalidated by subsequent changes. Pose records accompany CSV, craniometry JSON
+and session reports. No automatic occlusion, missing-jaw completion or GNM jaw
+joint is introduced; ordinary fitting is unchanged when the tool is unused.
