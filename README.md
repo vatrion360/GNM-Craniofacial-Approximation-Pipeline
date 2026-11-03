@@ -275,3 +275,22 @@ explicit configuration/review. [Workflow and geometric conventions](docs/CRANIAL
 | `python -m cranio.features template` | Explicit command | `--output` blank configuration |
 | `python -m cranio.features compute` | Explicit command | `--input` craniometry JSON, `--config`, `--output` results JSON |
 | `uncertainty` / `thresholds` | `null` / `null` | Conditional placement intervals / sourced descriptive labels only when configured |
+
+## Optional sagittal profile refinement (A4.4)
+
+An explicitly reviewed, segmented bone profile can refine identity at the baseline
+pose through the offline CLI or Blender's external fit/import action. Live preview
+is unchanged. [Manifest, objective, acceptance gates and limits](docs/SAGITTAL_PROFILE.md).
+
+| Control / command | Default | Behavior |
+|---|---|---|
+| Reviewed sagittal profile offline | Off | Opt-in fixed-pose identity refinement; currently marker-only |
+| Profile JSON | Empty | Reviewed model/case/source hashes, plane, segmented path, depths and positive SDs |
+| `python -m cranio.profile --template PATH` | Explicit command | Write blank manifest; refuse overwrite; no guessed scientific data |
+| `--profile-constraint PATH` | Absent | Same NumPy refinement as Blender's external pipeline; manifest copied by addon |
+| Acceptance gates | Explicit manifest limits | Reject candidate if any profile point worsens, marker limit or plane band fails |
+
+No automatic gap completion, anatomical mapping or depth/SD imputation. Incompatible
+losses/TPS/frozen protocols fail clearly. Reports distinguish baseline solver
+history from final profile-refined coefficients and residuals. This is experimental
+constraint fitting, not validated reconstruction accuracy.

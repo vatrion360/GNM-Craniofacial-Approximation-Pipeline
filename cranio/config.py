@@ -68,6 +68,7 @@ class PipelineConfig:
     distance_weight: float = 0.0
     measurement_weight: float = 0.0
     craniometry: Optional[str] = None
+    profile_constraint: Optional[str] = None
     prior_soft_sigma: float = 0.0
     prior_soft_weight: float = 4.0
     seed: int = 42
@@ -118,6 +119,12 @@ class PipelineConfig:
             tissue_inputs.append(table_path(self.tissue_table))
             if not tissue_inputs[0].is_file():
                 raise ValueError(f'Tissue table not found: {self.tissue_table}')
+        if self.profile_constraint and (self.skull or self.prior or self.measurement_weight > 0
+                or self.symmetry_weight > 0 or self.distance_weight > 0 or self.prior_soft_sigma > 0
+                or not self.skip_tps or self.exclude_outliers or self.protocol or self.tissue_compare):
+            raise ValueError('Profile refinement currently requires marker-only statistical fitting: '
+                             'no skull/dense, prior, distance/symmetry/measurement/soft-prior loss, '
+                             'local correction, automatic exclusion, tissue comparison or frozen protocol')
         if self.identity_subspace not in ('all', 'head'):
             raise ValueError('identity_subspace must be all or head')
         if not self.input or not os.path.isfile(self.input):
@@ -126,7 +133,7 @@ class PipelineConfig:
             raise ValueError(f"Model not found: {self.npz}; see docs/INSTALL.md")
         if self.skull and not os.path.isfile(self.skull):
             raise ValueError(f"Skull not found: {self.skull}")
-        for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'tissue_directions'):
+        for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'tissue_directions', 'profile_constraint'):
             if getattr(self, name) and not os.path.isfile(getattr(self, name)):
                 raise ValueError(f'{name} not found: {getattr(self, name)}')
         if self.skull and not self.skull_normals_reviewed:
@@ -161,14 +168,14 @@ class PipelineConfig:
             if not math.isfinite(value) or value <= 0:
                 raise ValueError("regularization must be 'auto', 'adaptive' or finite and positive")
         from .validation import validate_outputs
-        validate_outputs([self.input, self.npz, self.skull, self.prior, self.landmark_map, self.protocol, self.case_metadata, self.craniometry, self.tissue_directions, *tissue_inputs],
+        validate_outputs([self.input, self.npz, self.skull, self.prior, self.landmark_map, self.protocol, self.case_metadata, self.craniometry, self.tissue_directions, self.profile_constraint, *tissue_inputs],
                          [self.output, self.output_error_mesh, self.output_stats,
                           self.output_json, self.output_statistical], self.overwrite)
 
     def fill_default_outputs(self):
         """Completeaza caile de iesire implicite din numele intrarii."""
         for name in ("input", "npz", "skull", "output", "output_stats", "output_error_mesh",
-                     "output_json", "output_statistical", "prior", "landmark_map", "protocol", "case_metadata", "craniometry", "tissue_table", "tissue_directions"):
+                     "output_json", "output_statistical", "prior", "landmark_map", "protocol", "case_metadata", "craniometry", "tissue_table", "tissue_directions", "profile_constraint"):
             value = getattr(self, name)
             if value is not None:
                 setattr(self, name, os.fspath(value))

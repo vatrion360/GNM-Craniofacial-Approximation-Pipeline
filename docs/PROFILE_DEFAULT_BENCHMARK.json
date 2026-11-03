@@ -1,0 +1,38 @@
+{
+  "baseline_commit": "a5f29017e6867b360c2965ebc853cdfba0feb14c",
+  "model_sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de",
+  "seed": 44,
+  "marker_count": 48,
+  "runs": [
+    {
+      "local_correction": false,
+      "byte_identical": true,
+      "sha256": {
+        "output": "21ecafc664ff7a77fa6ac1b03bcd706c4fc545ad16e3ef0643fe814e9e2a0e96",
+        "output_statistical": "21ecafc664ff7a77fa6ac1b03bcd706c4fc545ad16e3ef0643fe814e9e2a0e96",
+        "output_error_mesh": "6b6a8c50e4f8f25fbd7179ff97884afa7dc718697e5dc601de5182930a4a3fc9"
+      },
+      "numerical_fields_identical": [
+        "transform",
+        "identity_coefficients",
+        "lambda",
+        "metrics"
+      ]
+    },
+    {
+      "local_correction": true,
+      "byte_identical": true,
+      "sha256": {
+        "output": "aec7debc989e5e6c77d650e9c32a42fcada99afc279039003bd0bfb1b0745de3",
+        "output_statistical": "21ecafc664ff7a77fa6ac1b03bcd706c4fc545ad16e3ef0643fe814e9e2a0e96",
+        "output_error_mesh": "eabfade358abc973e2192fd4eb4ef744da7e19c2603ffbd001c42134037d2979"
+      },
+      "numerical_fields_identical": [
+        "transform",
+        "identity_coefficients",
+        "lambda",
+        "metrics"
+      ]
+    }
+  ]
+}

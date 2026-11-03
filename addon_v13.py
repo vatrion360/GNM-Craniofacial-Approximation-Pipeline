@@ -315,6 +315,9 @@ class GNMSettings(PropertyGroup):
     protocol_id: StringProperty(name='Protocol / revision')
     offline_dense: BoolProperty(name='Include registered bones offline', default=False)
     local_correction: BoolProperty(name='Local correction offline', default=False)
+    profile_enabled: BoolProperty(name='Reviewed sagittal profile offline', default=False,
+        description='Fixed-pose refinement from an explicit reviewed JSON manifest; no live preview change')
+    profile_path: StringProperty(name='Profile JSON', subtype='FILE_PATH', default='')
 
     tissue_table: EnumProperty(name='Tissue table', items=[
         ('NONE', 'Keep case values', 'No application'),
@@ -1650,6 +1653,10 @@ class GNM_PT_panel(Panel):
         box.prop(settings, "case_directory")
         box.prop(settings, 'offline_dense')
         box.prop(settings, 'local_correction')
+        box.prop(settings, 'profile_enabled')
+        if settings.profile_enabled:
+            box.prop(settings, 'profile_path')
+            box.label(text='Reviewed data required; offline marker-only fit')
         box.prop(settings, 'case_id')
         box.prop(settings, 'observer_id')
         box.prop(settings, 'protocol_id')
@@ -3844,6 +3851,22 @@ class GNM_OT_check_python(Operator):
             return {'CANCELLED'}
 
 
+def _profile_offline_arguments(scene):
+    """Explicit offline-only option; reject incompatible settings before export."""
+    settings = scene.gnm_settings
+    if not settings.profile_enabled:
+        return []
+    if (settings.offline_dense or settings.local_correction or scene.gnm_craniometry.weight > 0
+            or (scene.gnm_live.prior_sex != 'NONE' and scene.gnm_live.prior_ethnicity != 'NONE')):
+        raise ValueError('Profile refinement requires marker-only fitting without prior, craniometry loss or local correction')
+    if not settings.profile_path:
+        raise ValueError('Select the reviewed profile JSON manifest')
+    path = bpy.path.abspath(settings.profile_path)
+    if not os.path.isfile(path):
+        raise ValueError('Profile JSON not found: ' + path)
+    return ['--profile-constraint', path]
+
+
 class GNM_OT_run_offline(Operator):
     bl_idname = 'gnm.run_offline'
     bl_label = 'Run Offline Fit and Import'
@@ -3863,6 +3886,7 @@ class GNM_OT_run_offline(Operator):
                 raise ValueError('Select the external Python executable and case output folder')
             # Fail before creating a case folder or launching the fit. In
             # particular, .py/ELF files cannot be executed by Windows.
+            profile_arguments = _profile_offline_arguments(scene)
             info = _check_external_python(scene)
             _build_snapshot(scene)
             root = Path(__file__).resolve().parent
@@ -3877,6 +3901,11 @@ class GNM_OT_run_offline(Operator):
                        '--lambda-base', str(scene.gnm_live.lambda_base),
                        '--lambda-min', str(scene.gnm_live.lambda_min),
                        '--lambda-max', str(scene.gnm_live.lambda_max)]
+            if profile_arguments:
+                # Preserve the exact manifest beside the exported case for replay.
+                profile_copy = folder / 'profile_constraint.json'
+                shutil.copy2(profile_arguments[1], profile_copy)
+                arguments += ['--profile-constraint', str(profile_copy)]
             arguments += ['--clip-sigma', str(scene.gnm_live.clip_sigma)]
             arguments += ['--identity-subspace', scene.gnm_live.identity_subspace]
             arguments += ['--measurement-weight', str(scene.gnm_craniometry.weight)]
