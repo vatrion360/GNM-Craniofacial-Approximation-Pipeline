@@ -9,7 +9,7 @@ from typing import Mapping
 import json
 import numpy as np
 from .validation import finite_array, has_documented_tissue_source
-from .landmarks import BONE_REFERENCE_EXTENSIONS
+from .landmarks import BONE_REFERENCE_EXTENSIONS, FEATURE_REFERENCE_EXTENSIONS, REFERENCE_EXTENSIONS
 
 PROTOCOL = 'table3-chords-v1'
 REFERENCE = 'https://doi.org/10.4995/var.2024.24796 (Table 3; definitions attributed to White et al. 2012)'
@@ -44,12 +44,12 @@ for _code, _name, _hint in (
 ALL_POINTS = dict(POINTS)
 ALL_POINTS.update({code: (entry['name'], entry['definition_text'] or
     'Definition not configured. Supply an expert-reviewed definition and source before confirmation.')
-    for code, entry in BONE_REFERENCE_EXTENSIONS.items()})
+    for code, entry in REFERENCE_EXTENSIONS.items()})
 
 
 def require_reference_definition(code, point):
     """A confirmed extension needs a case-recorded definition/source, not a guess."""
-    if code not in BONE_REFERENCE_EXTENSIONS:
+    if code not in REFERENCE_EXTENSIONS:
         return
     for field in ('definition_text', 'definition_source'):
         value = point.get(field)
@@ -146,7 +146,7 @@ def validate_document(document):
         if digest and not _sha(digest):
             raise ValueError(f'{code}: invalid source geometry SHA-256')
         _bool(point.get('definition_reviewed', False), f'{code} definition_reviewed')
-        if code in BONE_REFERENCE_EXTENSIONS:
+        if code in REFERENCE_EXTENSIONS:
             for field in ('definition_text', 'definition_source'):
                 _text(point.get(field, ''), f'{code} {field}')
             if point.get('definition_reviewed', False):

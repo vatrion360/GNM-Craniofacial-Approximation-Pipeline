@@ -103,3 +103,10 @@ features and anatomical validation remain separate tasks. Null definitions/mappi
 inputs, not anatomical estimates. A reviewed location on reconstructed bone is
 still reconstructed evidence, and missing opposite-side anatomy is not filled.
 See [execution and deviations](TASK_A4_1.md).
+
+## Optional feature extension (A4.3)
+
+The original INIT/INIT_EXTENDED actions still produce 22/34 rows. The separate
+**Add Feature Bone References** action extends to 38 with Prosthion, Pogonion
+and bilateral Gonion bone records. These reuse existing marker associations
+and bone definitions; they do not add tissue targets. See [features](CRANIAL_FEATURES.md).

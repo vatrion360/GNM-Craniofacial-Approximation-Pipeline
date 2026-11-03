@@ -88,3 +88,12 @@ residuals and optional conditional placement sensitivity. Blender marks changed
 inputs `stale` on export and blocks their use for views/captures. This metadata
 does not transform CSV targets or change offline fitting. See [reference-frame
 workflow](REFERENCE_FRAME.md); old CSV formats and frame-free exports are unchanged.
+
+### Feature bone references (A4.3)
+
+Explicit feature initialization adds `pr`, `pg`, `go_R`, `go_L` to craniometry
+metadata, with reviewed bone definitions and existing-marker associations. It
+adds no skin-target CSV rows and no default fit constraints. New codes require
+the updated reader; old CSV formats remain readable. Feature results are a
+separate, explicitly generated `skull_features.json`, not automatically applied
+to fitting. See [cranial feature protocol](CRANIAL_FEATURES.md).
