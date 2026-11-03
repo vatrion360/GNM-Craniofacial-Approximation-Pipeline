@@ -22,6 +22,8 @@ def _is_sha256(value):
 def frozen_from_report(report, protocol_id, split_sha256):
     if not isinstance(protocol_id, str) or not protocol_id.strip() or not _is_sha256(split_sha256):
         raise ValueError('Protocol ID and immutable subject-split SHA-256 required')
+    if report['config'].get('profile_constraint'):
+        raise ValueError('Profile refinement is not supported in frozen protocols yet')
     if report['config']['geometry_qc'] != 'full':
         raise ValueError('Development run must use full geometry QC')
     from .craniometry import control_protocol

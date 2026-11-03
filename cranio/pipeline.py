@@ -103,7 +103,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     """Ruleaza pipeline-ul complet. Returneaza 0 (succes) sau 2 (fatal)."""
     cfg.fill_default_outputs()
     cfg.validate()
-    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.protocol, cfg.case_metadata, cfg.craniometry, cfg.tissue_directions) if path}
+    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.protocol, cfg.case_metadata, cfg.craniometry, cfg.tissue_directions, cfg.profile_constraint) if path}
     tissue_table = None
     if cfg.tissue_table:
         from .tissue import load_table, table_path
@@ -228,6 +228,13 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         from .protocol import validate_protocol
         _csv_meta['protocol_review'] = validate_protocol(cfg, _csv_meta, targets, model_hash)
     model = backend.load()
+    profile_prepared = None
+    profile_report = None
+    if cfg.profile_constraint:
+        import json
+        from .profile import prepare
+        with open(cfg.profile_constraint, encoding='utf-8') as stream:
+            profile_prepared = prepare(json.load(stream), model, model_hash, _csv_meta)
     from .identity import active_components
     active_identity = active_components(model, cfg.identity_subspace)
     mu, basis = model.mu, model.basis
@@ -395,6 +402,16 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         mirror_indices=model.mirror_indices, distance_pairs=distance_pairs,
         loss_cfg=loss_cfg, max_iter=cfg.max_iter, tol=cfg.tolerance, active_components=active_identity,
         **prior_options, **measurement_fit_options)
+    if profile_prepared is not None:
+        from .profile import refine
+        c, profile_report = refine(model, c, scale, rot, trans, lm_idx, weights,
+                                  profile_prepared, clip_sigma=cfg.clip_sigma, active=active_identity)
+        _csv_meta['profile_constraint'] = profile_report
+        fit_info.diagnostics['scope'] = 'Baseline shared solver, before optional profile refinement'
+        res_fit = np.linalg.norm(scale*(model.generate(c)[lm_idx]@rot.T)+trans-targets_xyz, axis=1)
+        warnings_list.append('Profile refinement: ' + profile_report['status'] +
+                             '; reviewed training constraints, not anatomical validation. '
+                             'Solver history/IRLS weights describe the baseline fit.')
     logger.info(f"    lambda = {lam_used:g}, |c|max = {np.abs(c).max():.2f} sigma, "
           f"RMS = {rmse(res_fit):.2f} mm (max {res_fit.max():.2f} mm)")
     stab = stability_warnings(lam_used, fit_info[0], c, loss_cfg.clip_sigma, active_identity)
@@ -698,7 +715,8 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
                 clamped[:len(targets)], field, c, warnings_list, extra,
                 dense_report=dense_report, lm_regions=lm_regions,
                 consistency=cons_rows, excluded_auto=excluded_auto,
-                nasal_report=nasal_report, craniometry_report=measurement_report)
+                nasal_report=nasal_report, craniometry_report=measurement_report,
+                profile_report=profile_report)
     logger.info(f"    Statistics: {cfg.output_stats}")
     write_run_json(cfg, _csv_meta, model_hash, targets, skipped, excluded_auto,
                    scale, rot, trans, c, lam_used, fit_info, res_align,

@@ -12,7 +12,8 @@ from .landmarks import default_tissue_records
 def write_stats(path, cfg, targets, skipped, scale, lam_used, fit_info,
                 res_align, res_fit, res_final, clamped_mags, field, c,
                 warnings_list, extra, dense_report=None, lm_regions=None,
-                consistency=None, excluded_auto=None, nasal_report=None, craniometry_report=None):
+                consistency=None, excluded_auto=None, nasal_report=None, craniometry_report=None,
+                profile_report=None):
     """Raport complet de reconstructie (reproductibilitate / publicatie).
 
     ``cfg`` este un PipelineConfig (are aceleasi nume de attribute ca
@@ -52,6 +53,8 @@ def write_stats(path, cfg, targets, skipped, scale, lam_used, fit_info,
                  f"|c|max = {np.abs(c).max():.2f} sigma, "
                  f"|c|mean = {np.abs(c).mean():.2f} sigma, "
                  f"RMS = {rmse(res_fit):.2f} mm")
+    if profile_report is not None:
+        lines.append('  Following solver convergence/history/clip diagnostics describe the BASELINE fit before profile refinement.')
     lines.append(f"  Solver converged: {diagnostics['converged']}; stop: {diagnostics['stop_reason']}")
     identity = diagnostics['identity_fit']
     lines.append(f"  Identity subspace: {cfg.identity_subspace}; active {identity['active_components']}/{identity['total_components']}; "
@@ -71,6 +74,13 @@ def write_stats(path, cfg, targets, skipped, scale, lam_used, fit_info,
                  f"mean = {np.linalg.norm(field, axis=1).mean():.2f} mm, "
                  f"max = {np.linalg.norm(field, axis=1).max():.2f} mm, "
                  f"final RMS at markers = {rmse(res_final):.2f} mm")
+    if profile_report is not None:
+        lines.extend(['', 'Optional reviewed profile refinement: ' + profile_report['status'],
+                      profile_report['interpretation'],
+                      f"  Maximum final marker displacement: {profile_report['final_marker_max_displacement_mm']:.6f} mm"])
+        for row in profile_report['points']:
+            lines.append(f"  {row['label']} [v{row['vertex']}]: before {row['before_mm']:.6f}, "
+                         f"candidate {row['candidate_mm']:.6f}, final {row['final_mm']:.6f} mm; SD {row['sd_mm']:.6f} mm")
     if dense_report:
         lines.append("")
         lines.extend(dense_report)
@@ -146,7 +156,7 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
               "model": {"path": os.path.abspath(cfg.npz), "sha256": model_hash}}
     if cfg.skull:
         inputs["skull"] = {"path": os.path.abspath(cfg.skull), "sha256": sha256_file(cfg.skull)}
-    for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'tissue_directions'):
+    for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'tissue_directions', 'profile_constraint'):
         if getattr(cfg, name):
             inputs[name] = dict(path=os.path.abspath(getattr(cfg, name)), sha256=sha256_file(getattr(cfg, name)))
     if cfg.tissue_table:
@@ -196,7 +206,7 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
         "skipped": skipped, "auto_excluded": excluded_auto, "warnings": warnings_list,
     }
     for row, weight in zip(report['landmarks'], fit_info.diagnostics['final_irls_weights']):
-        row['final_irls_weight'] = weight
+        row['baseline_final_irls_weight' if cfg.profile_constraint else 'final_irls_weight'] = weight
     with atomic_text(cfg.output_json) as stream:
         json.dump(report, stream, indent=2, ensure_ascii=False, allow_nan=False)
         stream.write("\n")

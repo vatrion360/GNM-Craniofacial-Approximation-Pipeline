@@ -25,6 +25,7 @@ from blender_craniometry_checks import run_craniometry_checks
 from blender_extended_reference_checks import run_extended_reference_checks
 from blender_reference_frame_checks import run_reference_frame_checks
 from blender_feature_checks import run_feature_checks
+from blender_profile_checks import run_profile_options, run_profile_external
 from blender_performance_checks import run_performance_checks
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
 from blender_tissue_checks import run_tissue_checks, run_tissue_undo_checks
@@ -60,6 +61,7 @@ with tempfile.TemporaryDirectory() as directory:
         run_extended_reference_checks(addon, directory)
         run_reference_frame_checks(addon, directory)
         run_feature_checks(addon, directory)
+        run_profile_options(addon, directory)
         run_performance_checks(addon)
         run_depth_checks(addon)
         run_tissue_checks(addon)
@@ -232,6 +234,7 @@ with tempfile.TemporaryDirectory() as directory:
                 # timer returning None, unlike Blender's event loop.
                 if bpy.app.timers.is_registered(addon._offline_poll):
                     bpy.app.timers.unregister(addon._offline_poll)
+                run_profile_external(addon, scene, model, directory, report)
                 assert bpy.ops.gnm.run_offline() == {'FINISHED'}
                 process = addon._OFFLINE['process']
                 assert bpy.ops.gnm.cancel_offline() == {'FINISHED'}
