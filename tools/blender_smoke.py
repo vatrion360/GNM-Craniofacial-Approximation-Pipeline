@@ -61,6 +61,17 @@ with tempfile.TemporaryDirectory() as directory:
     assert all(r['result']['prediction'] is None and r['result']['sd'] is None
                and r['result']['applicable'] is None for r in availability['rules'])
     print('BLENDER_RULE_CONTRACTS_PASS')
+    comparison = addon._core_module('rules.comparison')
+    contracts = addon._core_module('rules.contracts')
+    mapping = comparison.empty_map()
+    mapping.update(model_sha256='0'*64, vertex_count=3)
+    measurements = comparison.measure_and_compare(
+        [[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]], [[0, 1, 2]], [[0, 1, 2]], '0'*64, mapping)
+    assert all(r['measurement_status'] == 'not_assessed' for r in measurements['features'].values())
+    residual = comparison.compare_prediction(contracts.Prediction(5, 'mm'),
+        contracts.RuleResult(contracts.Prediction(3, 'mm'), 2, True, ('Synthetic result',)))
+    assert residual['standardized_residual'] == 1 and residual['light'] == 'not_assessed'
+    print('BLENDER_RULE_COMPARISON_PASS')
     for _ in range(2):
         addon.register()
         assert hasattr(bpy.context.scene, 'gnm_markers')
