@@ -3998,6 +3998,7 @@ def register():
     _core_module('blender_articulation').register(sys.modules[__name__])
     _core_module('blender_sensitivity').register(sys.modules[__name__])
     _core_module('blender_postfit').register(sys.modules[__name__])
+    _core_module('blender_rules').register(sys.modules[__name__])
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
     for h in list(bpy.app.handlers.load_post):
@@ -4008,6 +4009,7 @@ def register():
 def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
+    _core_module('blender_rules').unregister()
     _core_module('blender_postfit').unregister()
     _core_module('blender_sensitivity').unregister()
     _core_module('blender_articulation').unregister()
