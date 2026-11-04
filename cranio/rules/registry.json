@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "id": "anatomical_feature_sources",
+  "revision": "1",
+  "rules": [
+    {
+      "id": "eyes_stephan_davidson_2008",
+      "feature": "eyes",
+      "status": "needs_verification",
+      "reference": {
+        "citation": null,
+        "doi": "10.1111/j.1556-4029.2008.00718.x",
+        "supplied_reference": "Stephan & Davidson (2008), Placement of the human eyeball and canthi. J Forensic Sci 53(3):612–619."
+      },
+      "tested_error": null,
+      "applicability": {
+        "sex": null,
+        "ancestry": null,
+        "dentition": null,
+        "notes": null
+      },
+      "implementation_id": null,
+      "verification": {
+        "source": {
+          "status": "not_verified",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "implementation": {
+          "status": "not_tested",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "external": {
+          "status": "not_validated",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        }
+      },
+      "notes": "TODO(verify-source): bibliography supplied in TASKS.md; primary text, full citation, exact rule, errors and applicability not verified. No numerical prediction implemented."
+    },
+    {
+      "id": "eyes_stephan_huang_davidson_2009",
+      "feature": "eyes",
+      "status": "needs_verification",
+      "reference": {
+        "citation": null,
+        "doi": "10.1111/j.1556-4029.2008.00982.x",
+        "supplied_reference": "Stephan, Huang & Davidson (2009), J Forensic Sci 54(2):267–269."
+      },
+      "tested_error": null,
+      "applicability": {
+        "sex": null,
+        "ancestry": null,
+        "dentition": null,
+        "notes": null
+      },
+      "implementation_id": null,
+      "verification": {
+        "source": {
+          "status": "not_verified",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "implementation": {
+          "status": "not_tested",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "external": {
+          "status": "not_validated",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        }
+      },
+      "notes": "TODO(verify-source): bibliography supplied in TASKS.md; primary text, full citation, exact rule, errors and applicability not verified. No numerical prediction implemented."
+    },
+    {
+      "id": "mouth_stephan_evaluation",
+      "feature": "mouth",
+      "status": "needs_verification",
+      "reference": {
+        "citation": null,
+        "doi": "10.1002/ajpa.10166",
+        "supplied_reference": "Stephan, evaluation of mouth-width determination."
+      },
+      "tested_error": null,
+      "applicability": {
+        "sex": null,
+        "ancestry": null,
+        "dentition": null,
+        "notes": null
+      },
+      "implementation_id": null,
+      "verification": {
+        "source": {
+          "status": "not_verified",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "implementation": {
+          "status": "not_tested",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "external": {
+          "status": "not_validated",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        }
+      },
+      "notes": "TODO(verify-source): bibliography supplied in TASKS.md; primary text, full citation, exact rule, errors and applicability not verified. No numerical prediction implemented."
+    },
+    {
+      "id": "mouth_stephan_murphy_2008",
+      "feature": "mouth",
+      "status": "needs_verification",
+      "reference": {
+        "citation": null,
+        "doi": null,
+        "supplied_reference": "Stephan & Murphy (2008), J Forensic Odontostomatol 26(1):2–7."
+      },
+      "tested_error": null,
+      "applicability": {
+        "sex": null,
+        "ancestry": null,
+        "dentition": null,
+        "notes": null
+      },
+      "implementation_id": null,
+      "verification": {
+        "source": {
+          "status": "not_verified",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "implementation": {
+          "status": "not_tested",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "external": {
+          "status": "not_validated",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        }
+      },
+      "notes": "TODO(verify-source): bibliography supplied in TASKS.md; primary text, full citation, exact rule, errors and applicability not verified. No numerical prediction implemented."
+    },
+    {
+      "id": "nose_projection_guidelines",
+      "feature": "nose",
+      "status": "needs_verification",
+      "reference": {
+        "citation": null,
+        "doi": null,
+        "supplied_reference": "Predicting nose projection and pronasale position in facial approximation: a test of published methods and proposal of new guidelines"
+      },
+      "tested_error": null,
+      "applicability": {
+        "sex": null,
+        "ancestry": null,
+        "dentition": null,
+        "notes": null
+      },
+      "implementation_id": null,
+      "verification": {
+        "source": {
+          "status": "not_verified",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "implementation": {
+          "status": "not_tested",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "external": {
+          "status": "not_validated",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        }
+      },
+      "notes": "TODO(verify-source): bibliography supplied in TASKS.md; primary text, full citation, exact rule, errors and applicability not verified. No numerical prediction implemented."
+    },
+    {
+      "id": "ears_guyomarch_stephan_2012",
+      "feature": "ears",
+      "status": "needs_verification",
+      "reference": {
+        "citation": null,
+        "doi": "10.1111/j.1556-4029.2012.02181.x",
+        "supplied_reference": "Guyomarc'h & Stephan (2012), J Forensic Sci 57(6):1427–1441."
+      },
+      "tested_error": null,
+      "applicability": {
+        "sex": null,
+        "ancestry": null,
+        "dentition": null,
+        "notes": null
+      },
+      "implementation_id": null,
+      "verification": {
+        "source": {
+          "status": "not_verified",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "implementation": {
+          "status": "not_tested",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        },
+        "external": {
+          "status": "not_validated",
+          "reviewer": null,
+          "evidence": null,
+          "scope": null
+        }
+      },
+      "notes": "TODO(verify-source): bibliography supplied in TASKS.md; primary text, full citation, exact rule, errors and applicability not verified. No numerical prediction implemented. Ear prediction remains unspecified; future execution policy is unused."
+    }
+  ]
+}

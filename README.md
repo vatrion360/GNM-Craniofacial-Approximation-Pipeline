@@ -334,3 +334,21 @@ cranial features and optional profile targets. [Configuration and interpretation
 Ranges describe sampled scenarios, not confidence or validated accuracy. Failed
 scenarios remain explicit and withhold dependent ranges. CT validation remains
 separate; default live/offline fitting is unchanged.
+
+## Anatomical-rule evidence registry (A3.1)
+
+Eye, nose, mouth and ear rule metadata can be inspected offline. The bundled
+bibliographic leads are **unverified and unimplemented**; missing formulas,
+errors and applicability remain null. The registry does not change the face or
+activate constraints. [Schema, review states and limitations](docs/ANATOMICAL_RULES.md).
+
+| Command / field | Default | Behavior |
+|---|---|---|
+| `python -m cranio.rules inspect` | Bundled unverified catalogue | Print metadata, warnings and content/schema hashes |
+| `inspect --input PATH` | No external file | Validate one explicit local JSON; no network access |
+| `template --id ID --output PATH` | Explicit action | Write an empty catalogue; refuse overwrite |
+| `status` / `verification` | `needs_verification` / unreviewed | Distinguish source verification, implementation testing and external evidence |
+| `implementation_id`, `tested_error`, applicability | Unconfigured | No execution, imputed errors or presumed case applicability |
+
+Registry/schema data ship in both the wheel and addon ZIP. Rule predictions and
+a Blender rule panel are separate planned increments; ordinary fitting is unchanged.
