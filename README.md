@@ -368,3 +368,20 @@ remaining source requirements](docs/ANATOMICAL_RULES.md#a32-contract-and-unavail
 A valid status report exits successfully even when no predictions are available.
 Changing registry review flags cannot activate a formula. Source-confirmed
 formulas and their numerical reference tests are still required to complete A3.2.
+
+## Optional native-mesh feature measurements (A3.3 core)
+
+Reviewed model-bound correspondences can be measured on the fitted world-mm OBJ.
+Missing mappings, predictors, SDs or threshold policies remain explicitly
+unevaluated. No anatomical indices or traffic-light cutoffs are supplied.
+[Mapping, API and limitations](docs/RULE_COMPARISON.md).
+
+| Command / field | Default | Behavior |
+|---|---|---|
+| `python -m cranio.rules.comparison template --npz MODEL --output MAP` | Explicit action | Bind empty mapping to model hash/count; no overwrite |
+| `python -m cranio.rules.comparison measure --npz MODEL --face FACE.obj --mapping MAP --output JSON` | Explicit action | Native-topology measurements and input hashes; no mesh changes |
+| Point/feature `reviewed` | False | Require documented definitions and correspondences before measurement |
+| `rule_id`, `thresholds` | Null | No prediction or traffic light inferred |
+
+The shared NumPy core ships in the addon ZIP, but a Blender panel, numerical
+anatomical rules, case adapters and fitting constraints remain separate work.

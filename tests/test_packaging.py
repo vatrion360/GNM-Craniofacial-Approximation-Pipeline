@@ -20,6 +20,7 @@ def test_addon_zip_contains_core_and_cli(tmp_path):
                 'gnm_cranio/cranio/rules/registry.json',
                 'gnm_cranio/cranio/rules/schema.json',
                 'gnm_cranio/cranio/rules/contracts.py',
+                'gnm_cranio/cranio/rules/comparison.py',
                 'gnm_cranio/cranio/rules/engine.py',
                 'gnm_cranio/cranio/rules/eyes.py',
                 'gnm_cranio/cranio/rules/mouth.py',
