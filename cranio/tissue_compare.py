@@ -18,11 +18,13 @@ def read_exported_vertices(path, count):
     return finite_array(points, 'exported vertices', (count, 3))
 
 
-def export_difference_ply(path, vertices, triangles, differences, color_max_mm):
+def export_difference_ply(path, vertices, triangles, differences, color_max_mm, *,
+                          interpretation='tissue scenario difference; NOT uncertainty or face accuracy'):
     """Numeric vertex distances with an explicit common colour scale."""
     with atomic_text(path) as stream:
         stream.write('ply\nformat ascii 1.0\ncomment units mm; corresponding vertices in case world frame; no ICP\n')
-        stream.write('comment tissue scenario difference; NOT uncertainty or face accuracy\n')
+        for line in interpretation.splitlines():
+            stream.write('comment '+line+'\n')
         stream.write(f'comment common_color_scale_max_mm {color_max_mm:.12g}\n')
         stream.write(f'element vertex {len(vertices)}\nproperty float x\nproperty float y\nproperty float z\n')
         stream.write('property uchar red\nproperty uchar green\nproperty uchar blue\nproperty double vertex_difference_mm\n')
