@@ -3,7 +3,7 @@
 This separate, opt-in tool measures reviewed correspondences on the fitted mesh.
 It does not change the mesh, fitting objective, marker values or default workflow.
 The shared engine requires NumPy only and is included in the Blender ZIP. There
-is no Blender panel in this increment; A3.4 remains separate.
+is now an optional [Blender inspection panel](BLENDER_RULE_PANEL.md), added in A3.4.
 
 ## Prepare a reviewed mapping
 
@@ -115,7 +115,8 @@ validation. No cutoffs or source formulas are bundled.
 
 This completes only the measurement/comparison foundation of A3.3. Verified
 anatomical mappings, numerical A3.2 rules and compatible case adapters, optional
-soft constraints, integration into the normal fit report and A3.4 UI are pending.
+soft constraints and integration into the normal fit report are pending. The
+A3.4 panel displays current rule availability and historical measurement snapshots.
 There is no anatomical accuracy claim, CT analysis or automatic face adjustment.
 Synthetic tests check geometry, missing-data semantics, safety and packaging;
 the real-model test checks OBJ topology preservation only.

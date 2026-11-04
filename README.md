@@ -350,8 +350,8 @@ activate constraints. [Schema, review states and limitations](docs/ANATOMICAL_RU
 | `status` / `verification` | `needs_verification` / unreviewed | Distinguish source verification, implementation testing and external evidence |
 | `implementation_id`, `tested_error`, applicability | Unconfigured | No execution, imputed errors or presumed case applicability |
 
-Registry/schema data ship in both the wheel and addon ZIP. Rule predictions and
-a Blender rule panel are separate planned increments; ordinary fitting is unchanged.
+Registry/schema data ship in both the wheel and addon ZIP. The optional Blender
+panel below exposes their status; numerical rule predictions remain pending.
 
 ## Anatomical-rule contracts (A3.2 infrastructure)
 
@@ -383,5 +383,23 @@ unevaluated. No anatomical indices or traffic-light cutoffs are supplied.
 | Point/feature `reviewed` | False | Require documented definitions and correspondences before measurement |
 | `rule_id`, `thresholds` | Null | No prediction or traffic light inferred |
 
-The shared NumPy core ships in the addon ZIP, but a Blender panel, numerical
-anatomical rules, case adapters and fitting constraints remain separate work.
+The shared NumPy core ships in the addon ZIP. Numerical anatomical rules, case
+adapters and fitting constraints remain separate work.
+
+## Blender anatomical-rule panel (A3.4)
+
+**Anatomical Rules / Feature Snapshot** shows the bundled source leads and
+execution states, with optional measurements on a selected neutral fitted mesh.
+[Workflow, input gates and snapshot semantics](docs/BLENDER_RULE_PANEL.md).
+
+| Control | Default | Behavior |
+|---|---|---|
+| Show / Refresh Rule Catalogue | Explicit action | Read-only source/DOI, review and execution states; no case assessment |
+| Neutral fitted mesh / Reviewed feature map | None / unconfigured | Require native topology, matching model and reviewed mapping |
+| Write Blank Feature Map | Explicit action | Model-bound null correspondences; no overwrite |
+| Measure / Export Snapshot | Explicit action | Shared NumPy measurements, provenance JSON and historical display |
+
+No model reads, geometry checks or fitting occur during panel redraw. Displayed
+values are **last snapshots**, requiring recomputation after changes. Numerical
+rules are still unavailable: SD deviation remains unavailable and the light
+remains **not assessed**. No anatomical threshold or formula is invented.

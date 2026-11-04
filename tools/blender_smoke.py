@@ -25,6 +25,7 @@ from blender_craniometry_checks import run_craniometry_checks
 from blender_extended_reference_checks import run_extended_reference_checks
 from blender_reference_frame_checks import run_reference_frame_checks
 from blender_feature_checks import run_feature_checks
+from blender_rule_checks import run_rule_checks
 from blender_sensitivity_checks import run_sensitivity_checks
 from blender_articulation_checks import run_articulation_checks, run_articulation_undo
 from blender_profile_checks import run_profile_options, run_profile_external
@@ -75,8 +76,10 @@ with tempfile.TemporaryDirectory() as directory:
     for _ in range(2):
         addon.register()
         assert hasattr(bpy.context.scene, 'gnm_markers')
+        assert hasattr(bpy.context.scene, 'gnm_rule_checks')
         addon.unregister()
         assert not hasattr(bpy.types.Scene, 'gnm_markers')
+        assert not hasattr(bpy.types.Scene, 'gnm_rule_checks')
     addon.register()
     try:
         run_fragment_checks(addon)
@@ -86,6 +89,7 @@ with tempfile.TemporaryDirectory() as directory:
         run_extended_reference_checks(addon, directory)
         run_reference_frame_checks(addon, directory)
         run_feature_checks(addon, directory)
+        run_rule_checks(addon, directory)
         run_profile_options(addon, directory)
         run_articulation_checks(addon, directory)
         run_sensitivity_checks(addon, directory)
