@@ -55,6 +55,12 @@ with tempfile.TemporaryDirectory() as directory:
                for row in registry.document['rules'])
     assert registry.warnings and registry.record()['execution'] == 'not_implemented'
     print('BLENDER_RULE_REGISTRY_PASS')
+    availability = addon._core_module('rules.engine').readiness(registry)
+    assert [r['execution_status'] for r in availability['rules']].count('not_configured') == 5
+    assert availability['rules'][-1]['execution_status'] == 'unused'
+    assert all(r['result']['prediction'] is None and r['result']['sd'] is None
+               and r['result']['applicable'] is None for r in availability['rules'])
+    print('BLENDER_RULE_CONTRACTS_PASS')
     for _ in range(2):
         addon.register()
         assert hasattr(bpy.context.scene, 'gnm_markers')

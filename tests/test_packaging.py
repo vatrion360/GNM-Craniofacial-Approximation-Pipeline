@@ -19,6 +19,12 @@ def test_addon_zip_contains_core_and_cli(tmp_path):
                 'gnm_cranio/cranio/rules/__main__.py',
                 'gnm_cranio/cranio/rules/registry.json',
                 'gnm_cranio/cranio/rules/schema.json',
+                'gnm_cranio/cranio/rules/contracts.py',
+                'gnm_cranio/cranio/rules/engine.py',
+                'gnm_cranio/cranio/rules/eyes.py',
+                'gnm_cranio/cranio/rules/mouth.py',
+                'gnm_cranio/cranio/rules/nose.py',
+                'gnm_cranio/cranio/rules/ears.py',
                 'gnm_cranio/cranio/blender_postfit.py',
                 'gnm_cranio/cranio/blender_marker_depths.py'}.issubset(names)
         assert not any(name.endswith('.npz') or '__pycache__' in name for name in names)

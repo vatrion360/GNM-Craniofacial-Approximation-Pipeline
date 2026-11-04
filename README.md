@@ -352,3 +352,19 @@ activate constraints. [Schema, review states and limitations](docs/ANATOMICAL_RU
 
 Registry/schema data ship in both the wheel and addon ZIP. Rule predictions and
 a Blender rule panel are separate planned increments; ordinary fitting is unchanged.
+
+## Anatomical-rule contracts (A3.2 infrastructure)
+
+The rule API now distinguishes unconfigured formulas, unused features and unknown
+case applicability. No numerical anatomical predictor is enabled. [Contracts and
+remaining source requirements](docs/ANATOMICAL_RULES.md#a32-contract-and-unavailable-rule-handling).
+
+| Command / API | Behavior |
+|---|---|
+| `python -m cranio.rules status [--input PATH] [--rule ID]` | Case-free readiness JSON; five bundled leads unconfigured, ear prediction unused |
+| `cranio.rules.engine.predict(...)` | Source-missing stubs raise `NotConfigured`; unused rules return null predictions/SD/applicability |
+| `Prediction` / `RuleResult` | Explicit units, finite values, immutable results and tri-state applicability; no SD imputation |
+
+A valid status report exits successfully even when no predictions are available.
+Changing registry review flags cannot activate a formula. Source-confirmed
+formulas and their numerical reference tests are still required to complete A3.2.

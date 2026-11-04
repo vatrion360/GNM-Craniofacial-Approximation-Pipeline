@@ -12,6 +12,9 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest='action', required=True)
     inspect = sub.add_parser('inspect')
     inspect.add_argument('--input', help='Local registry JSON; omitted uses bundled unverified metadata')
+    status = sub.add_parser('status', help='Report rule availability without evaluating a case')
+    status.add_argument('--input', help='Optional local registry JSON')
+    status.add_argument('--rule', help='Restrict to one exact registry rule ID')
     template = sub.add_parser('template')
     template.add_argument('--id', required=True)
     template.add_argument('--output', required=True)
@@ -20,6 +23,9 @@ def main(argv=None) -> int:
         if args.action == 'inspect':
             registry = load_registry(args.input)
             result = dict(registry=registry.document, record=registry.record())
+        elif args.action == 'status':
+            from .engine import readiness
+            result = readiness(load_registry(args.input), args.rule)
         else:
             from ..export import atomic_text
             from ..validation import validate_outputs

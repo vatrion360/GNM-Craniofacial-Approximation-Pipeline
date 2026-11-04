@@ -104,3 +104,66 @@ A3.3/A3.4 will separately address reviewed model correspondences, comparisons an
 Blender display. This registry introduces no GNM indices, anatomical constants,
 confidence estimates, tissue updates, new fitting defaults or runtime dependency.
 CT validation remains independent and is not replaced by metadata/schema tests.
+
+## A3.2 contract and unavailable-rule handling
+
+This increment supplies **interfaces and stubs only**. No source-confirmed eye,
+nose or mouth formula has been supplied for implementation. It does not complete
+the numerical-prediction part of A3.2, and it does not validate case observations.
+
+```bash
+python -m cranio.rules status
+python -m cranio.rules status --rule nose_projection_guidelines
+python -m cranio.rules status --input local_registry.json
+```
+
+`status` is a case-free availability report. It returns exit code 0 for a valid
+report even when all predictions are unavailable; malformed data or an unknown
+requested ID returns 2. Check each `execution_status`, not the CLI exit code, to
+learn whether a rule is unused or unconfigured. The report retains registry/hash
+metadata, references, review claims, missing requirements and null result fields.
+No input coordinates, model or scan are needed for this diagnostic.
+
+Declared registry status and execution status are distinct. Five bundled source
+leads report `not_configured`; the ear lead reports `unused` and an unspecified
+feature while its bibliographic status remains `needs_verification`. A custom
+unknown rule ID cannot trigger an import or expression evaluation. An
+`implementation_id` or `validated` flag never enables code automatically.
+
+The Python API is `cranio.rules.engine.predict(rule_id, observations=None,
+registry=...)`. Eye, mouth and nose stubs raise `NotConfigured`, with `rule_id`
+and a tuple of missing requirements. Ear/explicitly unused rules return null
+prediction, null SD and unknown applicability. Stubs deliberately do not read,
+validate or mutate observations: anatomy-specific input conventions must come
+from each verified source before a numerical implementation can be added.
+`readiness()` catches only expected `NotConfigured`; invalid metadata and route
+conflicts remain errors. No fallback to GNM averages or zero error is performed.
+
+`cranio.rules.contracts` defines immutable, standard-library result types:
+
+- `Prediction`: a finite scalar in mm/degrees/unitless, or three world-mm
+  coordinates in an immutable tuple. Other point frames require explicit
+  conversion; no unit/axis inference is supplied.
+- `RuleResult`: unpackable as `(prediction, sd, applicable, notes)`. A prediction
+  requires `applicable=True`; `False` means an assessed inapplicable case and
+  `None` means no applicability assessment. An unavailable prediction cannot
+  carry an SD or claim applicability.
+- SD remains optional. Scalar predictions take scalar SD; point predictions
+  require three explicitly supplied marginal coordinate SDs. A scalar source SD
+  is never expanded isotropically. SD does not encode covariance or a confidence
+  interval. Finite nonnegative values are required when supplied; unknown is
+  null, not zero. Published mean error is not automatically an SD.
+
+These representation contracts do not compute scientific estimates. Tests use
+synthetic quantities, check invalid units/NaNs/ambiguous SDs, immutable state,
+metadata-only activation attempts, and cold-start/Unicode portability. No test
+is presented as an anatomical prediction or independent accuracy result.
+
+To replace a stub, a separate reviewed change must supply the exact primary
+formula, source locator, coefficient units, observed landmark definitions,
+coordinate convention, case-applicability protocol and hand-computed reference
+examples. It must define how missing/reconstructed anatomy and absent source
+error statistics are handled, and bind execution to the reviewed implementation.
+There is no JSON coefficient evaluator, externally loaded Python or guessed
+regression in this release. A3.3 comparisons and A3.4 Blender display remain
+separate tasks; the ordinary fitting pipeline never calls these stubs.
