@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GNM anatomical-rule evidence registry v1",
+  "description": "Structural schema only. Loader also enforces unique IDs and review consistency; no scientific certification.",
+  "$defs": {
+    "nullable_text": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": ".*\\S.*"
+    },
+    "rule": {
+      "type": "object",
+      "required": [
+        "id",
+        "feature",
+        "status",
+        "reference",
+        "tested_error",
+        "applicability",
+        "implementation_id",
+        "verification",
+        "notes"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "[a-z][a-z0-9_]*"
+        },
+        "feature": {
+          "enum": [
+            "eyes",
+            "nose",
+            "mouth",
+            "ears"
+          ]
+        },
+        "status": {
+          "enum": [
+            "validated",
+            "needs_verification",
+            "unused"
+          ]
+        },
+        "reference": {
+          "type": "object",
+          "required": [
+            "citation",
+            "doi",
+            "supplied_reference"
+          ],
+          "properties": {
+            "citation": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": ".*\\S.*"
+            },
+            "doi": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "10\\.[0-9]{4,9}/\\S+"
+            },
+            "supplied_reference": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": ".*\\S.*"
+            }
+          },
+          "additionalProperties": false
+        },
+        "tested_error": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "metric",
+            "mean",
+            "sd",
+            "n",
+            "units",
+            "cohort",
+            "source_locator"
+          ],
+          "properties": {
+            "metric": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": ".*\\S.*"
+            },
+            "mean": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "sd": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "n": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "units": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": ".*\\S.*"
+            },
+            "cohort": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": ".*\\S.*"
+            },
+            "source_locator": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": ".*\\S.*"
+            }
+          },
+          "additionalProperties": false
+        },
+        "applicability": {
+          "type": "object",
+          "required": [
+            "sex",
+            "ancestry",
+            "dentition",
+            "notes"
+          ],
+          "properties": {
+            "sex": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": ".*\\S.*"
+              }
+            },
+            "ancestry": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": ".*\\S.*"
+              }
+            },
+            "dentition": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": ".*\\S.*"
+              }
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": ".*\\S.*"
+            }
+          },
+          "additionalProperties": false
+        },
+        "implementation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "[a-z][a-z0-9_]*"
+        },
+        "verification": {
+          "type": "object",
+          "required": [
+            "source",
+            "implementation",
+            "external"
+          ],
+          "properties": {
+            "source": {
+              "type": "object",
+              "required": [
+                "status",
+                "reviewer",
+                "evidence",
+                "scope"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "not_verified",
+                    "verified"
+                  ]
+                },
+                "reviewer": {
+                  "$ref": "#/$defs/nullable_text"
+                },
+                "evidence": {
+                  "$ref": "#/$defs/nullable_text"
+                },
+                "scope": {
+                  "$ref": "#/$defs/nullable_text"
+                }
+              },
+              "additionalProperties": false
+            },
+            "implementation": {
+              "type": "object",
+              "required": [
+                "status",
+                "reviewer",
+                "evidence",
+                "scope"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "not_tested",
+                    "tested"
+                  ]
+                },
+                "reviewer": {
+                  "$ref": "#/$defs/nullable_text"
+                },
+                "evidence": {
+                  "$ref": "#/$defs/nullable_text"
+                },
+                "scope": {
+                  "$ref": "#/$defs/nullable_text"
+                }
+              },
+              "additionalProperties": false
+            },
+            "external": {
+              "type": "object",
+              "required": [
+                "status",
+                "reviewer",
+                "evidence",
+                "scope"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "not_validated",
+                    "documented"
+                  ]
+                },
+                "reviewer": {
+                  "$ref": "#/$defs/nullable_text"
+                },
+                "evidence": {
+                  "$ref": "#/$defs/nullable_text"
+                },
+                "scope": {
+                  "$ref": "#/$defs/nullable_text"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "notes": {
+          "type": "string",
+          "pattern": ".*\\S.*"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "revision",
+    "rules"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "[a-z][a-z0-9_]*"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": ".*\\S.*"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    }
+  },
+  "additionalProperties": false
+}

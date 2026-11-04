@@ -20,11 +20,12 @@ gnm-reconstruct = "gnm_reconstruct:main"
 gnm-doctor = "cranio.doctor:main"
 
 [tool.setuptools]
-packages = ["cranio", "cranio.backend"]
+packages = ["cranio", "cranio.backend", "cranio.rules"]
 py-modules = ["gnm_reconstruct"]
 
 [tool.setuptools.package-data]
 cranio = ["data/tissue/*.json"]
+"cranio.rules" = ["*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

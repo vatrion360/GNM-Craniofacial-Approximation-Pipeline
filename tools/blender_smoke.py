@@ -49,6 +49,12 @@ with tempfile.TemporaryDirectory() as directory:
     for table_id in ('legacy_hardcoded', 'var2026_table2'):
         assert tissue.load_table(table_id).warnings
     print('BLENDER_TISSUE_DATA_PASS')
+    registry = addon._core_module('rules').load_registry()
+    assert len(registry.document['rules']) == 6
+    assert all(row['status'] == 'needs_verification' and row['implementation_id'] is None
+               for row in registry.document['rules'])
+    assert registry.warnings and registry.record()['execution'] == 'not_implemented'
+    print('BLENDER_RULE_REGISTRY_PASS')
     for _ in range(2):
         addon.register()
         assert hasattr(bpy.context.scene, 'gnm_markers')
