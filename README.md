@@ -315,3 +315,22 @@ Source-bound bone/skin targets move together; depths remain unchanged. Review is
 invalidated by subsequent changes. Pose records accompany CSV, craniometry JSON
 and session reports. No automatic occlusion, missing-jaw completion or GNM jaw
 joint is introduced; ordinary fitting is unchanged when the tool is unused.
+
+## Optional mandibular pose sensitivity (A4.6)
+
+Explore explicitly configured rigid-pose scenarios without changing the skull or
+face. The shared NumPy engine recomputes bone-reference positions, configured
+cranial features and optional profile targets. [Configuration and interpretation](docs/POSE_SENSITIVITY.md).
+
+| Control / command | Default | Behavior |
+|---|---|---|
+| Mandibular Pose Sensitivity panel | No run | Explicit configuration and export only |
+| Write Blank Configuration / `python -m cranio.sensitivity template --output PATH` | Explicit action | Null ranges/pivot/axes/sample count; no invented scientific settings |
+| `python -m cranio.sensitivity compute --input BONES --config CONFIG --output JSON` | Explicit action | Same scenario engine as Blender; no geometry mutation or face refit |
+| Translation/rotation intervals, moving source IDs/hashes | Unconfigured | One rigid mandibular group, baseline + corners + seeded uniform scenarios |
+| `feature_config.thresholds` | Null | Missing norms reported; threshold-crossing ranges labelled `indeterminate` |
+| `profile` | Null | Optional sourced bone-normal offsets; derived targets only, no gap filling |
+
+Ranges describe sampled scenarios, not confidence or validated accuracy. Failed
+scenarios remain explicit and withhold dependent ranges. CT validation remains
+separate; default live/offline fitting is unchanged.
