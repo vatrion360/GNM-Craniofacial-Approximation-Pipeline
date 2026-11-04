@@ -95,6 +95,10 @@ def parse_args(argv=None) -> PipelineConfig:
     parser.add_argument("--prior-soft-weight", type=float, default=4.0,
                         help="Strength of the soft prior (multiple of lambda)")
     parser.add_argument('--prior', default=None)
+    parser.add_argument('--prior-compare', action='store_true',
+                        help='Paired no-prior/prior fits in a fresh output bundle; requires prior and justification')
+    parser.add_argument('--prior-justification', default=None,
+                        help='Operator rationale for the experimental identity prior; required for prior-compare')
     parser.add_argument('--landmark-map', default=None)
     parser.add_argument('--protocol', default=None)
     parser.add_argument('--case-metadata', default=None)
@@ -130,6 +134,8 @@ def parse_args(argv=None) -> PipelineConfig:
         case_posture=args.case_posture, tissue_table=args.tissue_table, tissue_labels=args.tissue_labels,
         tissue_axis=args.tissue_axis, tissue_directions=args.tissue_directions, tissue_compare=args.tissue_compare, depth_weighting=args.depth_weighting,
         prior=args.prior,
+        prior_compare=args.prior_compare,
+        prior_justification=args.prior_justification,
         landmark_map=args.landmark_map,
         protocol=args.protocol,
         case_metadata=args.case_metadata,

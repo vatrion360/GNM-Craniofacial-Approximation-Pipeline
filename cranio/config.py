@@ -75,6 +75,8 @@ class PipelineConfig:
     overwrite: bool = False
     strict: bool = False
     prior: Optional[str] = None
+    prior_compare: bool = False
+    prior_justification: Optional[str] = None
     landmark_map: Optional[str] = None
     protocol: Optional[str] = None
     case_metadata: Optional[str] = None
@@ -91,6 +93,11 @@ class PipelineConfig:
 
 
     def validate(self):
+        if type(self.prior_compare) is not bool:
+            raise ValueError('prior_compare must be boolean')
+        if self.prior_compare or self.prior_justification is not None:
+            from .prior_compare import validate_request
+            validate_request(self)
         from .tissue_context import normalized_posture
         normalized_posture(self.case_posture)
         if self.depth_weighting not in ('none', 'sd'):

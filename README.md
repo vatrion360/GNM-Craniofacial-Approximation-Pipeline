@@ -403,3 +403,20 @@ No model reads, geometry checks or fitting occur during panel redraw. Displayed
 values are **last snapshots**, requiring recomputation after changes. Numerical
 rules are still unavailable: SD deviation remains unavailable and the light
 remains **not assessed**. No anatomical threshold or formula is invented.
+
+## Experimental identity-prior audit (A6, opt-in)
+
+Run the same case without an external prior and with the chosen prior, retain
+both fits and export corresponding-vertex difference maps. The operator rationale
+is recorded; the result describes sensitivity, not anatomical accuracy.
+[Commands, outputs and limitations](docs/PRIOR_COMPARISON.md).
+
+| Option | Default | Behavior |
+|---|---|---|
+| `--prior-compare` | Off | Paired neutral/prior fits under a fresh `<output stem>_prior_compare/` directory |
+| `--prior-justification TEXT` | None | Required with comparison; recorded verbatim in the summary and prior child reports |
+| `--prior FILE` | Existing none | Explicit experimental prior archive; no category inferred |
+
+The ordinary no-prior fit is unchanged. Existing standalone/Blender prior controls
+remain available without this new audit. Structured age handling and dedicated
+Blender comparison controls are pending. No prior values or age effects are invented.

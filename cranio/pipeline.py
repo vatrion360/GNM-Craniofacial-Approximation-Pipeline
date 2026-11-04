@@ -90,6 +90,9 @@ def _nasal_diagnostic_report(bone_positions, skull_points, v_final):
 def run_pipeline(cfg: PipelineConfig) -> int:
     """Public API: user input failures return 2, including missing dependencies."""
     try:
+        if cfg.prior_compare:
+            from .prior_compare import run_comparison
+            return run_comparison(cfg)
         if cfg.tissue_compare:
             from .tissue_compare import run_comparison
             return run_comparison(cfg)
@@ -675,6 +678,8 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
 
     extra = None
     extra_parts = []
+    if cfg.prior_justification is not None:
+        extra_parts.append('Experimental identity prior justification (operator supplied): '+cfg.prior_justification)
     if cfg.skip_tps:
         extra_parts.append("Local correction was disabled (--skip-tps).")
     if loss_cfg.symmetry_weight > 0.0:
