@@ -29,7 +29,8 @@ def main(argv=None) -> int:
             with atomic_text(output, validate=load_registry) as stream:
                 stream.write(json.dumps(document, ensure_ascii=False, sort_keys=True, indent=2)+'\n')
             result = dict(output=str(output), warnings=list(warnings))
-        print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False))
+        # ASCII JSON escapes preserve Unicode values across console/pipe encodings.
+        print(json.dumps(result, ensure_ascii=True, sort_keys=True, indent=2, allow_nan=False))
         return 0
     except (ValueError, OSError, UnicodeError) as exc:
         print(f'Rule registry: {exc}', file=sys.stderr)

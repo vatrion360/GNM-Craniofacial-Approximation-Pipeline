@@ -67,3 +67,29 @@ conventions, source locators, error definitions and applicability evidence.
 Unknowns remain TODO(verify-source); no scientific choice is silently resolved.
 A3.3/A3.4 comparison and UI remain separate tasks. Default live/offline outputs
 and model assets are unchanged. CT evaluation remains with the user.
+
+## PR #31 portability correction — 2026-11-04
+
+Hosted CI at `1ac84194b2d8501d3714cc02dedb9322780a7225` exposed two defects
+not caught by the earlier local runs:
+
+- The dependency test prohibited all `urllib` imports. A cold Python startup
+  imports `urllib.parse` through `pathlib`; parsing is not network activity.
+  Preloaded standard-library modules masked this locally. The corrected test
+  starts with `-I -S`, blocks numerical imports and socket audit events separately,
+  permits URL parsing, checks both guards with negative controls, and prints
+  child stderr on failure instead of hiding the cause in CalledProcessError.
+- Registry CLI JSON used the console's encoding for literal Unicode. Windows
+  CP1252 produced non-UTF-8 bytes on redirected stdout. JSON now escapes Unicode
+  on stdout without changing decoded strings or UTF-8 files. Three regression
+  cases exercise ASCII, CP1252 and UTF-8 streams, Unicode source text and paths.
+
+Both failures were reproduced locally before editing: the original import guard
+under `python -S` rejected `urllib.parse`, and CP1252 stdout failed UTF-8 JSON
+parsing. The ordinary local suite still passed (792 passed, 4 skipped), explaining
+why that suite alone was insufficient. After correction: 49 registry tests and
+795 full-suite tests passed, with 4 skips (model-dependent and Windows-only tests).
+Ruff and whitespace checks passed. Files changed: the registry CLI, its tests,
+ANATOMICAL_RULES.md and this report. No fitting, anatomy or registry data changed.
+The full Windows/Linux Python and model-backed Blender checks are rerun in CI;
+these replace neither interactive Blender review nor CT validation.

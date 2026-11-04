@@ -15,6 +15,9 @@ python -m cranio.rules template --id my_review --output local_registry.json
 
 Inspection prints the complete metadata, diagnostics, exact input-byte SHA-256
 and bundled-schema SHA-256. Output is deterministic for identical bytes/schema.
+CLI JSON uses ASCII Unicode escapes on stdout so redirected output remains
+UTF-8-compatible under Windows code pages; decoding JSON recovers the original
+Unicode strings. Files remain explicitly UTF-8.
 Template creation refuses existing outputs and protects bundled data. The blank
 template has an empty rule list. To prepare a row through Python:
 

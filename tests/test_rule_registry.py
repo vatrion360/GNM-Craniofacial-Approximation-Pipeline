@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -191,15 +192,64 @@ def test_cli_is_deterministic_and_templates_do_not_replace_inputs(tmp_path):
     assert missing.returncode == 2 and b'Rule registry:' in missing.stderr
 
 
-def test_registry_inspection_needs_no_numerical_or_network_modules():
-    script = '''import builtins
+def test_registry_inspection_needs_no_numerical_imports_or_network_access():
+    script = """import builtins
+import sys
+sys.path.insert(0, sys.argv[1])
 original = builtins.__import__
+forbidden = {'numpy', 'scipy', 'tensorflow', 'bpy'}
 def guarded(name, *args, **kwargs):
-    if name.split('.')[0] in {'numpy', 'scipy', 'tensorflow', 'bpy', 'socket', 'urllib'}:
+    if name.split('.')[0] in forbidden:
         raise AssertionError('Unneeded import: '+name)
     return original(name, *args, **kwargs)
+def no_network(event, args):
+    if event.startswith('socket.'):
+        raise AssertionError('Network access: '+event)
 builtins.__import__ = guarded
+sys.addaudithook(no_network)
+# pathlib uses urllib.parse; parsing does not open a network connection.
+from urllib.parse import quote_from_bytes
+assert quote_from_bytes(b'a b') == 'a%20b'
 from cranio.rules import load_registry
 assert len(load_registry().document['rules']) == 6
-'''
-    subprocess.run([sys.executable, '-c', script], check=True, capture_output=True)
+# Negative controls: both guards must still reject the prohibited operations.
+for name in sorted(forbidden):
+    try:
+        __import__(name)
+    except AssertionError as exc:
+        assert str(exc) == 'Unneeded import: '+name
+    else:
+        raise AssertionError('Import guard inactive')
+try:
+    sys.audit('socket.connect', None, ('127.0.0.1', 1))
+except AssertionError as exc:
+    assert str(exc) == 'Network access: socket.connect'
+else:
+    raise AssertionError('Network guard inactive')
+"""
+    # Ignore site startup/PYTHONPATH: preloaded modules previously hid the defect.
+    result = subprocess.run([sys.executable, '-I', '-S', '-c', script,
+                             str(Path(__file__).resolve().parents[1])], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize('encoding', ['ascii', 'cp1252', 'utf-8'])
+def test_cli_json_preserves_unicode_under_console_encodings(tmp_path, encoding):
+    document = sample()
+    document['rules'][0]['reference']['supplied_reference'] = 'Știință – 骨 🦴'
+    source = tmp_path/'registry.json'
+    source.write_text(json.dumps(document, ensure_ascii=False), encoding='utf-8')
+    env = dict(os.environ, PYTHONIOENCODING=encoding)
+    command = [sys.executable, '-m', 'cranio.rules']
+    result = subprocess.run(command+['inspect', '--input', str(source)], env=env, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    # ASCII is also valid UTF-8; JSON unescaping must recover the original text.
+    assert result.stdout.isascii()
+    assert json.loads(result.stdout.decode('utf-8'))['registry'] == document
+    output = tmp_path/'șablon.json'
+    result = subprocess.run(command+['template', '--id', 'fixture', '--output', str(output)],
+                            env=env, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.isascii()
+    assert json.loads(result.stdout.decode('utf-8'))['output'] == str(output)
+    assert json.loads(output.read_text(encoding='utf-8')) == rules.empty_registry('fixture')
