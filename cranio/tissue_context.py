@@ -1,5 +1,5 @@
 """Descriptive tissue estimator/posture audit; never changes targets or weights."""
-import json
+import copy
 
 UNKNOWN_POSTURES = {'', 'unknown', 'unspecified', 'not reported', 'not recorded', 'unavailable'}
 
@@ -15,14 +15,25 @@ def normalized_posture(value):
 
 
 def with_case_metadata(metadata, path):
-    """Keep the existing external case-document precedence, shared by CLI/compare."""
+    """External case precedence, but never erase or override a declared age."""
     if not path:
         return metadata
+    from .tissue import _json
+    from .age_context import KEY, resolve
     with open(path, encoding='utf-8') as stream:
-        case = json.load(stream)
+        case = _json(stream.read())
     if not isinstance(case, dict):
         raise ValueError('Case metadata must be a JSON object')
-    return dict(metadata, case_metadata=case)
+    old = resolve(metadata)['estimate']
+    incoming = resolve({KEY: case.get(KEY)})['estimate']
+    if old is not None and incoming is not None and old != incoming:
+        raise ValueError('Conflicting age_at_death_estimate in external case metadata')
+    previous = metadata.get('case_metadata') or {}
+    if KEY in previous and case.get(KEY) is None:
+        case[KEY] = copy.deepcopy(previous[KEY])
+    result = dict(metadata, case_metadata=case)
+    resolve(result)
+    return result
 
 
 def case_posture(metadata, explicit=None):
@@ -63,16 +74,24 @@ def describe_context(table, metadata, replaced_labels=(), explicit_posture=None)
               depth_applied=scope == 'landmarks' and label in selected,
               provenance=row['provenance']) for label,row in data[scope].items()}
             for scope in ('landmarks','regions')}
-    return dict(table_id=data['id'], table_sha256=table.sha256, table_posture=data['posture'],
+    result = dict(table_id=data['id'], table_sha256=table.sha256, table_posture=data['posture'],
         case_posture=case, posture_comparison=status, estimators=rows, warnings=warnings,
         interpretation='Posture label comparison only, not biological equivalence or a calibrated correction. '
             'Estimator labels and central values are supplied table data. No shorth/75-shormax is derived from means; '
             'unapplied rows are reference metadata, not case measurements.')
+    from .age_context import is_declared, describe_age
+    if is_declared(metadata):
+        result['age'] = describe_age(metadata, table)
+        warnings.extend(result['age']['warnings'])
+    return result
 
 
 def context_text(record, compact=False):
     """Render explicit unknowns and per-row estimator/application status in TXT."""
     lines = [f"Tissue posture: table={record['table_posture']!r}; case={record['case_posture']['value']!r}; comparison={record['posture_comparison']}. No posture correction."]
+    if 'age' in record:
+        from .age_context import age_text
+        lines.append(age_text(record['age']))
     if compact:
         from collections import Counter
         counts = Counter(row['estimator'] or 'unknown' for row in record['estimators']['landmarks'].values() if row['depth_applied'])

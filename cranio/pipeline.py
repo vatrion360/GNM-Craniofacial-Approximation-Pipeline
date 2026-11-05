@@ -145,6 +145,13 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     label_to_vertex = dict(label_to_vertex, **{target.label: target.vertex for target in targets})
     from .tissue_context import with_case_metadata
     _csv_meta = with_case_metadata(_csv_meta, cfg.case_metadata)
+    from .age_context import is_declared, describe_age
+    _csv_meta.pop('age_context', None)  # Derived audit is always recomputed.
+    if is_declared(_csv_meta):
+        # Reporting only: validate before fitting even when no table is selected.
+        _csv_meta['age_context'] = describe_age(_csv_meta, tissue_table)
+        if tissue_table is None:
+            warnings_list.extend(_csv_meta['age_context']['warnings'])
     document = _csv_meta.get('craniometry')
     if document is not None:
         craniometry.validate_document(document)
@@ -678,6 +685,9 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
 
     extra = None
     extra_parts = []
+    if tissue_table is None and 'age_context' in _csv_meta:
+        from .age_context import age_text
+        extra_parts.append(age_text(_csv_meta['age_context']))
     if cfg.prior_justification is not None:
         extra_parts.append('Experimental identity prior justification (operator supplied): '+cfg.prior_justification)
     if cfg.skip_tps:

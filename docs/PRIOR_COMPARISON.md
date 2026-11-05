@@ -108,9 +108,9 @@ still a model assumption; “neutral” does not mean a face without statistical
 
 ## Remaining A6 work
 
-Structured age-at-death metadata, reviewed age-range/table matching and explicit
-ageing limitations in the regular case workflow remain separate work. No tissue
-depth is changed based on age here. Blender controls/justification migration and
+Structured age-at-death metadata and descriptive range comparisons are available
+in the [age audit](AGE_CONTEXT.md). No tissue depth is changed based on age.
+Automatic table selection is not implemented. Blender prior controls/justification migration and
 complete A7 record integration also remain pending. CT validation remains with
 the user. Tests use synthetic targets/priors and the official model topology;
 they do not constitute a demographic or subject-level validation study.

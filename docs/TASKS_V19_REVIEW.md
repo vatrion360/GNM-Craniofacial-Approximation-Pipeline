@@ -138,7 +138,7 @@ de acceptare din task sunt îndeplinite.
 | A4.6 | Lipsește | Nu există eșantionarea sensibilității la poziția mandibulei. |
 | A4.7 | Lipsește | Fitul utilizează toate cele 253 de componente. |
 | A5 | Parțial | Există validări, strict, protocol înghețat și QC obligatoriu; lipsește contractul unic pass/warn/block/override și intervalele anatomice configurate. |
-| A6 | Parțial | Priorul neutru este deja implicit. Lipsesc comparația neutral/prior, justificarea obligatorie și tratarea structurată a vârstei. |
+| A6 | Parțial | Priorul neutru este implicit; comparația neutral/prior cu justificare este opt-in ([A6.1](TASK_A6_1.md)). Metadatele de vârstă și compararea descriptivă cu intervalele tabelelor sunt implementate ([A6.2](TASK_A6_2.md)). Selectarea automată a tabelului și migrarea controalelor priorului din Blender rămân neimplementate. |
 | A7.1 | Substanțial, dar incomplet | `report.py` și `provenance.py` au versiuni, hash-uri, coeficienți, transformare, setări, reziduuri și metadate. Extindem acest raport, nu construim unul concurent. |
 | A7.2 | Lipsește | Nu există un domeniu de validitate alimentat de evaluări independente. Poate rămâne neconfigurat. |
 | A7.3 | Parțial | V19 separă copia neutră de prezentarea cu UV/expresii. Lipsesc modurile formale de export, etichetele obligatorii și capturile în Frankfort. |

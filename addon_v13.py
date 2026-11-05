@@ -311,6 +311,8 @@ class GNMSettings(PropertyGroup):
     case_id: StringProperty(name='Pseudonymous case ID')
     acquisition_posture: StringProperty(name='Case acquisition posture', default='',
         description='Optional declared posture; leave empty if unknown. No CT inference or geometric correction')
+    age_context_path: StringProperty(name='Age assessment JSON', subtype='FILE_PATH', default='',
+        description='Optional age_at_death_estimate case document; read on Apply/export only, no ageing or automatic table selection')
     observer_id: StringProperty(name='Observer ID')
     protocol_id: StringProperty(name='Protocol / revision')
     offline_dense: BoolProperty(name='Include registered bones offline', default=False)
@@ -1546,6 +1548,7 @@ class GNM_PT_panel(Panel):
         tissue_box.label(text='Versioned tissue-table scenario')
         tissue_box.prop(settings, 'tissue_table')
         tissue_box.prop(settings, 'acquisition_posture')
+        tissue_box.prop(settings, 'age_context_path')
         if settings.tissue_table == 'FILE':
             tissue_box.prop(settings, 'tissue_table_path')
         tissue_box.label(text='Uses the same selection checkboxes above')
@@ -3758,6 +3761,7 @@ def _export_markers(scene, path):
             "plane_marker_labels": [item.label for item in _plane_markers(scene)],
             "restoration_regions": _restoration_records(scene),
             "target_construction": "bone plus operator-reviewed depth/direction; local normal is initial heuristic"}
+    meta.update(_core_module('blender_tissue').scene_age_metadata(scene))
     articulation = _core_module('blender_articulation').snapshot(scene)
     if articulation is not None:
         meta['mandible_pose'] = articulation

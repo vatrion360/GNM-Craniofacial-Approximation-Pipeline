@@ -24,6 +24,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
 - [Reviewed tissue measurement directions](docs/TISSUE_DIRECTIONS.md)
 - [Explicit tissue scenarios and comparison](docs/TISSUE_SCENARIOS.md)
+- [Optional age-at-death assessment and tissue-range audit](docs/AGE_CONTEXT.md)
 - [Versioned tissue tables: JSON/CSV exchange](docs/tissue_tables_howto.md)
 - [Contributing and CI](CONTRIBUTING.md)
 - [Optional head-only identity fitting](docs/IDENTITY_SUBSPACE.md)
@@ -156,6 +157,7 @@ follow reviewed sampled bone normals and are not replaced by selected-marker tab
 | Fit option | Default | Effect |
 | --- | --- | --- |
 | `--case-posture TEXT` | Unknown | Declared acquisition posture; selected-table mismatch/unknown warnings only, no geometric correction |
+| `--case-metadata FILE` | None | Case JSON; optional reviewed `age_at_death_estimate` is reported and compared with the selected tissue range, without changing geometry |
 | `--depth-weighting {none,sd}` | `none` | Offline only: optional `1/SD_mm²` multipliers from the selected table; missing SD retains base weight with warning; sensitivity, not calibrated uncertainty |
 | `--tissue-table ID_OR_JSON` | None | Select/report a table; does not by itself replace targets |
 | `--tissue-labels LABEL ...` | Empty | Explicit authorization to replace these case depths/targets |
@@ -420,3 +422,13 @@ is recorded; the result describes sensitivity, not anatomical accuracy.
 The ordinary no-prior fit is unchanged. Existing standalone/Blender prior controls
 remain available without this new audit. Structured age handling and dedicated
 Blender comparison controls are pending. No prior values or age effects are invented.
+
+## Age-at-death metadata (A6, optional)
+
+Use `python -m cranio.age_context template --output case_age.json` to create an
+unknown assessment. Supply documented bounds, method and source, then pass it
+via `--case-metadata` or Blender's **Age assessment JSON** field. The standalone
+`compare --case-metadata FILE --tables ID_OR_PATH ... --output FILE` command audits
+reported table ranges. No age, scientific threshold or tissue value is imputed;
+no table is selected automatically and soft-tissue ageing is not modelled.
+See [format, statuses and Blender workflow](docs/AGE_CONTEXT.md).
