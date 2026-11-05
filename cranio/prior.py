@@ -3,6 +3,18 @@ import numpy as np
 from .validation import finite_array, sha256_file
 
 
+def validate_justification(reason, *, required=False):
+    """Validate operator intent without supplying a scientific rationale."""
+    if reason is None:
+        if required:
+            raise ValueError('Prior comparison requires a documented prior justification')
+        return
+    if (not isinstance(reason, str) or not reason.strip()
+            or reason.strip().casefold() in {'todo', 'unknown', 'unspecified', 'none', 'null'}
+            or 'todo(verify-source)' in reason.casefold()):
+        raise ValueError('prior-justification must document the operator rationale, not a placeholder')
+
+
 def load_prior(path, identity_dim=253):
     with np.load(path, allow_pickle=False) as archive:
         if not {'mean', 'scale'} <= set(archive.files):

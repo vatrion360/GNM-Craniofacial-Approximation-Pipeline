@@ -13,7 +13,7 @@ import numpy as np
 from .backend import GNMBackend
 from .export import atomic_text
 from .identity import active_components
-from .prior import load_prior
+from .prior import load_prior, validate_justification
 from .tissue import _json, table_path
 from .tissue_compare import read_exported_vertices, export_difference_ply
 from .validation import finite_array, residual_metrics, sha256_file, validate_outputs
@@ -28,11 +28,8 @@ INTERPRETATION = ('Experimental identity-prior sensitivity, NOT uncertainty or a
 def validate_request(config) -> None:
     """Validate explicit intent without choosing a scientific prior or rationale."""
     reason = config.prior_justification
+    validate_justification(reason)
     if reason is not None:
-        if (not isinstance(reason, str) or not reason.strip()
-                or reason.strip().casefold() in {'todo', 'unknown', 'unspecified', 'none', 'null'}
-                or 'todo(verify-source)' in reason.casefold()):
-            raise ValueError('prior-justification must document the operator rationale, not a placeholder')
         if not config.prior:
             raise ValueError('prior-justification requires an explicit prior file')
     if not config.prior_compare:
