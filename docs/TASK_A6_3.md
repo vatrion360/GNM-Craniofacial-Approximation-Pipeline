@@ -61,3 +61,13 @@ No worker accesses bpy; object creation happens in the existing main-thread poll
 No automatic population assignment, source verification, age simulation or
 age-based table selection is introduced. A7 canonical record consolidation and
 manual case/CT validation remain separate. Full A6 is not claimed complete.
+
+### Cross-platform follow-up
+
+Initial Windows CI exposed a path-format mismatch in the new importer: the
+existing comparison writer uses native separators in child report paths. The
+reader now accepts only the exact POSIX and Windows spellings of each fixed
+expected report path, without weakening path confinement or following arbitrary
+JSON paths. The relocation test runs with both separator styles on every OS
+(36 new synthetic tests in total). This also covers moving Windows-produced
+bundles to Linux. Final-head CI is the completion gate.

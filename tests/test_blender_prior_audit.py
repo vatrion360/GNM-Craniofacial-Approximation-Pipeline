@@ -20,7 +20,13 @@ def bundle(tmp_path, model_file, marker_file):
     return tmp_path/'case_prior_compare'
 
 
-def test_bundle_roundtrip_and_relocation(bundle,tmp_path):
+@pytest.mark.parametrize('separator',['/','\\'])
+def test_bundle_roundtrip_and_relocation(bundle,tmp_path,separator):
+    path=bundle/'summary.json'
+    record=json.loads(path.read_text())
+    for row in record['scenarios']:
+        row['report']=row['id']+separator+'face_report.json'
+    path.write_text(json.dumps(record))
     summary,rows=load_comparison(bundle)
     assert [r['id'] for r in rows]==['neutral','prior']
     assert summary['comparison_status']=='completed_converged'

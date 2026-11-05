@@ -69,7 +69,9 @@ def load_comparison(folder):
         for row in rows:
             name = row['id']
             relative = name+'/face_report.json'
-            if row['report'] != relative or row['prior_enabled'] is not (name == 'prior'):
+            # The existing writer serializes native Path separators. Accept only
+            # the two exact spellings of this fixed path, including moved bundles.
+            if row['report'] not in (relative, relative.replace('/', '\\')) or row['prior_enabled'] is not (name == 'prior'):
                 raise ValueError('Comparison scenario identity/path mismatch')
             report = _json(_read(root, relative, row['report_sha256']).decode('utf-8'))
             if report['status'] != 'completed' or report['units'] != 'mm':
