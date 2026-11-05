@@ -16,6 +16,7 @@ def test_addon_zip_contains_core_and_cli(tmp_path):
                 'gnm_cranio/docs/POSTFIT_PRESENTATION.md',
                 'gnm_cranio/cranio/postfit.py',
                 'gnm_cranio/cranio/prior_compare.py',
+                'gnm_cranio/cranio/age_context.py',
                 'gnm_cranio/cranio/rules/__init__.py',
                 'gnm_cranio/cranio/rules/__main__.py',
                 'gnm_cranio/cranio/rules/registry.json',

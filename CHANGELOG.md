@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add opt-in structured age-at-death metadata, source/method validation and tissue age-range auditing in JSON/TXT. Blender reads an optional case JSON only on Apply/export and retains history/source hashes. No automatic table selection, simulated ageing or fit/default changes.
+
 - Add opt-in tissue-table selection, explicit selected-marker replacement on current case axes, and independent offline table comparisons with statistical/final vertex-difference PLYs. Preserve manual values unless explicitly selected for replacement; record sources, input hashes and before/after history. Blender application supports rollback and Undo/Redo. No source-direction enforcement or uncertainty calibration is implied.
 
 - Migrate existing marker and dense-region/scalp depths to two versioned data files; retain exact values, default sets and manual case precedence. Include data/schema hashes and an explicitly labelled default catalogue in audit reports.

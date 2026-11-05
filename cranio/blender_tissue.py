@@ -43,7 +43,9 @@ def apply_selected_table(addon, context, source, axis_acknowledged=False, direct
     if direction_source is not None:
         from .tissue_directions import load_directions
         directions = load_directions(direction_source)
-    _, _, plan = apply_table(targets, dict(version=3, marker_records=records, acquisition_posture=context.scene.gnm_settings.acquisition_posture), load_table(source),
+    metadata = dict(version=3, marker_records=records, acquisition_posture=context.scene.gnm_settings.acquisition_posture)
+    metadata.update(scene_age_metadata(context.scene))
+    _, _, plan = apply_table(targets, metadata, load_table(source),
                             [m.label for m in selected], 'source' if directions else 'existing', directions)
     by_label = {r['label']: r for r in plan['replacements']}
     shared = {k: v for k, v in plan.items() if k != 'replacements'}
@@ -56,6 +58,16 @@ def apply_selected_table(addon, context, source, axis_acknowledged=False, direct
     return _apply_changes(addon, context, selected, lambda item: by_label[item.label]['after_mm'],
                           audit_for, record_unchanged=True,
                           direction_for=(lambda item: by_label[item.label]['axis_world']) if directions else None)
+
+
+def scene_age_metadata(scene):
+    """Read optional age metadata on an explicit main-thread action only."""
+    path = scene.gnm_settings.age_context_path
+    if not path.strip():
+        return {}
+    import bpy
+    from .age_context import load_case_age
+    return load_case_age(bpy.path.abspath(path))
 
 
 def latest_context_messages(scene):
