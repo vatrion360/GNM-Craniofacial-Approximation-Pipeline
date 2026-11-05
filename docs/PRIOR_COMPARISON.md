@@ -34,9 +34,10 @@ applicability. Supplying a reason without a prior is an error. The reason is cas
 metadata rather than a frozen numerical setting; prior weight and other numerical
 settings remain part of protocol settings.
 
-For compatibility, the existing standalone `--prior` flow and Blender prior
-selection still work without the new audit or rationale. Mandatory justification
-for those older flows and a dedicated Blender comparison control remain pending.
+For compatibility, standalone `--prior` and ordinary Blender prior fits still
+work without a rationale when its field is empty. The separate Blender paired
+comparison requires one. Mandatory justification for older live/ordinary flows
+would be a separate compatibility change.
 The numerical default is unchanged; JSON configuration records now include the
 two new fields. Timestamped/provenance reports are not promised byte-identical.
 
@@ -110,7 +111,68 @@ still a model assumption; “neutral” does not mean a face without statistical
 
 Structured age-at-death metadata and descriptive range comparisons are available
 in the [age audit](AGE_CONTEXT.md). No tissue depth is changed based on age.
-Automatic table selection is not implemented. Blender prior controls/justification migration and
-complete A7 record integration also remain pending. CT validation remains with
+Automatic table selection is not implemented. A dedicated Blender comparison
+control is available below; mandatory rationale for legacy live/ordinary prior
+fits and complete A7 record integration remain separate work. CT validation remains with
 the user. Tests use synthetic targets/priors and the official model topology;
 they do not constitute a demographic or subject-level validation study.
+
+## Blender paired comparison
+
+Use the existing experimental prior selectors and local **Priors Folder**. These
+labels are inherited GNM categories, not demographic estimates derived from the
+case. Archives are not included in the addon ZIP; supply and review a local prior.
+No generation, download, TensorFlow or network call is introduced in Blender.
+
+In **Offline fit (external Python)**:
+
+1. Configure the Python interpreter, case directory and the intended offline fit
+   options, as for an ordinary offline run.
+2. Enter **Prior rationale**, describing why this sensitivity scenario is being
+   examined. Empty/placeholder text cannot start a comparison.
+3. Click **Compare Neutral / Selected Prior**. This is a distinct action; the
+   ordinary fit button retains its previous default mode.
+
+| Control | Default | Behavior |
+|---|---|---|
+| Prior rationale | Empty | Required for paired comparison; optional for an ordinary prior-enabled run; stored verbatim |
+| Compare Neutral / Selected Prior | Explicit click only | Run the existing CLI `--prior-compare` workflow in the external process |
+| Run Offline Fit and Import | Existing ordinary fit | One fit; carries a supplied rationale when a prior is selected |
+| Cancel Offline Fit | Existing control | Cancel either mode; retain diagnostic partial files without importing incomplete results |
+
+Comparison uses the offline button's settings: included markers, regularization,
+identity subspace, clip, measurement weight and explicitly enabled dense/local
+correction options. It does not clone the last preview or transfer every preview
+control. Profile refinement remains incompatible. No existing validation is
+skipped. A selected prior that cannot be loaded blocks the run; a copied prior
+whose hash changed during export also blocks launch.
+
+Every invocation receives a fresh case directory. Within it, `face_prior_compare/`
+has the bundle layout above. The selected prior is copied beside the exported
+markers for replay; the original prior/model are never modified. The rationale
+is captured before launch and cannot be changed in an already running process.
+Editing the rationale does not request a live refit or move any target. If running
+a neutral-only fit, clear a previous rationale: intent without a selected prior
+is rejected rather than silently discarded.
+
+After a successful process, Blender checks the completion record, both child
+reports and all expected artifact hashes using fixed paths. It checks triangle
+indices, finite vertices, matching topology and consistent convergence status.
+It reads only the pipeline's triangle OBJ dialect, without axis/unit conversion.
+No Blender objects are created until the full bundle passes these checks. Object
+creation is rolled back if an import step fails. A nonzero process exit or missing
+summary never imports a single successful child as a completed comparison.
+
+Two new objects are imported; existing live/offline faces remain unchanged:
+
+- `GNM_Audit_<run>_prior`: shown initially.
+- `GNM_Audit_<run>_neutral`: hidden in viewport and render initially, to avoid
+  overlapping surfaces. Toggle visibility in the Outliner to compare them.
+
+Each object records its scenario, child report path, comparison summary path and
+convergence status. The difference PLY files remain available in the output
+folder; this increment does not automatically load their colours into Blender.
+The status explicitly says sensitivity, not accuracy. A nonconverged pair is
+labelled `diagnostic_only_nonconverged` even though its completed diagnostic
+surfaces can be inspected. Neither convergence nor file integrity validates the
+prior scientifically. No automatic ranking or preferred-face claim is made.

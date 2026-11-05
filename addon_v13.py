@@ -1669,6 +1669,9 @@ class GNM_PT_panel(Panel):
         box.label(text='Lambda: conditional LOO' if scene.gnm_live.loo_auto
                        else 'Lambda: adaptive from included markers')
         box.operator("gnm.run_offline", icon="PLAY")
+        box.prop(scene.gnm_live, 'prior_justification')
+        box.operator('gnm.run_offline', text='Compare Neutral / Selected Prior', icon='MOD_DATA_TRANSFER').prior_compare = True
+        box.label(text='Comparison requires a selected prior and rationale')
         box.operator("gnm.cancel_offline", icon="CANCEL")
         for line in textwrap.wrap(settings.offline_status, width=48):
             box.label(text=line)
@@ -3522,6 +3525,8 @@ class GNMLiveSettings(PropertyGroup):
         description="Folder with prior_<SEX>_<ETHNICITY>.npz files "
                     "(generated with make_demographic_prior.py)")
     prior_status: StringProperty(default="inactive")
+    prior_justification: StringProperty(name='Prior rationale', default='',
+        description='Operator rationale required for paired offline comparison; optional for ordinary prior fitting, not evidence of applicability')
     dense_enabled: BoolProperty(
         name="Dense on each refit", default=False,
         update=_on_dense_toggle_update,
@@ -3650,6 +3655,7 @@ def _draw_live_section(layout, context):
     rowp2 = pr.row(align=True)
     rowp2.prop(st, "prior_weight")
     rowp2.label(text=st.prior_status)
+    pr.label(text='Experimental; not demographic identification')
 
     db = box.box()
     db.label(text="Skull Alignment & Deformation (V13.2):")
@@ -3808,6 +3814,9 @@ def _offline_poll():
         scene.gnm_settings.offline_status = f"Failed ({code}); see {folder / 'run.log'}"
         return None
     try:
+        if _OFFLINE.get('prior_compare', False):
+            _core_module('blender_prior_audit').import_comparison(scene, folder / 'face_prior_compare')
+            return None
         report = json.loads((folder / 'face_report.json').read_text(encoding='utf-8'))
         if report.get('status') != 'completed':
             raise ValueError('Incomplete run report')
@@ -3882,6 +3891,8 @@ def _profile_offline_arguments(scene):
 class GNM_OT_run_offline(Operator):
     bl_idname = 'gnm.run_offline'
     bl_label = 'Run Offline Fit and Import'
+    prior_compare: BoolProperty(default=False, options={'SKIP_SAVE'},
+        description='Run the existing offline neutral/prior audit; requires an explicit rationale')
 
     @classmethod
     def poll(cls, context):
@@ -3899,6 +3910,18 @@ class GNM_OT_run_offline(Operator):
             # Fail before creating a case folder or launching the fit. In
             # particular, .py/ELF files cannot be executed by Windows.
             profile_arguments = _profile_offline_arguments(scene)
+            _load_prior(scene)
+            selected_prior = _LIVE.prior
+            reason = scene.gnm_live.prior_justification or None
+            if self.prior_compare and settings.profile_enabled:
+                raise ValueError('Prior comparison does not combine with profile refinement')
+            if scene.gnm_live.prior_sex != 'NONE' and scene.gnm_live.prior_ethnicity != 'NONE' and selected_prior is None:
+                raise ValueError('Selected prior unavailable: ' + scene.gnm_live.prior_status)
+            if self.prior_compare and selected_prior is None:
+                raise ValueError('Select an explicit experimental prior before comparison')
+            _core_module('prior').validate_justification(reason, required=self.prior_compare)
+            if reason is not None and selected_prior is None:
+                raise ValueError('Prior rationale requires a selected prior; clear it for a neutral-only run')
             info = _check_external_python(scene)
             _build_snapshot(scene)
             root = Path(__file__).resolve().parent
@@ -3930,13 +3953,16 @@ class GNM_OT_run_offline(Operator):
                               '--dense-nose-weight', str(scene.gnm_live.dense_nose_weight), '--dense-max-rows', str(scene.gnm_live.dense_max_rows)]
                 if scene.gnm_live.dense_scalp_only:
                     arguments.append('--no-face-dense')
-            _load_prior(scene)
-            if scene.gnm_live.prior_sex != 'NONE' and scene.gnm_live.prior_ethnicity != 'NONE' and _LIVE.prior is None:
-                raise ValueError('Selected prior unavailable: ' + scene.gnm_live.prior_status)
-            if _LIVE.prior is not None:
+            if selected_prior is not None:
                 prior_path = folder / 'selected_prior.npz'
-                shutil.copy2(_LIVE.prior['path'], prior_path)
+                shutil.copy2(selected_prior['path'], prior_path)
+                if _core_module('validation').sha256_file(prior_path) != selected_prior['sha256']:
+                    raise ValueError('Selected prior changed during export; retry with a stable source')
                 arguments += ['--prior', str(prior_path), '--prior-weight', str(scene.gnm_live.prior_weight)]
+                if reason is not None:
+                    arguments += ['--prior-justification', reason]
+            if self.prior_compare:
+                arguments.append('--prior-compare')
             log = (folder / 'run.log').open('w', encoding='utf-8')
             try:
                 process = _core_module('external_python').start_pipeline(
@@ -3944,7 +3970,8 @@ class GNM_OT_run_offline(Operator):
             except Exception:
                 log.close()
                 raise
-            _OFFLINE.update(process=process, log=log, folder=str(folder), scene=scene.name)
+            _OFFLINE.update(process=process, log=log, folder=str(folder), scene=scene.name,
+                            prior_compare=bool(self.prior_compare))
             settings.offline_status = 'Running; ' + str(folder)
             bpy.app.timers.register(_offline_poll, first_interval=0.5)
             return {'FINISHED'}

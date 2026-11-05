@@ -432,3 +432,14 @@ via `--case-metadata` or Blender's **Age assessment JSON** field. The standalone
 reported table ranges. No age, scientific threshold or tissue value is imputed;
 no table is selected automatically and soft-tissue ageing is not modelled.
 See [format, statuses and Blender workflow](docs/AGE_CONTEXT.md).
+
+## Blender prior audit (A6, explicit action)
+
+The offline panel offers **Prior rationale** and **Compare Neutral / Selected
+Prior**. Select an existing local experimental prior and document the rationale;
+the button runs the same paired CLI audit in external Python. Both checked
+surfaces are imported separately (neutral initially hidden), with their report
+links. Existing objects and marker coordinates are preserved. **Cancel Offline
+Fit** handles either mode. Difference PLYs stay in the case output directory.
+The ordinary fit button remains a single fit; a supplied rationale is recorded
+when a prior is selected. See [controls and limitations](docs/PRIOR_COMPARISON.md#blender-paired-comparison).
