@@ -1,5 +1,6 @@
 """Actual ZIP/external record export, source immutability and lifecycle checks."""
 import json
+import hashlib
 from pathlib import Path
 import time
 
@@ -20,6 +21,23 @@ def run_record_checks(addon, scene, directory, source_folder, fitted):
     limits.write_text(json.dumps(dict(schema_version=1, revision='synthetic-blender', approved=True,
         ro='Text sintetic — fără validare anatomică.', en='Synthetic text, not anatomical validation.'),
         ensure_ascii=False), encoding='utf-8')
+
+    # Synthetic complete-only domain and a partial case exercise the banner;
+    # this is a software fixture, not a declaration about the model-mean skull.
+    domain_core = addon._core_module('validity_domain')
+    raw_report = (Path(source_folder)/'face_report.json').read_bytes()
+    report = json.loads(raw_report)
+    domain = domain_core.empty_domain()
+    domain.update(id='synthetic-blender-domain', revision='test-1', reviewed=True,
+        model_sha256=report['inputs']['model']['sha256'], run_signatures=[domain_core.run_signature(report)],
+        evidence=dict(reference='Synthetic software fixture, not CT evidence', sha256='a'*64, n_subjects=3),
+        conditions={'skull_completeness': dict(definition='Synthetic completeness category',
+                    allowed_values=['complete'], source='Synthetic fixture definition')})
+    observations = domain_core.case_template(hashlib.sha256(raw_report).hexdigest(), domain)
+    observations['observations']['skull_completeness'] = dict(value='partial', source='Synthetic test observation', reviewed=True)
+    domain_path, observations_path = Path(directory)/'domain.json', Path(directory)/'domain-case.json'
+    domain_path.write_text(json.dumps(domain), encoding='utf-8')
+    observations_path.write_text(json.dumps(observations), encoding='utf-8')
 
     def wait():
         deadline = time.monotonic()+90
@@ -46,6 +64,9 @@ def run_record_checks(addon, scene, directory, source_folder, fitted):
         assert settings.report_path == fitted['gnm_report']
         settings.output_parent = str(parent)
         settings.limitations_path = str(limits)
+        assert settings.validity_domain_path == settings.domain_case_path == ''
+        settings.validity_domain_path = str(domain_path)
+        settings.domain_case_path = str(observations_path)
         settings.uncertainty_scenario = 'off'
         reject()
         assert 'both an uncertainty JSON' in settings.status
@@ -67,6 +88,10 @@ def run_record_checks(addon, scene, directory, source_folder, fitted):
         settings.report_path = saved_path
         result = json.loads(Path(settings.result_path).read_text(encoding='utf-8'))
         assert result['status'] == 'recorded_not_validated'
+        assert result['assessments']['validity_domain']['status'] == 'outside_declared_domain'
+        assert 'OUTSIDE DECLARED DOMAIN' in settings.status
+        assert '[DOMAIN] OUTSIDE DECLARED DOMAIN' in bpy.data.texts[settings.result_text].as_string()
+        print('BLENDER_DECLARED_VALIDITY_DOMAIN_BANNER_PASS')
         assert result['limitations']['document']['revision'] == 'synthetic-blender'
         assert 'fără validare' in bpy.data.texts[settings.result_text].as_string()
         first_text = settings.result_text

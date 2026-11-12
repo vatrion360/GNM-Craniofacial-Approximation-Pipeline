@@ -17,6 +17,8 @@ python -m cranio.record build --report outputs/case/face_report.json --output-di
 | `--limitations` | Not configured | Optional operator-approved RO/EN wording file |
 | `--uncertainty` | Not linked | Optional related A2.1 CLI ensemble JSON |
 | `--uncertainty-scenario` | No automatic choice | `off` or `on`; required with `--uncertainty`, matching run prior state |
+| `--validation-domain` | Not configured | Optional operator-declared domain JSON |
+| `--domain-case` | Required with domain | Observations bound to the exact report hash |
 
 ## Outputs and interpretation
 
@@ -42,8 +44,9 @@ is `recorded_not_validated`. These labels do not replace source warnings. When
 profile refinement was enabled, solver diagnostics are explicitly scoped to the
 baseline before profile refinement.
 
-Final-mesh uncertainty, calibration, validity domain and scientific export
-authorization remain `not_assessed`. An explicitly linked A2.1 analysis is recorded
+Final-mesh uncertainty, calibration and scientific export authorization remain
+`not_assessed`. Validity domain also stays `not_assessed` unless both explicit
+[A7.2 domain/case files](VALIDITY_DOMAIN.md) are supplied. An explicitly linked A2.1 analysis is recorded
 separately as described below. This does not validate CT artifacts, introduce
 overrides, or infer approval from small marker residuals.
 Tissue/prior comparison child run reports can be processed individually; their
@@ -104,8 +107,9 @@ unapproved files are rejected. The status `operator_declared_approved` describes
 the declaration in that file; it is not independent ethical or scientific approval.
 The supplied wording and exact file hash are retained.
 
-Remaining A7 work includes calibration linkage, validated case domains,
-export-mode integration. [Blender controls](BLENDER_APPROXIMATION_RECORD.md) now
+Remaining A7 work includes calibration linkage and export-mode integration.
+[A7.2](VALIDITY_DOMAIN.md) compares operator-declared domains; it does not supply
+an independently validated case domain. [Blender controls](BLENDER_APPROXIMATION_RECORD.md) now
 expose explicit saved-fit record export. The optional A2.1 linkage below
 does not establish final-mesh uncertainty. CT validation remains
 a separate operator-led protocol.

@@ -18,7 +18,8 @@ def _digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def prepare_request(report_path, *, artifacts=None, limitations=None, uncertainty=None, scenario=None):
+def prepare_request(report_path, *, artifacts=None, limitations=None, uncertainty=None, scenario=None,
+                    validity_domain=None, domain_case=None):
     """Snapshot explicit paths and source-report identity; do not inspect meshes."""
     report_path = Path(report_path).resolve()
     raw = report_path.read_bytes()
@@ -27,8 +28,11 @@ def prepare_request(report_path, *, artifacts=None, limitations=None, uncertaint
         raise ValueError('Select both an uncertainty JSON and an explicit prior scenario')
     if scenario is not None and scenario not in ('off', 'on'):
         raise ValueError('Select the explicit uncertainty prior scenario off or on')
+    if (validity_domain is None) != (domain_case is None):
+        raise ValueError('Select both validation domain and bound case observations')
     arguments = ['build', '--report', str(report_path)]
-    for flag, value in (('--artifacts', artifacts), ('--limitations', limitations), ('--uncertainty', uncertainty)):
+    for flag, value in (('--artifacts', artifacts), ('--limitations', limitations), ('--uncertainty', uncertainty),
+                        ('--validation-domain', validity_domain), ('--domain-case', domain_case)):
         if value is None:
             continue
         path = Path(value).resolve()

@@ -23,6 +23,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Optional derived approximation record and provenance](docs/APPROXIMATION_RECORD.md)
 - [Export a saved-fit approximation record from Blender](docs/BLENDER_APPROXIMATION_RECORD.md)
+- [Operator-declared validation domain and explicit case comparison](docs/VALIDITY_DOMAIN.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
 - [Reviewed tissue measurement directions](docs/TISSUE_DIRECTIONS.md)
 - [Explicit tissue scenarios and comparison](docs/TISSUE_SCENARIOS.md)
@@ -475,3 +476,17 @@ Select the saved fit report explicitly or use **Use Active Fit Report**, then
 Blender displays a new text report after verified completion. Cancel, file-load
 and unregister cleanup are supported. This records saved fit files, not current
 scene edits. See [controls, defaults and limitations](docs/BLENDER_APPROXIMATION_RECORD.md).
+
+
+Optional A7.2 domain comparison is available in the record CLI and Blender panel:
+
+| Record option | Default | Effect |
+|---|---|---|
+| `--validation-domain FILE` | Absent | Reviewed, operator-declared conditions, model/run signatures and study results |
+| `--domain-case FILE` | Required with domain | Explicit observations bound to the exact saved report hash |
+
+Use `python -m cranio.validity_domain template --output validation_domain.json`
+and `case-template --report face_report.json --domain validation_domain.json --output domain_case.json`
+to prepare blank declarations. No conditions, thresholds, N or errors are invented.
+Missing observations stay unknown; outside-domain cases receive a banner. Matching
+conditions does not establish scientific validity. See [schema, signature and limits](docs/VALIDITY_DOMAIN.md).

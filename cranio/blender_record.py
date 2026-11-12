@@ -21,6 +21,8 @@ class GNMRecordSettings(PropertyGroup):
     artifacts_path: StringProperty(name='Moved artifacts folder (optional)', subtype='DIR_PATH')
     limitations_path: StringProperty(name='Approved RO/EN limitations (optional)', subtype='FILE_PATH')
     uncertainty_path: StringProperty(name='Existing A2.1 ensemble (optional)', subtype='FILE_PATH')
+    validity_domain_path: StringProperty(name='Declared validation domain (optional)', subtype='FILE_PATH')
+    domain_case_path: StringProperty(name='Bound domain observations (optional)', subtype='FILE_PATH')
     uncertainty_scenario: EnumProperty(name='Ensemble prior scenario', items=[
         ('NONE', 'Not selected', 'No implicit prior scenario'),
         ('off', 'Prior off', 'Explicit neutral ensemble scenario'),
@@ -85,7 +87,9 @@ def poll_job():
         text.write(page)
         settings.result_path = str(folder/'record'/'approximation_record.json')
         settings.result_text = text.name
-        settings.status = 'Recorded; '+record['status']+'; '+settings.result_path
+        domain = record['assessments']['validity_domain']
+        banner = ('; '+domain['banner']) if domain['status'] != 'not_assessed' else ''
+        settings.status = 'Recorded; '+record['status']+banner+'; '+settings.result_path
     except (ValueError, OSError, TypeError, KeyError) as exc:
         settings.status = 'Result not displayed: '+str(exc)+'; inspect '+str(folder/'run.log')
     return None
@@ -128,7 +132,8 @@ class GNM_OT_record_export(Operator):
             request = record_job.prepare_request(path(settings.report_path),
                 artifacts=path(settings.artifacts_path), limitations=path(settings.limitations_path),
                 uncertainty=path(settings.uncertainty_path),
-                scenario=None if settings.uncertainty_scenario == 'NONE' else settings.uncertainty_scenario)
+                scenario=None if settings.uncertainty_scenario == 'NONE' else settings.uncertainty_scenario,
+                validity_domain=path(settings.validity_domain_path), domain_case=path(settings.domain_case_path))
             info = _api._check_external_python(scene)
             parent = Path(path(settings.output_parent) or Path(request['report_path']).parent)
             folder = parent/('record_'+datetime.datetime.now().strftime('%Y%m%dT%H%M%S')+'_'+uuid.uuid4().hex[:8])
@@ -183,7 +188,8 @@ class GNM_PT_record(Panel):
         column = layout.column()
         column.enabled = _JOB['process'] is None
         column.operator('gnm.record_use_active')
-        for name in ('report_path', 'output_parent', 'artifacts_path', 'limitations_path', 'uncertainty_path'):
+        for name in ('report_path', 'output_parent', 'artifacts_path', 'limitations_path', 'uncertainty_path',
+                     'validity_domain_path', 'domain_case_path'):
             column.prop(settings, name)
         if settings.uncertainty_path or settings.uncertainty_scenario != 'NONE':
             column.prop(settings, 'uncertainty_scenario')
