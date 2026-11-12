@@ -105,7 +105,8 @@ the declaration in that file; it is not independent ethical or scientific approv
 The supplied wording and exact file hash are retained.
 
 Remaining A7 work includes calibration linkage, validated case domains,
-export-mode integration and Blender controls. The optional A2.1 linkage below
+export-mode integration. [Blender controls](BLENDER_APPROXIMATION_RECORD.md) now
+expose explicit saved-fit record export. The optional A2.1 linkage below
 does not establish final-mesh uncertainty. CT validation remains
 a separate operator-led protocol.
 

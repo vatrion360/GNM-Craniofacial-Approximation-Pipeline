@@ -22,6 +22,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Optional derived approximation record and provenance](docs/APPROXIMATION_RECORD.md)
+- [Export a saved-fit approximation record from Blender](docs/BLENDER_APPROXIMATION_RECORD.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
 - [Reviewed tissue measurement directions](docs/TISSUE_DIRECTIONS.md)
 - [Explicit tissue scenarios and comparison](docs/TISSUE_SCENARIOS.md)
@@ -466,3 +467,11 @@ This records source warnings, omitted errors and numerical failures; it does not
 apply SDs or calibration to the final mesh. Settings/target comparisons remain
 descriptive, with fit equivalence explicitly unestablished. See the
 [association contract](docs/APPROXIMATION_RECORD.md#explicit-association-of-an-a21-monte-carlo-analysis).
+
+
+In Blender, **Approximation Record (saved fit)** now exposes the same export.
+Select the saved fit report explicitly or use **Use Active Fit Report**, then
+**Export Approximation Record**. The existing external Python performs the checks;
+Blender displays a new text report after verified completion. Cancel, file-load
+and unregister cleanup are supported. This records saved fit files, not current
+scene edits. See [controls, defaults and limitations](docs/BLENDER_APPROXIMATION_RECORD.md).

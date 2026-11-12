@@ -30,6 +30,7 @@ from blender_sensitivity_checks import run_sensitivity_checks
 from blender_articulation_checks import run_articulation_checks, run_articulation_undo
 from blender_profile_checks import run_profile_options, run_profile_external
 from blender_prior_audit_checks import run_prior_audit_checks
+from blender_record_checks import run_record_checks
 from blender_performance_checks import run_performance_checks
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
 from blender_tissue_checks import run_tissue_checks, run_tissue_undo_checks
@@ -266,6 +267,7 @@ with tempfile.TemporaryDirectory() as directory:
                 # timer returning None, unlike Blender's event loop.
                 if bpy.app.timers.is_registered(addon._offline_poll):
                     bpy.app.timers.unregister(addon._offline_poll)
+                run_record_checks(addon, scene, directory, folder, imported[0])
                 run_profile_external(addon, scene, model, directory, report)
                 run_prior_audit_checks(addon, scene, model, directory)
                 assert bpy.ops.gnm.run_offline() == {'FINISHED'}
@@ -288,4 +290,5 @@ with tempfile.TemporaryDirectory() as directory:
         addon.unregister()
     assert not bpy.app.timers.is_registered(addon._offline_poll)
     assert not bpy.app.timers.is_registered(addon._live_timer_tick)
+    assert not bpy.app.timers.is_registered(addon._core_module('blender_record').poll_job)
 print('BLENDER_SMOKE_PASS')

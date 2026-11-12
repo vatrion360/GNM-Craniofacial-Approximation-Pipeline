@@ -2833,6 +2833,7 @@ def _gnm_live_on_load_post(_dummy):
     sens; modelul numpy si firul de lucru raman valabile."""
     _stop_live()
     _stop_offline()
+    _core_module('blender_record').stop()
     _LIVE.__init__()
     _core_module('blender_marker_normals').clear_preview()
     _core_module('blender_craniometry').clear_segment()
@@ -4030,6 +4031,7 @@ def register():
     _core_module('blender_sensitivity').register(sys.modules[__name__])
     _core_module('blender_postfit').register(sys.modules[__name__])
     _core_module('blender_rules').register(sys.modules[__name__])
+    _core_module('blender_record').register(sys.modules[__name__])
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
     for h in list(bpy.app.handlers.load_post):
@@ -4040,6 +4042,7 @@ def register():
 def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
+    _core_module('blender_record').unregister()
     _core_module('blender_rules').unregister()
     _core_module('blender_postfit').unregister()
     _core_module('blender_sensitivity').unregister()
