@@ -153,3 +153,13 @@ OPENBLAS_NUM_THREADS=1 python tools/benchmark_uncertainty.py --npz models/gnm_he
 
 On Windows set `OPENBLAS_NUM_THREADS` in the shell environment before Python.
 See [task verification](TASK_A2_1.md) for measured timings and convergence.
+
+
+## Association with an approximation record
+
+An existing CLI ensemble can be explicitly associated using
+`cranio.record build --uncertainty FILE --uncertainty-scenario off` (or `on` for a
+matching prior-enabled run), in addition to `--report` and `--output-dir`.
+[The association contract](APPROXIMATION_RECORD.md#explicit-association-of-an-a21-monte-carlo-analysis)
+checks shared recorded hashes and retains all numerical/partial-input warnings.
+It does not establish uncertainty of a dense/TPS/final face or apply calibration.

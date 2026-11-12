@@ -138,6 +138,9 @@ def compile_record(report: dict, limitations=None) -> dict:
 def _text(record):
     """Concise summary; full values remain in the canonical report and JSON view."""
     run = record['run']
+    uncertainty = record['assessments']['uncertainty']
+    uncertainty_label = ('Final-mesh uncertainty' if uncertainty['status'] == 'linked_uncalibrated_analysis'
+                         else 'Uncertainty')
     lines = ['GNM approximation record (derived)', 'Status: '+record['status'], INTERPRETATION,
              'Model SHA-256: '+run['inputs']['model']['sha256'],
              'Pipeline version: '+str(run['software'].get('pipeline')),
@@ -145,12 +148,21 @@ def _text(record):
              'Prior enabled: '+str(record['prior']['enabled'])+'; rationale: '+str(record['prior']['justification']),
              'Geometry gate from report: '+record['assessments']['geometry_gate_from_report'],
              'Solver scope: '+record['assessments']['solver_scope'],
-             'Uncertainty / calibration / validity domain / scientific authorization: not_assessed',
+             uncertainty_label+' / calibration / validity domain / scientific authorization: not_assessed',
              'RO/EN limitations: '+record['limitations']['status'], 'Fitted markers:']
     for row in record['markers']:
         p = row['provenance'] or {}
         lines.append(f"  {row['fit']['label']}: vertex={row['fit']['vertex']}; bone_status={p.get('bone_status')}; "
                      f"mapping_reviewed={p.get('mapping_reviewed')}; tissue_source={p.get('tissue_source')}")
+    if uncertainty['status'] == 'linked_uncalibrated_analysis':
+        lines.extend(['Related uncertainty analysis: '+uncertainty['source_sha256'],
+                      uncertainty['interpretation'],
+                      'Selected prior scenario: '+uncertainty['selected_prior_scenario'],
+                      'Analysis status: '+uncertainty['analysis_status'],
+                      'Samples: '+str(uncertainty['samples']),
+                      'Scenario diagnostics: '+json.dumps(uncertainty['scenario_diagnostics'], sort_keys=True),
+                      'Omitted errors: '+json.dumps(uncertainty['omitted_error_inputs'], ensure_ascii=False)])
+        lines.extend(uncertainty['source_warnings'])
     lines.append('Source warnings:')
     lines.extend(str(w) for w in run['warnings'])
     lines.append('Excluded markers (source report): '+json.dumps(run['skipped'], ensure_ascii=False))
@@ -160,13 +172,16 @@ def _text(record):
     return '\n'.join(lines)+'\n'
 
 
-def build_record(report_path, output_dir, *, artifacts=None, limitations_path=None) -> Path:
+def build_record(report_path, output_dir, *, artifacts=None, limitations_path=None,
+                 uncertainty_path=None, uncertainty_scenario=None) -> Path:
     """Verify local outputs and publish the derived JSON last as completion marker.
 
     Inputs/model are not opened. A moved bundle may supply --artifacts with the
     four output basenames. Existing destinations are refused; failures after
     creation leave partial output without approximation_record.json.
     """
+    if (uncertainty_path is None) != (uncertainty_scenario is None):
+        raise ValueError('Supply uncertainty file and explicit scenario together')
     report_path, destination = Path(report_path), Path(output_dir)
     if destination.exists() or destination.is_symlink():
         raise ValueError('Record directory exists; choose a new destination')
@@ -176,6 +191,12 @@ def build_record(report_path, output_dir, *, artifacts=None, limitations_path=No
     approved_raw = Path(limitations_path).read_bytes() if limitations_path else None
     approved = validate_limitations(_json(approved_raw.decode('utf-8-sig'))) if approved_raw is not None else None
     record = compile_record(report, approved)
+    uncertainty_raw = Path(uncertainty_path).read_bytes() if uncertainty_path is not None else None
+    if uncertainty_raw is not None:
+        from .record_uncertainty import summarize_link
+        uncertainty = _json(uncertainty_raw.decode('utf-8-sig'))
+        record['assessments']['uncertainty'] = summarize_link(
+            report, uncertainty, uncertainty_scenario, _digest(uncertainty_raw))
     directory = Path(artifacts) if artifacts else report_path.parent
     checked, names = {}, set()
     for key in OUTPUT_KEYS:
@@ -197,6 +218,11 @@ def build_record(report_path, output_dir, *, artifacts=None, limitations_path=No
         path_settings={key: value for key, value in report['config'].items() if key in PATH_SETTINGS},
         input_verification='hashes_recorded_not_revalidated',
         limitations_file=None if approved_raw is None else dict(path=str(Path(limitations_path).resolve()), sha256=_digest(approved_raw)))
+    if uncertainty_raw is not None:
+        from . import record_uncertainty
+        envelope['uncertainty_file'] = dict(path=str(Path(uncertainty_path).resolve()),
+            sha256=_digest(uncertainty_raw), recorded_input_hashes=uncertainty['input_hashes'],
+            validator_sha256=_digest(Path(record_uncertainty.__file__).read_bytes()))
     content = canonical_bytes(record)
     page = _text(record).encode('utf-8')
     envelope['derived_files'] = {name: dict(sha256=_digest(data)) for name, data in
@@ -210,6 +236,8 @@ def build_record(report_path, output_dir, *, artifacts=None, limitations_path=No
         raise ValueError('Source record changed during export; no completion marker')
     if any(_digest(Path(row['path']).read_bytes()) != row['sha256'] for row in checked.values()):
         raise ValueError('Output artifacts changed during export; no completion marker')
+    if uncertainty_raw is not None and Path(uncertainty_path).read_bytes() != uncertainty_raw:
+        raise ValueError('Uncertainty source changed during export; no completion marker')
     with atomic_text(destination/'approximation_record.json') as stream:
         stream.write(content.decode('utf-8'))
     return destination/'approximation_record.json'
@@ -223,12 +251,15 @@ def main(argv=None):
     build.add_argument('--output-dir', required=True)
     build.add_argument('--artifacts')
     build.add_argument('--limitations')
+    build.add_argument('--uncertainty', help='Related A2.1 CLI ensemble JSON (not final-mesh uncertainty)')
+    build.add_argument('--uncertainty-scenario', choices=('off', 'on'))
     template = sub.add_parser('limitations-template')
     template.add_argument('--output', required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == 'build':
-            build_record(args.report, args.output_dir, artifacts=args.artifacts, limitations_path=args.limitations)
+            build_record(args.report, args.output_dir, artifacts=args.artifacts, limitations_path=args.limitations,
+                         uncertainty_path=args.uncertainty, uncertainty_scenario=args.uncertainty_scenario)
         else:
             path = Path(args.output)
             if path.exists() or path.is_symlink():
