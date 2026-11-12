@@ -139,6 +139,8 @@ def _text(record):
     """Concise summary; full values remain in the canonical report and JSON view."""
     run = record['run']
     uncertainty = record['assessments']['uncertainty']
+    domain = record['assessments']['validity_domain']
+    domain_label = ' / validity domain' if domain['status'] == 'not_assessed' else ''
     uncertainty_label = ('Final-mesh uncertainty' if uncertainty['status'] == 'linked_uncalibrated_analysis'
                          else 'Uncertainty')
     lines = ['GNM approximation record (derived)', 'Status: '+record['status'], INTERPRETATION,
@@ -148,8 +150,10 @@ def _text(record):
              'Prior enabled: '+str(record['prior']['enabled'])+'; rationale: '+str(record['prior']['justification']),
              'Geometry gate from report: '+record['assessments']['geometry_gate_from_report'],
              'Solver scope: '+record['assessments']['solver_scope'],
-             uncertainty_label+' / calibration / validity domain / scientific authorization: not_assessed',
+             uncertainty_label+' / calibration'+domain_label+' / scientific authorization: not_assessed',
              'RO/EN limitations: '+record['limitations']['status'], 'Fitted markers:']
+    if domain['status'] != 'not_assessed':
+        lines.insert(1, '[DOMAIN] '+domain['banner'])
     for row in record['markers']:
         p = row['provenance'] or {}
         lines.append(f"  {row['fit']['label']}: vertex={row['fit']['vertex']}; bone_status={p.get('bone_status')}; "
@@ -163,6 +167,13 @@ def _text(record):
                       'Scenario diagnostics: '+json.dumps(uncertainty['scenario_diagnostics'], sort_keys=True),
                       'Omitted errors: '+json.dumps(uncertainty['omitted_error_inputs'], ensure_ascii=False)])
         lines.extend(uncertainty['source_warnings'])
+    if domain['status'] != 'not_assessed':
+        lines.extend(['Domain comparison: '+domain['status'], domain['interpretation'],
+                      'Declared study evidence: '+json.dumps(domain['domain']['evidence'], ensure_ascii=False),
+                      'Domain checks: '+json.dumps(domain['checks'], ensure_ascii=False),
+                      'Declared study regional results (not errors of this face): '+
+                      json.dumps(domain['domain']['regional_errors'], ensure_ascii=False)])
+        lines.extend(domain['warnings'])
     lines.append('Source warnings:')
     lines.extend(str(w) for w in run['warnings'])
     lines.append('Excluded markers (source report): '+json.dumps(run['skipped'], ensure_ascii=False))
@@ -173,7 +184,8 @@ def _text(record):
 
 
 def build_record(report_path, output_dir, *, artifacts=None, limitations_path=None,
-                 uncertainty_path=None, uncertainty_scenario=None) -> Path:
+                 uncertainty_path=None, uncertainty_scenario=None,
+                 validity_domain_path=None, domain_case_path=None) -> Path:
     """Verify local outputs and publish the derived JSON last as completion marker.
 
     Inputs/model are not opened. A moved bundle may supply --artifacts with the
@@ -182,6 +194,8 @@ def build_record(report_path, output_dir, *, artifacts=None, limitations_path=No
     """
     if (uncertainty_path is None) != (uncertainty_scenario is None):
         raise ValueError('Supply uncertainty file and explicit scenario together')
+    if (validity_domain_path is None) != (domain_case_path is None):
+        raise ValueError('Supply validation domain and bound case observations together')
     report_path, destination = Path(report_path), Path(output_dir)
     if destination.exists() or destination.is_symlink():
         raise ValueError('Record directory exists; choose a new destination')
@@ -197,6 +211,14 @@ def build_record(report_path, output_dir, *, artifacts=None, limitations_path=No
         uncertainty = _json(uncertainty_raw.decode('utf-8-sig'))
         record['assessments']['uncertainty'] = summarize_link(
             report, uncertainty, uncertainty_scenario, _digest(uncertainty_raw))
+    domain_raw = Path(validity_domain_path).read_bytes() if validity_domain_path is not None else None
+    case_raw = Path(domain_case_path).read_bytes() if domain_case_path is not None else None
+    if domain_raw is not None:
+        from .validity_domain import assess
+        record['assessments']['validity_domain'] = assess(report, _digest(raw),
+            _json(domain_raw.decode('utf-8-sig')), _json(case_raw.decode('utf-8-sig')))
+        record['assessments']['validity_domain']['source_hashes'] = dict(
+            domain_sha256=_digest(domain_raw), case_sha256=_digest(case_raw))
     directory = Path(artifacts) if artifacts else report_path.parent
     checked, names = {}, set()
     for key in OUTPUT_KEYS:
@@ -223,6 +245,11 @@ def build_record(report_path, output_dir, *, artifacts=None, limitations_path=No
         envelope['uncertainty_file'] = dict(path=str(Path(uncertainty_path).resolve()),
             sha256=_digest(uncertainty_raw), recorded_input_hashes=uncertainty['input_hashes'],
             validator_sha256=_digest(Path(record_uncertainty.__file__).read_bytes()))
+    if domain_raw is not None:
+        from . import validity_domain
+        envelope['validity_domain_file'] = dict(path=str(Path(validity_domain_path).resolve()),
+            sha256=_digest(domain_raw), validator_sha256=_digest(Path(validity_domain.__file__).read_bytes()))
+        envelope['domain_case_file'] = dict(path=str(Path(domain_case_path).resolve()), sha256=_digest(case_raw))
     content = canonical_bytes(record)
     page = _text(record).encode('utf-8')
     envelope['derived_files'] = {name: dict(sha256=_digest(data)) for name, data in
@@ -238,6 +265,9 @@ def build_record(report_path, output_dir, *, artifacts=None, limitations_path=No
         raise ValueError('Output artifacts changed during export; no completion marker')
     if uncertainty_raw is not None and Path(uncertainty_path).read_bytes() != uncertainty_raw:
         raise ValueError('Uncertainty source changed during export; no completion marker')
+    if domain_raw is not None and (Path(validity_domain_path).read_bytes() != domain_raw
+                                   or Path(domain_case_path).read_bytes() != case_raw):
+        raise ValueError('Validation domain or case observations changed during export; no completion marker')
     with atomic_text(destination/'approximation_record.json') as stream:
         stream.write(content.decode('utf-8'))
     return destination/'approximation_record.json'
@@ -253,13 +283,16 @@ def main(argv=None):
     build.add_argument('--limitations')
     build.add_argument('--uncertainty', help='Related A2.1 CLI ensemble JSON (not final-mesh uncertainty)')
     build.add_argument('--uncertainty-scenario', choices=('off', 'on'))
+    build.add_argument('--validation-domain', help='Explicit operator-declared validation domain JSON')
+    build.add_argument('--domain-case', help='Observations bound to this exact source report SHA-256')
     template = sub.add_parser('limitations-template')
     template.add_argument('--output', required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == 'build':
             build_record(args.report, args.output_dir, artifacts=args.artifacts, limitations_path=args.limitations,
-                         uncertainty_path=args.uncertainty, uncertainty_scenario=args.uncertainty_scenario)
+                         uncertainty_path=args.uncertainty, uncertainty_scenario=args.uncertainty_scenario,
+                         validity_domain_path=args.validation_domain, domain_case_path=args.domain_case)
         else:
             path = Path(args.output)
             if path.exists() or path.is_symlink():

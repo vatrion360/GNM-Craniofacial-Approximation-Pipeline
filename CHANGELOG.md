@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add opt-in operator-declared validation domains and report-bound case observations, with conservative model/run signatures, unknown/outside/matching statuses, study-only regional results and visible CLI/Blender banners. Templates contain no invented conditions or scientific values; matching is not independent validation or export approval. Fitting and defaults remain unchanged.
+
 - Add a Blender saved-fit approximation-record panel with explicit source selection, asynchronous external export, optional limitations/Monte Carlo linkage, verified result text and cancellation/lifecycle cleanup. Preserve meshes, markers, earlier reports and fitting defaults; current scene edits are not silently treated as saved fit evidence.
 
 - Add explicit A2.1 ensemble association to approximation records, requiring recorded model/CSV and selected-prior hash matches. Preserve nonconvergence, clipping, partial sensitivity and source warnings; compare settings descriptively without claiming final-mesh uncertainty or applying calibration. Existing unlinked exports and fitting defaults are unchanged.

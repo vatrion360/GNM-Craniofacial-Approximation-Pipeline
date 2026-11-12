@@ -33,6 +33,8 @@ texture the face, or provide scientific validation.
 | Moved artifacts folder | Empty | Use the report folder unless explicitly overridden |
 | Approved RO/EN limitations | Empty | No unapproved scientific wording inserted |
 | Existing A2.1 ensemble | Empty | No linked analysis or automatic Monte Carlo computation |
+| Declared validation domain | Empty | Optional operator-declared conditions and study results |
+| Bound domain observations | Empty | Required with domain; bound to the exact report hash |
 | Ensemble prior scenario | Not selected | Explicit `off`/`on` is required with an ensemble |
 | Export Approximation Record | Explicit click | Check the interpreter and launch one record job |
 | Cancel Record Export | Available while running | Stop the child process; retain files for inspection |
@@ -71,5 +73,7 @@ needed by this exporter. For prior comparisons choose one scenario's child
 
 Integrity hashes are not authentication or proof of anatomical accuracy. Linked
 Monte Carlo evidence remains uncalibrated and is not assigned as uncertainty of
-the final mesh. CT evaluation, scientific export modes and validity-domain checks
-remain separate work. Review identifiers and file paths before sharing reports.
+the final mesh. CT evaluation and scientific export modes remain separate work.
+[Declared-domain comparison](VALIDITY_DOMAIN.md) is optional; its banner appears
+in the completion status and text report without certifying validity. Review
+identifiers and file paths before sharing reports.
