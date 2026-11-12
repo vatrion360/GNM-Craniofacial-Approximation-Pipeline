@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add an opt-in derived approximation record: verified output hashes, deterministic JSON/TXT and separate timestamp/path provenance. Preserve unknown assessments and diagnostic-only status; accept explicitly approved RO/EN limitations. No fit or default changes.
+
 - Add a separate Blender neutral/prior comparison action with required operator rationale, using the existing offline audit. Validate complete bundles before transactional import; preserve scenario labels and nonconvergence status. Ordinary fitting remains the default.
 
 - Add opt-in structured age-at-death metadata, source/method validation and tissue age-range auditing in JSON/TXT. Blender reads an optional case JSON only on Apply/export and retains history/source hashes. No automatic table selection, simulated ageing or fit/default changes.
