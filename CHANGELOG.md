@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add a Blender saved-fit approximation-record panel with explicit source selection, asynchronous external export, optional limitations/Monte Carlo linkage, verified result text and cancellation/lifecycle cleanup. Preserve meshes, markers, earlier reports and fitting defaults; current scene edits are not silently treated as saved fit evidence.
+
 - Add explicit A2.1 ensemble association to approximation records, requiring recorded model/CSV and selected-prior hash matches. Preserve nonconvergence, clipping, partial sensitivity and source warnings; compare settings descriptively without claiming final-mesh uncertainty or applying calibration. Existing unlinked exports and fitting defaults are unchanged.
 
 - Add an opt-in derived approximation record: verified output hashes, deterministic JSON/TXT and separate timestamp/path provenance. Preserve unknown assessments and diagnostic-only status; accept explicitly approved RO/EN limitations. No fit or default changes.
