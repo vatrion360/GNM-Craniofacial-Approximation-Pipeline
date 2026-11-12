@@ -21,6 +21,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Protocol-defined cranial features and conditional intervals](docs/CRANIAL_FEATURES.md)
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
+- [Optional derived approximation record and provenance](docs/APPROXIMATION_RECORD.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
 - [Reviewed tissue measurement directions](docs/TISSUE_DIRECTIONS.md)
 - [Explicit tissue scenarios and comparison](docs/TISSUE_SCENARIOS.md)
@@ -443,3 +444,12 @@ links. Existing objects and marker coordinates are preserved. **Cancel Offline
 Fit** handles either mode. Difference PLYs stay in the case output directory.
 The ordinary fit button remains a single fit; a supplied rationale is recorded
 when a prior is selected. See [controls and limitations](docs/PRIOR_COMPARISON.md#blender-paired-comparison).
+
+## Derived approximation record (A7.1, optional)
+
+After a completed fit, run `python -m cranio.record build --report path/to/face_report.json --output-dir path/to/new_record`.
+The command checks the four output artifacts and writes a deterministic JSON view,
+a summary TXT and a separate provenance envelope. It preserves the canonical run
+report and all mesh files. Unknown uncertainty/calibration/validity-domain fields
+remain `not_assessed`; operator-approved RO/EN limitations can be supplied explicitly.
+See [options, integrity checks and determinism limits](docs/APPROXIMATION_RECORD.md).
