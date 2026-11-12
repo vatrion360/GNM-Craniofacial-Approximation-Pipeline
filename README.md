@@ -453,3 +453,16 @@ a summary TXT and a separate provenance envelope. It preserves the canonical run
 report and all mesh files. Unknown uncertainty/calibration/validity-domain fields
 remain `not_assessed`; operator-approved RO/EN limitations can be supplied explicitly.
 See [options, integrity checks and determinism limits](docs/APPROXIMATION_RECORD.md).
+
+
+To associate an existing A2.1 Monte Carlo report, add the following explicit options:
+
+| Record option | Default | Effect |
+|---|---|---|
+| `--uncertainty FILE` | Absent | Link related uncalibrated marker-only evidence after checking recorded model/CSV hashes |
+| `--uncertainty-scenario off/on` | Required with the file | Choose the scenario matching the run prior state; `on` also requires matching prior hash |
+
+This records source warnings, omitted errors and numerical failures; it does not
+apply SDs or calibration to the final mesh. Settings/target comparisons remain
+descriptive, with fit equivalence explicitly unestablished. See the
+[association contract](docs/APPROXIMATION_RECORD.md#explicit-association-of-an-a21-monte-carlo-analysis).

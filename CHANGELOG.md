@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add explicit A2.1 ensemble association to approximation records, requiring recorded model/CSV and selected-prior hash matches. Preserve nonconvergence, clipping, partial sensitivity and source warnings; compare settings descriptively without claiming final-mesh uncertainty or applying calibration. Existing unlinked exports and fitting defaults are unchanged.
+
 - Add an opt-in derived approximation record: verified output hashes, deterministic JSON/TXT and separate timestamp/path provenance. Preserve unknown assessments and diagnostic-only status; accept explicitly approved RO/EN limitations. No fit or default changes.
 
 - Add a separate Blender neutral/prior comparison action with required operator rationale, using the existing offline audit. Validate complete bundles before transactional import; preserve scenario labels and nonconvergence status. Ordinary fitting remains the default.

@@ -15,6 +15,8 @@ python -m cranio.record build --report outputs/case/face_report.json --output-di
 | `--output-dir` | Required | New directory; existing destinations are refused |
 | `--artifacts` | Report's directory | Directory holding the four unchanged output basenames |
 | `--limitations` | Not configured | Optional operator-approved RO/EN wording file |
+| `--uncertainty` | Not linked | Optional related A2.1 CLI ensemble JSON |
+| `--uncertainty-scenario` | No automatic choice | `off` or `on`; required with `--uncertainty`, matching run prior state |
 
 ## Outputs and interpretation
 
@@ -40,9 +42,10 @@ is `recorded_not_validated`. These labels do not replace source warnings. When
 profile refinement was enabled, solver diagnostics are explicitly scoped to the
 baseline before profile refinement.
 
-Uncertainty, calibration, validity domain and scientific export authorization
-remain `not_assessed`. This increment does not link or validate uncertainty or CT
-artifacts, introduce overrides, or infer approval from small marker residuals.
+Final-mesh uncertainty, calibration, validity domain and scientific export
+authorization remain `not_assessed`. An explicitly linked A2.1 analysis is recorded
+separately as described below. This does not validate CT artifacts, introduce
+overrides, or infer approval from small marker residuals.
 Tissue/prior comparison child run reports can be processed individually; their
 aggregate `summary.json` files are not schema-2 pipeline run reports.
 
@@ -101,6 +104,50 @@ unapproved files are rejected. The status `operator_declared_approved` describes
 the declaration in that file; it is not independent ethical or scientific approval.
 The supplied wording and exact file hash are retained.
 
-Remaining A7 work includes explicit linkage to uncertainty/calibration, validated
-case domains, export-mode integration and Blender controls. CT validation remains
+Remaining A7 work includes calibration linkage, validated case domains,
+export-mode integration and Blender controls. The optional A2.1 linkage below
+does not establish final-mesh uncertainty. CT validation remains
 a separate operator-led protocol.
+
+
+## Explicit association of an A2.1 Monte Carlo analysis
+
+```bash
+python -m cranio.record build --report outputs/case/face_report.json --output-dir outputs/case/record_with_analysis --uncertainty outputs/case/marker_ensemble.json --uncertainty-scenario off
+```
+
+Both new options must be provided together. Use `on` only for a prior-enabled run;
+the selected prior hash must then match. No scenario is selected implicitly and
+no Monte Carlo run is started. A2.2 export summaries and A2.4 calibration JSONs are
+not accepted as A2.1 ensembles.
+
+The loader requires both run model and marker-CSV hashes among the ensemble's
+recorded inputs. The ensemble format stores these as a path-to-hash map rather
+than typed input roles: the association is explicitly labelled
+`hashes_present_in_recorded_inputs`, not fresh verification of those files or
+proof of authenticity. Embedded paths are never opened. A conflicting marker
+model hash is rejected. The explicit ensemble file is hashed and checked again
+before the record completion marker is published.
+
+The JSON `assessments.uncertainty` becomes `linked_uncalibrated_analysis`, with
+`applies_to: related_marker_only_analysis` and `final_mesh_uncertainty: not_assessed`.
+It records source hash, selected prior scenario, sample count, seed, placement
+sources, omitted errors, depth parameters, settings, software, original warnings
+and diagnostics for each separate scenario. Nonconverged baselines/samples and
+clipping remain visible; they are not discarded or relabelled converged. Partial
+sensitivity and deterministic zero-error replays retain their source labels and
+warnings. No samples or prior scenarios are pooled. No per-vertex SD is invented.
+
+A descriptive comparison lists regularization, identity subspace, iteration and
+solver settings for both runs; exact central-target/vertex/weight equality is
+reported without an anatomical tolerance. Run features such as local correction,
+skull input and additional constraints are retained. Even an exact target match
+leaves fitting equivalence `not_established`: A2.1 is marker-only and does not
+represent dense constraints, TPS, profile refinement or other additional losses.
+The associated spread cannot be assigned to the final face as calibrated error.
+
+The original ensemble is referenced by its hash, not copied into the record. Keep
+it with the case evidence. Source paths and recorded input hashes are retained in
+`provenance.json`; moving the unchanged ensemble file does not alter the core
+record. The concise TXT prints the source, scope, statuses, missing errors and
+warnings. Without the new options, A7.1's original JSON/TXT behavior is unchanged.
