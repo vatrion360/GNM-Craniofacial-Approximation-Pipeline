@@ -174,6 +174,13 @@ def _text(record):
                       'Declared study regional results (not errors of this face): '+
                       json.dumps(domain['domain']['regional_errors'], ensure_ascii=False)])
         lines.extend(domain['warnings'])
+    assessment = record['assessments'].get('check_policy')
+    if assessment is not None:
+        lines.insert(1, '[CHECKS] '+assessment['banner'])
+        lines.extend([assessment['interpretation'], 'Check gate: '+json.dumps(assessment['gate'], ensure_ascii=False)])
+        for row in assessment['checks']:
+            lines.append('  '+row['id']+': '+row['status']+'; '+row['reason']+'; observed='+
+                         json.dumps(row['observed'], ensure_ascii=False))
     lines.append('Source warnings:')
     lines.extend(str(w) for w in run['warnings'])
     lines.append('Excluded markers (source report): '+json.dumps(run['skipped'], ensure_ascii=False))
@@ -185,13 +192,15 @@ def _text(record):
 
 def build_record(report_path, output_dir, *, artifacts=None, limitations_path=None,
                  uncertainty_path=None, uncertainty_scenario=None,
-                 validity_domain_path=None, domain_case_path=None) -> Path:
+                 validity_domain_path=None, domain_case_path=None, check_policy_path=None, check_override=None) -> Path:
     """Verify local outputs and publish the derived JSON last as completion marker.
 
     Inputs/model are not opened. A moved bundle may supply --artifacts with the
     four output basenames. Existing destinations are refused; failures after
     creation leave partial output without approximation_record.json.
     """
+    if check_override is not None and check_policy_path is None:
+        raise ValueError('A check override requires an explicit policy')
     if (uncertainty_path is None) != (uncertainty_scenario is None):
         raise ValueError('Supply uncertainty file and explicit scenario together')
     if (validity_domain_path is None) != (domain_case_path is None):
@@ -219,6 +228,13 @@ def build_record(report_path, output_dir, *, artifacts=None, limitations_path=No
             _json(domain_raw.decode('utf-8-sig')), _json(case_raw.decode('utf-8-sig')))
         record['assessments']['validity_domain']['source_hashes'] = dict(
             domain_sha256=_digest(domain_raw), case_sha256=_digest(case_raw))
+    check_raw = Path(check_policy_path).read_bytes() if check_policy_path is not None else None
+    if check_raw is not None:
+        from .check_policy import assess as assess_checks
+        record['assessments']['check_policy'] = assess_checks(report, _json(check_raw.decode('utf-8-sig')), check_override)
+        record['assessments']['check_policy']['policy_sha256'] = _digest(check_raw)
+        if record['assessments']['check_policy']['status'] in ('block', 'not_assessed'):
+            record['status'] = 'diagnostic_only'
     directory = Path(artifacts) if artifacts else report_path.parent
     checked, names = {}, set()
     for key in OUTPUT_KEYS:
@@ -250,6 +266,10 @@ def build_record(report_path, output_dir, *, artifacts=None, limitations_path=No
         envelope['validity_domain_file'] = dict(path=str(Path(validity_domain_path).resolve()),
             sha256=_digest(domain_raw), validator_sha256=_digest(Path(validity_domain.__file__).read_bytes()))
         envelope['domain_case_file'] = dict(path=str(Path(domain_case_path).resolve()), sha256=_digest(case_raw))
+    if check_raw is not None:
+        from . import check_policy
+        envelope['check_policy_file'] = dict(path=str(Path(check_policy_path).resolve()), sha256=_digest(check_raw),
+            validator_sha256=_digest(Path(check_policy.__file__).read_bytes()))
     content = canonical_bytes(record)
     page = _text(record).encode('utf-8')
     envelope['derived_files'] = {name: dict(sha256=_digest(data)) for name, data in
@@ -268,6 +288,8 @@ def build_record(report_path, output_dir, *, artifacts=None, limitations_path=No
     if domain_raw is not None and (Path(validity_domain_path).read_bytes() != domain_raw
                                    or Path(domain_case_path).read_bytes() != case_raw):
         raise ValueError('Validation domain or case observations changed during export; no completion marker')
+    if check_raw is not None and Path(check_policy_path).read_bytes() != check_raw:
+        raise ValueError('Check policy changed during export; no completion marker')
     with atomic_text(destination/'approximation_record.json') as stream:
         stream.write(content.decode('utf-8'))
     return destination/'approximation_record.json'
@@ -285,6 +307,8 @@ def main(argv=None):
     build.add_argument('--uncertainty-scenario', choices=('off', 'on'))
     build.add_argument('--validation-domain', help='Explicit operator-declared validation domain JSON')
     build.add_argument('--domain-case', help='Observations bound to this exact source report SHA-256')
+    build.add_argument('--check-policy', help='Optional reviewed saved-report check policy JSON')
+    build.add_argument('--check-override', help='Recorded reason; findings and diagnostic status remain visible')
     template = sub.add_parser('limitations-template')
     template.add_argument('--output', required=True)
     args = parser.parse_args(argv)
@@ -292,7 +316,8 @@ def main(argv=None):
         if args.command == 'build':
             build_record(args.report, args.output_dir, artifacts=args.artifacts, limitations_path=args.limitations,
                          uncertainty_path=args.uncertainty, uncertainty_scenario=args.uncertainty_scenario,
-                         validity_domain_path=args.validation_domain, domain_case_path=args.domain_case)
+                         validity_domain_path=args.validation_domain, domain_case_path=args.domain_case,
+                         check_policy_path=args.check_policy, check_override=args.check_override)
         else:
             path = Path(args.output)
             if path.exists() or path.is_symlink():

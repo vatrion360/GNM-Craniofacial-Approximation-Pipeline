@@ -39,6 +39,15 @@ def run_record_checks(addon, scene, directory, source_folder, fitted):
     domain_path.write_text(json.dumps(domain), encoding='utf-8')
     observations_path.write_text(json.dumps(observations), encoding='utf-8')
 
+    check_core = addon._core_module('check_policy')
+    check_policy = check_core.empty_policy()
+    check_policy.update(id='synthetic-count-policy', revision='test-1', reviewed=True, rules=[
+        dict(id='synthetic-region', kind='marker_count', region='synthetic missing region',
+             labels=['not-in-this-synthetic-fit'], minimum=1, on_fail='block',
+             source='Synthetic software fixture, not anatomical evidence')])
+    check_path = Path(directory)/'check-policy.json'
+    check_path.write_text(json.dumps(check_policy), encoding='utf-8')
+
     def wait():
         deadline = time.monotonic()+90
         while module._JOB['process'] is not None and time.monotonic() < deadline:
@@ -67,6 +76,9 @@ def run_record_checks(addon, scene, directory, source_folder, fitted):
         assert settings.validity_domain_path == settings.domain_case_path == ''
         settings.validity_domain_path = str(domain_path)
         settings.domain_case_path = str(observations_path)
+        assert settings.check_policy_path == settings.check_override == ''
+        settings.check_policy_path = str(check_path)
+        settings.check_override = 'Synthetic diagnostic investigation; not approval'
         settings.uncertainty_scenario = 'off'
         reject()
         assert 'both an uncertainty JSON' in settings.status
@@ -87,7 +99,12 @@ def run_record_checks(addon, scene, directory, source_folder, fitted):
         assert settings.status.startswith('Recorded;'), (settings.status, (run_folder/'run.log').read_text(encoding='utf-8'))
         settings.report_path = saved_path
         result = json.loads(Path(settings.result_path).read_text(encoding='utf-8'))
-        assert result['status'] == 'recorded_not_validated'
+        assert result['status'] == 'diagnostic_only'
+        assert result['assessments']['check_policy']['status'] == 'block'
+        assert result['assessments']['check_policy']['gate']['status'] == 'overridden'
+        assert 'CHECK POLICY: BLOCK' in settings.status
+        assert '[CHECKS] CHECK POLICY: BLOCK' in bpy.data.texts[settings.result_text].as_string()
+        print('BLENDER_EXPLICIT_CHECK_POLICY_PASS')
         assert result['assessments']['validity_domain']['status'] == 'outside_declared_domain'
         assert 'OUTSIDE DECLARED DOMAIN' in settings.status
         assert '[DOMAIN] OUTSIDE DECLARED DOMAIN' in bpy.data.texts[settings.result_text].as_string()

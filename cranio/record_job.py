@@ -19,7 +19,7 @@ def _digest(data):
 
 
 def prepare_request(report_path, *, artifacts=None, limitations=None, uncertainty=None, scenario=None,
-                    validity_domain=None, domain_case=None):
+                    validity_domain=None, domain_case=None, check_policy=None, check_override=None):
     """Snapshot explicit paths and source-report identity; do not inspect meshes."""
     report_path = Path(report_path).resolve()
     raw = report_path.read_bytes()
@@ -30,15 +30,22 @@ def prepare_request(report_path, *, artifacts=None, limitations=None, uncertaint
         raise ValueError('Select the explicit uncertainty prior scenario off or on')
     if (validity_domain is None) != (domain_case is None):
         raise ValueError('Select both validation domain and bound case observations')
+    if check_override is not None:
+        from .check_policy import _text
+        _text(check_override)
+        if check_policy is None:
+            raise ValueError('A check override requires an explicit policy')
     arguments = ['build', '--report', str(report_path)]
     for flag, value in (('--artifacts', artifacts), ('--limitations', limitations), ('--uncertainty', uncertainty),
-                        ('--validation-domain', validity_domain), ('--domain-case', domain_case)):
+                        ('--validation-domain', validity_domain), ('--domain-case', domain_case), ('--check-policy', check_policy)):
         if value is None:
             continue
         path = Path(value).resolve()
         if not (path.is_dir() if flag == '--artifacts' else path.is_file()):
             raise ValueError('Missing '+flag+' input: '+str(path))
         arguments.extend([flag, str(path)])
+    if check_override is not None:
+        arguments.extend(['--check-override', check_override])
     if scenario is not None:
         arguments.extend(['--uncertainty-scenario', scenario])
     return dict(report_path=str(report_path), report_sha256=_digest(raw), arguments=arguments)

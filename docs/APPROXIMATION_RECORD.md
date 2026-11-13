@@ -156,3 +156,8 @@ it with the case evidence. Source paths and recorded input hashes are retained i
 `provenance.json`; moving the unchanged ensemble file does not alter the core
 record. The concise TXT prints the source, scope, statuses, missing errors and
 warnings. Without the new options, A7.1's original JSON/TXT behavior is unchanged.
+
+Optional [saved-report check policies](CHECK_POLICY.md) add configured findings and
+explicit override reasons. Held checks remain diagnostic even with an override;
+this does not authorize scientific mesh export. Empty policy fields preserve
+the prior record path.
