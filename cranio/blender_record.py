@@ -93,6 +93,15 @@ def poll_job():
         settings.status = f'Failed ({code}); inspect {folder / "run.log"}'
         return None
     try:
+        if request.get('kind') == 'postfit_consistency':
+            from .consistency import read_result
+            result, page = read_result(folder/'consistency', request)
+            text = bpy.data.texts.new('GNM_Postfit_Consistency_'+folder.name)
+            text.write(page)
+            settings.result_path = str(folder/'consistency'/'consistency_manifest.json')
+            settings.result_text = text.name
+            settings.status = 'Consistency: '+result['status']+' / '+result['light']+'; '+settings.result_path
+            return None
         if request.get('kind') == 'standardized_captures':
             from .capture_job import read_result
             result = read_result(folder/'captures', request)
@@ -157,6 +166,7 @@ class GNM_OT_record_export(Operator):
     bl_idname = 'gnm.export_approximation_record'
     bl_label = 'Export Approximation Record'
     bundle: bpy.props.BoolProperty(default=False, options={'HIDDEN', 'SKIP_SAVE'})
+    diagnostics: bpy.props.BoolProperty(default=False, options={'HIDDEN', 'SKIP_SAVE'})
 
     @classmethod
     def poll(cls, context):
@@ -168,30 +178,37 @@ class GNM_OT_record_export(Operator):
         try:
             def path(value):
                 return bpy.path.abspath(value) if value.strip() else None
-            prepare = record_job.prepare_export_request if self.bundle else record_job.prepare_request
-            mode = dict(mode=settings.export_mode) if self.bundle else {}
-            request = prepare(path(settings.report_path), **mode,
-                artifacts=path(settings.artifacts_path), limitations=path(settings.limitations_path),
-                uncertainty=path(settings.uncertainty_path),
-                scenario=None if settings.uncertainty_scenario == 'NONE' else settings.uncertainty_scenario,
-                validity_domain=path(settings.validity_domain_path), domain_case=path(settings.domain_case_path),
-                check_policy=path(settings.check_policy_path), check_override=settings.check_override or None)
+            if self.diagnostics and self.bundle:
+                raise ValueError('Select one saved-fit action at a time')
+            if self.diagnostics:
+                request = record_job.prepare_consistency_request(path(settings.report_path), artifacts=path(settings.artifacts_path))
+            else:
+                prepare = record_job.prepare_export_request if self.bundle else record_job.prepare_request
+                mode = dict(mode=settings.export_mode) if self.bundle else {}
+                request = prepare(path(settings.report_path), **mode,
+                    artifacts=path(settings.artifacts_path), limitations=path(settings.limitations_path),
+                    uncertainty=path(settings.uncertainty_path),
+                    scenario=None if settings.uncertainty_scenario == 'NONE' else settings.uncertainty_scenario,
+                    validity_domain=path(settings.validity_domain_path), domain_case=path(settings.domain_case_path),
+                    check_policy=path(settings.check_policy_path), check_override=settings.check_override or None)
             info = _api._check_external_python(scene)
             parent = Path(path(settings.output_parent) or Path(request['report_path']).parent)
             folder = parent/('record_'+datetime.datetime.now().strftime('%Y%m%dT%H%M%S')+'_'+uuid.uuid4().hex[:8])
             folder.mkdir(parents=True, exist_ok=False)
             log = (folder/'run.log').open('w', encoding='utf-8')
             try:
-                start = record_job.start_export if self.bundle else record_job.start_record
+                start = (record_job.start_consistency if self.diagnostics else
+                         record_job.start_export if self.bundle else record_job.start_record)
                 process = start(info, Path(_api.__file__).resolve().parent,
-                                request, folder/('bundle' if self.bundle else 'record'), log)
+                                request, folder/('consistency' if self.diagnostics else 'bundle' if self.bundle else 'record'), log)
             except Exception:
                 log.close()
                 raise
             _JOB.update(process=process, log=log, scene=scene, folder=str(folder), request=request)
             settings.result_path = ''
             settings.result_text = ''
-            settings.status = ('Exporting saved fit bundle; ' if self.bundle else 'Exporting saved fit record; ')+str(folder)
+            settings.status = ('Summarizing saved fit diagnostics; ' if self.diagnostics else
+                               'Exporting saved fit bundle; ' if self.bundle else 'Exporting saved fit record; ')+str(folder)
             try:
                 bpy.app.timers.register(poll_job, first_interval=.5)
             except Exception:
@@ -281,6 +298,8 @@ class GNM_PT_record(Panel):
             column.prop(settings, 'uncertainty_scenario')
         column.label(text='Uses the external Python selected in Offline fit')
         column.operator('gnm.export_approximation_record')
+        column.operator('gnm.export_approximation_record', text='Summarize Saved-fit Consistency').diagnostics = True
+        column.label(text='Diagnostics only; missing checks stay not assessed')
         column.separator()
         column.prop(settings, 'export_mode')
         export = column.row()

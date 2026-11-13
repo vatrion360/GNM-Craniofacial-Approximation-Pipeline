@@ -73,9 +73,20 @@ def start_export(info, package_root, request, output_dir, log):
     return _start_module('review_export', info, package_root, request, output_dir, log)
 
 
+def prepare_consistency_request(report_path, *, artifacts=None):
+    """Saved QC summary uses only report/artifacts; no implicit policy or prior."""
+    request = prepare_request(report_path, artifacts=artifacts)
+    request['kind'] = 'postfit_consistency'
+    return request
+
+
+def start_consistency(info, package_root, request, output_dir, log):
+    return _start_module('consistency', info, package_root, request, output_dir, log)
+
+
 def _start_module(module, info, package_root, request, output_dir, log):
     root = Path(package_root).resolve()
-    if module not in ('record', 'review_export') or not (root/'cranio'/(module+'.py')).is_file():
+    if module not in ('record', 'review_export', 'consistency') or not (root/'cranio'/(module+'.py')).is_file():
         raise ValueError('The installed add-on is missing its export module; reinstall the complete ZIP')
     bootstrap = ("import runpy, sys; sys.path.insert(0, sys.argv.pop(1)); "
                  "runpy.run_module('cranio."+module+"', run_name='__main__', alter_sys=True)")

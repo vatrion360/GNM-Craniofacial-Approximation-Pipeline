@@ -25,6 +25,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Export a saved-fit approximation record from Blender](docs/BLENDER_APPROXIMATION_RECORD.md)
 - [Gated scientific/illustrative saved-fit mesh export](docs/SAVED_FIT_EXPORT.md)
 - [Explicit saved-report checks and configured criteria](docs/CHECK_POLICY.md)
+- [Saved-fit consistency diagnostics and triangle quality](docs/POSTFIT_CONSISTENCY.md)
 - [Operator-declared validation domain and explicit case comparison](docs/VALIDITY_DOMAIN.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
 - [Reviewed tissue measurement directions](docs/TISSUE_DIRECTIONS.md)
@@ -543,3 +544,23 @@ See [capture requirements, provenance and limits](docs/STANDARDIZED_CAPTURES.md)
 | Scale bar (mm) | 50 | Positive display length; does not validate scan scale |
 | CPU samples | 16 | Cycles rendering cost/noise, 1–128 |
 | Capture Reviewed Saved-fit Bundle | Explicit click | Three views and a separate hashed manifest |
+
+## Saved-fit consistency diagnostics (opt-in)
+
+```bash
+python -m cranio.consistency build --report outputs/case01/face_report.json --output-dir outputs/case01/consistency
+```
+
+The Blender **Summarize Saved-fit Consistency** button in the saved-fit record
+panel runs this action through the configured external Python. It collects
+recorded geometry/contact/clearance diagnostics and measures minimum triangle
+angles on the exact saved statistical/final OBJ files. Red flags require review;
+missing anatomical checks remain explicitly unassessed. No correction is applied.
+See [metric definitions, output files and limits](docs/POSTFIT_CONSISTENCY.md).
+
+| Diagnostic option | Default | Effect |
+|---|---|---|
+| `--report FILE` | Required | Completed saved world-mm report |
+| `--output-dir DIR` | Required/new | JSON/TXT diagnostics, source record and completion manifest |
+| `--artifacts DIR` | Report folder | Explicit relocated saved outputs |
+| Summarize Saved-fit Consistency | Explicit click | Separate diagnostic job; no fit/default/scene changes |
