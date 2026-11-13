@@ -23,6 +23,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Optional derived approximation record and provenance](docs/APPROXIMATION_RECORD.md)
 - [Export a saved-fit approximation record from Blender](docs/BLENDER_APPROXIMATION_RECORD.md)
+- [Explicit saved-report checks and configured criteria](docs/CHECK_POLICY.md)
 - [Operator-declared validation domain and explicit case comparison](docs/VALIDITY_DOMAIN.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
 - [Reviewed tissue measurement directions](docs/TISSUE_DIRECTIONS.md)
@@ -490,3 +491,19 @@ and `case-template --report face_report.json --domain validation_domain.json --o
 to prepare blank declarations. No conditions, thresholds, N or errors are invented.
 Missing observations stay unknown; outside-domain cases receive a banner. Matching
 conditions does not establish scientific validity. See [schema, signature and limits](docs/VALIDITY_DOMAIN.md).
+
+## Optional saved-report check policy
+
+`python -m cranio.check_policy` evaluates explicit criteria without changing the
+fit. Missing or unreviewed evidence stays `not_assessed`. A policy pass is not
+scientific authorization. See [schema, commands and limits](docs/CHECK_POLICY.md).
+
+| Option | Default | Effect |
+|---|---|---|
+| `check_policy template --output FILE` | Explicit action | Blank policy; no anatomical constants |
+| `check_policy assess --report FILE --policy FILE --output FILE` | Explicit action | New diagnostic JSON; exit 3 for held checks |
+| `check_policy assess --allow-blocked REASON` | Off | Audited exception; findings retained, no scientific approval |
+| `record build --check-policy FILE` | None | Include configured checks in derived record; Blender exposes the same optional file |
+| `record build --check-override REASON` | None | Record an exception; blocked/incomplete results remain diagnostic |
+
+Existing mesh exports are not yet gated by these optional saved-report checks.

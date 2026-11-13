@@ -23,6 +23,9 @@ class GNMRecordSettings(PropertyGroup):
     uncertainty_path: StringProperty(name='Existing A2.1 ensemble (optional)', subtype='FILE_PATH')
     validity_domain_path: StringProperty(name='Declared validation domain (optional)', subtype='FILE_PATH')
     domain_case_path: StringProperty(name='Bound domain observations (optional)', subtype='FILE_PATH')
+    check_policy_path: StringProperty(name='Check policy (optional)', subtype='FILE_PATH')
+    check_override: StringProperty(name='Check override reason (optional)',
+        description='Records an explicit exception; does not grant scientific approval')
     uncertainty_scenario: EnumProperty(name='Ensemble prior scenario', items=[
         ('NONE', 'Not selected', 'No implicit prior scenario'),
         ('off', 'Prior off', 'Explicit neutral ensemble scenario'),
@@ -89,6 +92,9 @@ def poll_job():
         settings.result_text = text.name
         domain = record['assessments']['validity_domain']
         banner = ('; '+domain['banner']) if domain['status'] != 'not_assessed' else ''
+        checks = record['assessments'].get('check_policy')
+        if checks is not None:
+            banner += '; '+checks['banner']
         settings.status = 'Recorded; '+record['status']+banner+'; '+settings.result_path
     except (ValueError, OSError, TypeError, KeyError) as exc:
         settings.status = 'Result not displayed: '+str(exc)+'; inspect '+str(folder/'run.log')
@@ -133,7 +139,8 @@ class GNM_OT_record_export(Operator):
                 artifacts=path(settings.artifacts_path), limitations=path(settings.limitations_path),
                 uncertainty=path(settings.uncertainty_path),
                 scenario=None if settings.uncertainty_scenario == 'NONE' else settings.uncertainty_scenario,
-                validity_domain=path(settings.validity_domain_path), domain_case=path(settings.domain_case_path))
+                validity_domain=path(settings.validity_domain_path), domain_case=path(settings.domain_case_path),
+                check_policy=path(settings.check_policy_path), check_override=settings.check_override or None)
             info = _api._check_external_python(scene)
             parent = Path(path(settings.output_parent) or Path(request['report_path']).parent)
             folder = parent/('record_'+datetime.datetime.now().strftime('%Y%m%dT%H%M%S')+'_'+uuid.uuid4().hex[:8])
@@ -189,7 +196,7 @@ class GNM_PT_record(Panel):
         column.enabled = _JOB['process'] is None
         column.operator('gnm.record_use_active')
         for name in ('report_path', 'output_parent', 'artifacts_path', 'limitations_path', 'uncertainty_path',
-                     'validity_domain_path', 'domain_case_path'):
+                     'validity_domain_path', 'domain_case_path', 'check_policy_path', 'check_override'):
             column.prop(settings, name)
         if settings.uncertainty_path or settings.uncertainty_scenario != 'NONE':
             column.prop(settings, 'uncertainty_scenario')

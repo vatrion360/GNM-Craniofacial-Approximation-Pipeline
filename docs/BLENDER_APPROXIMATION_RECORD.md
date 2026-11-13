@@ -77,3 +77,8 @@ the final mesh. CT evaluation and scientific export modes remain separate work.
 [Declared-domain comparison](VALIDITY_DOMAIN.md) is optional; its banner appears
 in the completion status and text report without certifying validity. Review
 identifiers and file paths before sharing reports.
+
+Optional [saved-report check policies](CHECK_POLICY.md) add configured findings and
+explicit override reasons. Held checks remain diagnostic even with an override;
+this does not authorize scientific mesh export. Empty policy fields preserve
+the prior record path.

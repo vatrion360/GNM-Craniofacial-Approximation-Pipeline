@@ -1,5 +1,10 @@
 # Unreleased
 
+- A5.1: add opt-in sourced policy criteria for bone chords, regional fitted-marker counts and midline RMS.
+- Preserve pass/warn/block/not_assessed, legacy diagnostic provenance and explicit override reasons.
+- Integrate with derived records and the Blender external-process record panel; no fit/default changes.
+- This is the gate contract, not yet mesh-export enforcement or scientific validation.
+
 - Add opt-in operator-declared validation domains and report-bound case observations, with conservative model/run signatures, unknown/outside/matching statuses, study-only regional results and visible CLI/Blender banners. Templates contain no invented conditions or scientific values; matching is not independent validation or export approval. Fitting and defaults remain unchanged.
 
 - Add a Blender saved-fit approximation-record panel with explicit source selection, asynchronous external export, optional limitations/Monte Carlo linkage, verified result text and cancellation/lifecycle cleanup. Preserve meshes, markers, earlier reports and fitting defaults; current scene edits are not silently treated as saved fit evidence.
