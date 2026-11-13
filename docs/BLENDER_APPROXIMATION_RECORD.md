@@ -87,3 +87,10 @@ the prior record path.
 For mesh bundles choose **Mesh export mode** explicitly (default **Not selected**)
 and **Export Labelled Saved-fit Mesh**. Scientific mode requires a check policy;
 blocked jobs retain diagnostics without a face OBJ. See [details and remaining scope](SAVED_FIT_EXPORT.md).
+
+After a completed mesh export, **Capture Reviewed Saved-fit Bundle** uses the
+matching saved report/frame to render three orthographic views with scale bars in
+a separate CPU Blender process. It shares cancellation/lifecycle handling but
+does not require the external Python interpreter. See [settings, inputs and
+limits](STANDARDIZED_CAPTURES.md). The original bundle and working scene remain
+unchanged; images have their own source-bound completion manifest.

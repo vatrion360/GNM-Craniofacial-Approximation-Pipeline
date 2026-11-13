@@ -5,7 +5,7 @@ import textwrap
 import uuid
 
 import bpy
-from bpy.props import EnumProperty, PointerProperty, StringProperty
+from bpy.props import EnumProperty, PointerProperty, StringProperty, IntProperty, FloatProperty
 from bpy.types import Operator, Panel, PropertyGroup
 
 from . import record_job
@@ -34,6 +34,10 @@ class GNMRecordSettings(PropertyGroup):
         ('NONE', 'Not selected', 'Choose a mode explicitly'),
         ('scientific', 'Scientific (checks required)', 'Saved neutral fit; not validation or approval'),
         ('illustrative', 'Illustrative', 'Labelled saved neutral fit; not current presentation')], default='NONE')
+    capture_bundle_path: StringProperty(name='Capture source export_decision.json', subtype='FILE_PATH')
+    capture_resolution: IntProperty(name='Capture size (px)', default=1024, min=128, max=4096)
+    capture_bar_mm: FloatProperty(name='Scale bar (mm)', default=50., min=.000001)
+    capture_samples: IntProperty(name='CPU samples', default=16, min=1, max=128)
     status: StringProperty(default='Not exported; select a saved offline fit report', options={'SKIP_SAVE'})
     result_path: StringProperty(name='Last completed record', subtype='FILE_PATH', options={'SKIP_SAVE'})
     result_text: StringProperty(name='Report text block', options={'SKIP_SAVE'})
@@ -89,6 +93,17 @@ def poll_job():
         settings.status = f'Failed ({code}); inspect {folder / "run.log"}'
         return None
     try:
+        if request.get('kind') == 'standardized_captures':
+            from .capture_job import read_result
+            result = read_result(folder/'captures', request)
+            text = bpy.data.texts.new('GNM_Standardized_Captures_'+folder.name)
+            text.write(result['export_label']+'\n'+result['interpretation']+'\n'+
+                       'Scale bar: '+str(result['bar_mm'])+' mm; size: '+str(result['resolution'])+' px\n'+
+                       'Front / three-quarter / right profile\n'+str(folder/'captures'))
+            settings.result_path = str(folder/'captures'/'capture_manifest.json')
+            settings.result_text = text.name
+            settings.status = 'Captures completed; '+result['export_label']+'; '+settings.result_path
+            return None
         if bundle:
             from .review_export import read_result
             decision, page = read_result(folder/'bundle', request)
@@ -98,6 +113,7 @@ def poll_job():
             text.write(page)
             settings.result_path = str(folder/'bundle'/'export_decision.json')
             settings.result_text = text.name
+            settings.capture_bundle_path = settings.result_path if decision['status'] == 'completed' else ''
             settings.status = decision['label']+'; '+settings.result_path
             return None
         record, page = record_job.read_result(folder/'record', request)
@@ -188,6 +204,49 @@ class GNM_OT_record_export(Operator):
             return {'CANCELLED'}
 
 
+class GNM_OT_capture_bundle(Operator):
+    bl_idname = 'gnm.capture_saved_bundle'
+    bl_label = 'Capture Reviewed Saved-fit Bundle'
+
+    @classmethod
+    def poll(cls, context):
+        return (_JOB['process'] is None and _api._OFFLINE.get('process') is None
+                and bool(context.scene.gnm_record.report_path.strip())
+                and bool(context.scene.gnm_record.capture_bundle_path.strip()))
+
+    def execute(self, context):
+        from . import capture_job
+        scene, settings = context.scene, context.scene.gnm_record
+        try:
+            request = capture_job.prepare_request(bpy.path.abspath(settings.report_path),
+                bpy.path.abspath(settings.capture_bundle_path), resolution=settings.capture_resolution,
+                bar_mm=settings.capture_bar_mm, samples=settings.capture_samples)
+            parent = Path(bpy.path.abspath(settings.output_parent) if settings.output_parent.strip()
+                          else Path(request['bundle_path']).parent)
+            folder = parent/('captures_'+datetime.datetime.now().strftime('%Y%m%dT%H%M%S')+'_'+uuid.uuid4().hex[:8])
+            folder.mkdir(parents=True, exist_ok=False)
+            log = (folder/'run.log').open('w', encoding='utf-8')
+            try:
+                process = capture_job.start(bpy.app.binary_path, Path(_api.__file__).resolve().parent,
+                                            request, folder/'captures', log)
+            except Exception:
+                log.close()
+                raise
+            _JOB.update(process=process, log=log, scene=scene, folder=str(folder), request=request)
+            settings.result_path = settings.result_text = ''
+            settings.status = 'Rendering in separate CPU Blender process; '+str(folder)
+            try:
+                bpy.app.timers.register(poll_job, first_interval=.5)
+            except Exception:
+                stop()
+                raise
+            return {'FINISHED'}
+        except (ValueError, OSError, TypeError, RuntimeError) as exc:
+            settings.status = 'Cannot capture: '+str(exc)
+            self.report({'ERROR'}, settings.status)
+            return {'CANCELLED'}
+
+
 class GNM_OT_record_cancel(Operator):
     bl_idname = 'gnm.cancel_record_export'
     bl_label = 'Cancel Record Export'
@@ -228,6 +287,11 @@ class GNM_PT_record(Panel):
         export.enabled = settings.export_mode != 'NONE'
         export.operator('gnm.export_approximation_record', text='Export Labelled Saved-fit Mesh').bundle = True
         column.label(text='Neutral saved OBJ only; scientific mode enforces checks')
+        column.separator()
+        for name in ('capture_bundle_path', 'capture_resolution', 'capture_bar_mm', 'capture_samples'):
+            column.prop(settings, name)
+        column.operator('gnm.capture_saved_bundle')
+        column.label(text='Requires reviewed saved frame; separate CPU Blender render')
         layout.operator('gnm.cancel_record_export')
         for line in textwrap.wrap(settings.status, 48):
             layout.label(text=line)
@@ -240,7 +304,7 @@ class GNM_PT_record(Panel):
         layout.label(text='Integrity and provenance are not scientific validation')
 
 
-CLASSES = (GNMRecordSettings, GNM_OT_record_use_active, GNM_OT_record_export, GNM_OT_record_cancel, GNM_PT_record)
+CLASSES = (GNMRecordSettings, GNM_OT_record_use_active, GNM_OT_record_export, GNM_OT_capture_bundle, GNM_OT_record_cancel, GNM_PT_record)
 
 
 def register(addon):

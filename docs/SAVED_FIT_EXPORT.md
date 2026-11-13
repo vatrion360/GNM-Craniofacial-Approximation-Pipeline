@@ -113,12 +113,13 @@ presentation controls remain available inside Blender, but their current meshes,
 UVs/textures and expressions are not exported by this command. A live-only preview
 must first produce a canonical offline fit/report to use this workflow.
 
-Standardized Frankfort captures, scale bars and final-mesh uncertainty heatmaps
-are not supplied. The manifest explicitly says captures are not exported and
-final-mesh uncertainty is not assessed. It never relabels the displacement
-heatmap or a related marker-only Monte Carlo ensemble as final-mesh confidence.
-The existing A4.2 capture workflow remains separate. These remaining A7.3 tasks
-need their own implementation and checks.
+Standardized Frankfort captures and scale bars are available through the separate
+[A7.3.2 saved-bundle capture action](STANDARDIZED_CAPTURES.md), requiring a reviewed
+frame in the saved report. The original mesh-bundle manifest still says captures
+are not exported: it is not rewritten. A new capture manifest links the images to
+that bundle by hash. Final-mesh uncertainty remains unassessed; no displacement
+heatmap or related marker-only Monte Carlo ensemble is relabelled as final-mesh
+confidence. The existing A4.2 live-scene capture workflow remains separate.
 
 This software change does not add CT validation, scientific thresholds or an
 independent validity domain. The operator remains responsible for policy sources,

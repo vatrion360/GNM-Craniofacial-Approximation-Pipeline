@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add explicit reviewed saved-fit captures: frontal, three-quarter and right-profile orthographic PNGs with metric bars, mode/override labels and a hashed manifest. Use an isolated CPU Blender process, preserve the working scene and saved bundle, refuse stale/missing references. No fit/default changes or final-mesh uncertainty claim.
+
 - Add explicit saved-fit scientific/illustrative mesh bundles, neutral gray materials and hashed decisions. Scientific mode enforces A5 checks or records a visible override; held exports contain diagnostics but no face OBJ. Blender uses the existing external-process lifecycle. No fit/default changes; current textured scenes, standardized captures and final-mesh uncertainty remain outside this increment.
 
 - A5.1: add opt-in sourced policy criteria for bone chords, regional fitted-marker counts and midline RMS.
