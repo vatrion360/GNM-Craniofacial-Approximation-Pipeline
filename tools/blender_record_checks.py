@@ -168,6 +168,30 @@ def run_record_checks(addon, scene, directory, source_folder, fitted):
         settings.export_mode = 'NONE'
         settings.check_override = old_reason
         print('BLENDER_GATED_SAVED_FIT_EXPORT_PASS')
+        # Explicit B4 diagnostics use only report/artifacts, not optional policy,
+        # prior, ensemble or presentation settings. They never authorize export.
+        assert bpy.ops.gnm.export_approximation_record(diagnostics=True) == {'FINISHED'}
+        assert not module.GNM_OT_record_export.poll(bpy.context)
+        diagnostic_folder = Path(module._JOB['folder'])
+        settings.report_path = str(Path(directory)/'not-submitted-diagnostic-report.json')
+        wait()
+        assert settings.status.startswith('Consistency: '), (settings.status,
+            (diagnostic_folder/'run.log').read_text(encoding='utf-8'))
+        settings.report_path = saved_path
+        diagnostic = json.loads((Path(settings.result_path).parent/'consistency.json').read_text(encoding='utf-8'))
+        assert diagnostic['status'] in ('block', 'not_assessed')
+        assert diagnostic['correction_applied'] is False
+        assert diagnostic['stages']['final']['serialized_mesh_angles']['triangle_count'] == len(fitted.data.polygons)
+        assert 'NOT ASSESSED:' in bpy.data.texts[settings.result_text].as_string()
+        assert before_objects == set(scene.objects)
+        np.testing.assert_array_equal(vertices, [tuple(v.co) for v in fitted.data.vertices])
+        np.testing.assert_array_equal(targets, [tuple(m.target_empty.matrix_world.translation) for m in scene.gnm_markers if m.is_placed])
+        assert all(p.read_bytes() == data for p, data in before.items())
+        assert bpy.ops.gnm.export_approximation_record(diagnostics=True) == {'FINISHED'}
+        process = module._JOB['process']
+        assert bpy.ops.gnm.cancel_record_export() == {'FINISHED'}
+        assert process.poll() is not None and not bpy.app.timers.is_registered(module.poll_job)
+        print('BLENDER_SAVED_FIT_CONSISTENCY_PASS')
         # Worker rejection never creates another displayed report or mesh.
         face = Path(source_folder)/'face.obj'
         original = face.read_bytes()

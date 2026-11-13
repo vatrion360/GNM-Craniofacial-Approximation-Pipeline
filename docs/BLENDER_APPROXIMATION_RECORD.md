@@ -94,3 +94,9 @@ a separate CPU Blender process. It shares cancellation/lifecycle handling but
 does not require the external Python interpreter. See [settings, inputs and
 limits](STANDARDIZED_CAPTURES.md). The original bundle and working scene remain
 unchanged; images have their own source-bound completion manifest.
+
+**Summarize Saved-fit Consistency** launches the separate diagnostic summary
+using only the report, optional moved-artifact folder and output parent. It
+reuses recorded QC and measures serialized triangle quality; other optional
+record-panel fields do not configure it. The same external interpreter and job
+lifecycle apply. See [definitions and unassessed checks](POSTFIT_CONSISTENCY.md).

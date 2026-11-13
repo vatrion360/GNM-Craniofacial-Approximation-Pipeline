@@ -23,6 +23,7 @@ def test_addon_zip_contains_core_and_cli(tmp_path):
                 'gnm_cranio/cranio/record_job.py',
                 'gnm_cranio/cranio/validity_domain.py',
                 'gnm_cranio/cranio/check_policy.py',
+                'gnm_cranio/cranio/consistency.py',
                 'gnm_cranio/cranio/review_export.py',
                 'gnm_cranio/cranio/capture_plan.py',
                 'gnm_cranio/cranio/capture_render.py',

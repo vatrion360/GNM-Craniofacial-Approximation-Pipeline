@@ -146,7 +146,7 @@ de acceptare din task sunt îndeplinite.
 | B2.1 | Parțial | Există definiții și sugestii de plasare, fără atlas pe craniu de referință. |
 | B2.2–B2.4 | Lipsește | ICP-ul actual aliniază GNM, nu transferă repere de pe un atlas osos. Lipsesc propunerile, coada lor de revizie și sesiunile A/B. |
 | B3 | Lipsește ca wizard | Există opțiuni pentru fragmente/scalp/mandibulă; nu există scenarii declarative complete. |
-| B4 | Parțial | Reutilizăm QC existent; lipsesc panoul unificat, benzile tisulare și corecția explicită opțională. |
+| B4 | Rezumat diagnostic implementat; verificări anatomice parțiale | [B4.1](POSTFIT_CONSISTENCY.md) reunește QC salvat, contacte, statistici de clearance local și unghiurile triunghiurilor exportate în CLI/Blender. Defectele cunoscute rămân roșii; lipsurile rămân neevaluate. Nu furnizează încă distanță semnată volumetrică, acoperire pe arie, benzi tisulare regionale sau corecție automată. |
 | B5 | Parțial | Proveniență pe obiecte/regiuni/markeri există; lipsesc atributele per-față și propagarea calibrată spre ponderi/incertitudine. |
 | C1 | Lipsește ca detector | Există raport de asimetrie și câmp de modificare craniană. Acestea nu diagnostichează etiologia sau patologia. |
 | C2 | Lipsește | Controalele post-fit pentru dantură nu compară automat dinții GNM cu dentiția observată. |
