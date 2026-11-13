@@ -23,6 +23,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Optional derived approximation record and provenance](docs/APPROXIMATION_RECORD.md)
 - [Export a saved-fit approximation record from Blender](docs/BLENDER_APPROXIMATION_RECORD.md)
+- [Gated scientific/illustrative saved-fit mesh export](docs/SAVED_FIT_EXPORT.md)
 - [Explicit saved-report checks and configured criteria](docs/CHECK_POLICY.md)
 - [Operator-declared validation domain and explicit case comparison](docs/VALIDITY_DOMAIN.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
@@ -507,3 +508,24 @@ scientific authorization. See [schema, commands and limits](docs/CHECK_POLICY.md
 | `record build --check-override REASON` | None | Record an exception; blocked/incomplete results remain diagnostic |
 
 Existing mesh exports are not yet gated by these optional saved-report checks.
+
+## Explicit saved-fit mesh export modes
+
+Use `python -m cranio.review_export build --report face_report.json --mode scientific
+--check-policy checks.json --output-dir export` (one shell line), or explicitly
+choose `--mode illustrative`. Blender exposes **Mesh export mode** and **Export
+Labelled Saved-fit Mesh** in its saved-fit record panel. Both modes export the
+saved neutral world-mm face with a gray material and provenance; scientific mode
+enforces the configured gate. See [workflow, exit codes and limits](docs/SAVED_FIT_EXPORT.md).
+
+| Export option | Default | Effect |
+|---|---|---|
+| `--mode {scientific,illustrative}` | Required; Blender Not selected | Explicit mode and mandatory output label |
+| `--check-policy FILE` | None | Required for scientific; missing criteria hold export |
+| `--allow-blocked REASON` | Off | Audited exception; original findings remain visible |
+| `--output-dir DIR` | Required/new | Complete bundle or blocked decision with no face OBJ |
+
+This increment does not export current scene presentation edits/textures,
+standardized captures, scale bars or a final-mesh uncertainty heatmap. Existing
+pipeline exports retain their behavior; a labelled scientific export is not a
+claim of anatomical validation.

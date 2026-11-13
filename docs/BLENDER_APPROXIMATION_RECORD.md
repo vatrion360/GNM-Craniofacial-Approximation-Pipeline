@@ -73,7 +73,8 @@ needed by this exporter. For prior comparisons choose one scenario's child
 
 Integrity hashes are not authentication or proof of anatomical accuracy. Linked
 Monte Carlo evidence remains uncalibrated and is not assigned as uncertainty of
-the final mesh. CT evaluation and scientific export modes remain separate work.
+the final mesh. CT evaluation remains manual. The optional [labelled mesh-export action](SAVED_FIT_EXPORT.md)
+shares this panel and process lifecycle but has its own explicit decision file.
 [Declared-domain comparison](VALIDITY_DOMAIN.md) is optional; its banner appears
 in the completion status and text report without certifying validity. Review
 identifiers and file paths before sharing reports.
@@ -82,3 +83,7 @@ Optional [saved-report check policies](CHECK_POLICY.md) add configured findings 
 explicit override reasons. Held checks remain diagnostic even with an override;
 this does not authorize scientific mesh export. Empty policy fields preserve
 the prior record path.
+
+For mesh bundles choose **Mesh export mode** explicitly (default **Not selected**)
+and **Export Labelled Saved-fit Mesh**. Scientific mode requires a check policy;
+blocked jobs retain diagnostics without a face OBJ. See [details and remaining scope](SAVED_FIT_EXPORT.md).

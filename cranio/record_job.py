@@ -1,8 +1,8 @@
 """External record-export request and result checks; no bpy or fitting.
 
 Blender delegates artifact hashing and optional ensemble validation to a child
-Python process. Only the explicit source report and small result files are read
-on the UI thread. No path found in a report chooses executable code.
+Python process. Record requests read the explicit source report and small result files on the
+UI thread. Labelled mesh-bundle completion separately verifies its fixed files. No path found in a report chooses executable code.
 """
 import hashlib
 import json
@@ -51,13 +51,34 @@ def prepare_request(report_path, *, artifacts=None, limitations=None, uncertaint
     return dict(report_path=str(report_path), report_sha256=_digest(raw), arguments=arguments)
 
 
+def prepare_export_request(report_path, *, mode, **options):
+    """Explicit mode, same saved-report inputs; no current-scene mesh inference."""
+    if mode not in ('scientific', 'illustrative'):
+        raise ValueError('Select scientific or illustrative export explicitly')
+    if mode == 'scientific' and options.get('check_policy') is None:
+        raise ValueError('Scientific mode requires an explicit check policy')
+    request = prepare_request(report_path, **options)
+    request.update(kind='saved_fit_export', export_mode=mode)
+    request['arguments'].extend(['--mode', mode])
+    return request
+
+
 def start_record(info, package_root, request, output_dir, log):
-    """Launch this checkout/ZIP's fixed CLI module, with the shared safe environment."""
+    """Launch the fixed record module; never select executable code from a report."""
+    return _start_module('record', info, package_root, request, output_dir, log)
+
+
+def start_export(info, package_root, request, output_dir, log):
+    """Launch the fixed saved-fit export module with the shared safe environment."""
+    return _start_module('review_export', info, package_root, request, output_dir, log)
+
+
+def _start_module(module, info, package_root, request, output_dir, log):
     root = Path(package_root).resolve()
-    if not (root/'cranio'/'record.py').is_file():
-        raise ValueError('The installed add-on is missing cranio/record.py; reinstall the complete ZIP')
+    if module not in ('record', 'review_export') or not (root/'cranio'/(module+'.py')).is_file():
+        raise ValueError('The installed add-on is missing its export module; reinstall the complete ZIP')
     bootstrap = ("import runpy, sys; sys.path.insert(0, sys.argv.pop(1)); "
-                 "runpy.run_module('cranio.record', run_name='__main__', alter_sys=True)")
+                 "runpy.run_module('cranio."+module+"', run_name='__main__', alter_sys=True)")
     command = [info['executable'], '-c', bootstrap, str(root),
                *request['arguments'], '--output-dir', str(output_dir)]
     log.write('External Python: '+json.dumps(info, ensure_ascii=False)+'\n')
