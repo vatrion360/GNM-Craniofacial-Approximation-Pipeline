@@ -97,9 +97,10 @@ this increment does not implicitly combine it with the gate.
 
 ## Scope remaining
 
-A5 is **not complete**: the ordinary CLI and Blender mesh exports are not yet
-controlled by this policy. A7.3 must wire the gate to explicit scientific versus
-illustrative export operations and preserve diagnostic outputs. These policies
+The [A7.3.1 saved-fit exporter](SAVED_FIT_EXPORT.md) now enforces this gate for
+its explicit scientific mode, preserving diagnostics when held. Ordinary legacy
+CLI/Blender mesh exports retain their behavior. A5 is **not complete** for all
+scene/legacy export paths. These policies
 also do not supply population ranges, minimum-marker recommendations, automatic
 anatomical inference, calibrated midsagittal confidence, or live-scene checks.
 

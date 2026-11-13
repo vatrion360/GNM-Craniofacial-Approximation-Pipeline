@@ -30,6 +30,10 @@ class GNMRecordSettings(PropertyGroup):
         ('NONE', 'Not selected', 'No implicit prior scenario'),
         ('off', 'Prior off', 'Explicit neutral ensemble scenario'),
         ('on', 'Prior on', 'Explicit matching prior ensemble scenario')], default='NONE')
+    export_mode: EnumProperty(name='Mesh export mode', items=[
+        ('NONE', 'Not selected', 'Choose a mode explicitly'),
+        ('scientific', 'Scientific (checks required)', 'Saved neutral fit; not validation or approval'),
+        ('illustrative', 'Illustrative', 'Labelled saved neutral fit; not current presentation')], default='NONE')
     status: StringProperty(default='Not exported; select a saved offline fit report', options={'SKIP_SAVE'})
     result_path: StringProperty(name='Last completed record', subtype='FILE_PATH', options={'SKIP_SAVE'})
     result_text: StringProperty(name='Report text block', options={'SKIP_SAVE'})
@@ -80,10 +84,22 @@ def poll_job():
     _JOB['log'].close()
     _JOB.update(process=None, log=None, scene=None, folder=None, request=None)
     settings = scene.gnm_record
-    if code != 0:
+    bundle = request.get('kind') == 'saved_fit_export'
+    if code != 0 and not (bundle and code == 3):
         settings.status = f'Failed ({code}); inspect {folder / "run.log"}'
         return None
     try:
+        if bundle:
+            from .review_export import read_result
+            decision, page = read_result(folder/'bundle', request)
+            if (code == 3) != (decision['status'] == 'blocked'):
+                raise ValueError('Process exit and export decision disagree')
+            text = bpy.data.texts.new('GNM_Fit_Export_'+folder.name)
+            text.write(page)
+            settings.result_path = str(folder/'bundle'/'export_decision.json')
+            settings.result_text = text.name
+            settings.status = decision['label']+'; '+settings.result_path
+            return None
         record, page = record_job.read_result(folder/'record', request)
         # New text blocks preserve previous reports. No scene mesh is changed.
         text = bpy.data.texts.new('GNM_Approximation_Record_'+folder.name)
@@ -124,6 +140,7 @@ class GNM_OT_record_use_active(Operator):
 class GNM_OT_record_export(Operator):
     bl_idname = 'gnm.export_approximation_record'
     bl_label = 'Export Approximation Record'
+    bundle: bpy.props.BoolProperty(default=False, options={'HIDDEN', 'SKIP_SAVE'})
 
     @classmethod
     def poll(cls, context):
@@ -135,7 +152,9 @@ class GNM_OT_record_export(Operator):
         try:
             def path(value):
                 return bpy.path.abspath(value) if value.strip() else None
-            request = record_job.prepare_request(path(settings.report_path),
+            prepare = record_job.prepare_export_request if self.bundle else record_job.prepare_request
+            mode = dict(mode=settings.export_mode) if self.bundle else {}
+            request = prepare(path(settings.report_path), **mode,
                 artifacts=path(settings.artifacts_path), limitations=path(settings.limitations_path),
                 uncertainty=path(settings.uncertainty_path),
                 scenario=None if settings.uncertainty_scenario == 'NONE' else settings.uncertainty_scenario,
@@ -147,15 +166,16 @@ class GNM_OT_record_export(Operator):
             folder.mkdir(parents=True, exist_ok=False)
             log = (folder/'run.log').open('w', encoding='utf-8')
             try:
-                process = record_job.start_record(info, Path(_api.__file__).resolve().parent,
-                                                  request, folder/'record', log)
+                start = record_job.start_export if self.bundle else record_job.start_record
+                process = start(info, Path(_api.__file__).resolve().parent,
+                                request, folder/('bundle' if self.bundle else 'record'), log)
             except Exception:
                 log.close()
                 raise
             _JOB.update(process=process, log=log, scene=scene, folder=str(folder), request=request)
             settings.result_path = ''
             settings.result_text = ''
-            settings.status = 'Exporting saved fit record; '+str(folder)
+            settings.status = ('Exporting saved fit bundle; ' if self.bundle else 'Exporting saved fit record; ')+str(folder)
             try:
                 bpy.app.timers.register(poll_job, first_interval=.5)
             except Exception:
@@ -202,6 +222,12 @@ class GNM_PT_record(Panel):
             column.prop(settings, 'uncertainty_scenario')
         column.label(text='Uses the external Python selected in Offline fit')
         column.operator('gnm.export_approximation_record')
+        column.separator()
+        column.prop(settings, 'export_mode')
+        export = column.row()
+        export.enabled = settings.export_mode != 'NONE'
+        export.operator('gnm.export_approximation_record', text='Export Labelled Saved-fit Mesh').bundle = True
+        column.label(text='Neutral saved OBJ only; scientific mode enforces checks')
         layout.operator('gnm.cancel_record_export')
         for line in textwrap.wrap(settings.status, 48):
             layout.label(text=line)

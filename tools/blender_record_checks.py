@@ -116,6 +116,58 @@ def run_record_checks(addon, scene, directory, source_folder, fitted):
         np.testing.assert_array_equal(vertices, [tuple(v.co) for v in fitted.data.vertices])
         np.testing.assert_array_equal(targets, [tuple(m.target_empty.matrix_world.translation) for m in scene.gnm_markers if m.is_placed])
         assert all(p.read_bytes() == data for p, data in before.items())
+        # The same saved-fit job lifecycle supports explicit mesh-export modes.
+        assert settings.export_mode == 'NONE'
+        try:
+            assert bpy.ops.gnm.export_approximation_record(bundle=True) == {'CANCELLED'}
+        except RuntimeError:
+            pass
+        assert module._JOB['process'] is None
+        old_reason = settings.check_override
+        settings.check_override = ''
+        settings.export_mode = 'scientific'
+        assert bpy.ops.gnm.export_approximation_record(bundle=True) == {'FINISHED'}
+        # UI edits cannot replace the submitted mode.
+        settings.export_mode = 'illustrative'
+        wait()
+        blocked = json.loads(Path(settings.result_path).read_text(encoding='utf-8'))
+        assert blocked['status'] == 'blocked' and blocked['mode'] == 'scientific'
+        assert settings.status.startswith('SCIENTIFIC EXPORT BLOCKED')
+        assert not (Path(settings.result_path).parent/'face.obj').exists()
+        assert 'No face mesh was exported' in bpy.data.texts[settings.result_text].as_string()
+        settings.export_mode = 'scientific'
+        settings.check_override = old_reason
+        assert bpy.ops.gnm.export_approximation_record(bundle=True) == {'FINISHED'}
+        wait()
+        decision = json.loads(Path(settings.result_path).read_text(encoding='utf-8'))
+        assert decision['status'] == 'completed' and decision['check_gate']['status'] == 'overridden'
+        assert settings.status.startswith('SCIENTIFIC EXPORT WITH RECORDED OVERRIDE')
+        bundle = Path(settings.result_path).parent
+        assert 'map_' not in (bundle/'face.mtl').read_text(encoding='utf-8')
+        source_rows = [line for line in (Path(source_folder)/'face.obj').read_text(encoding='utf-8').splitlines()
+                       if line.startswith(('v ', 'f '))]
+        exported_rows = [line for line in (bundle/'face.obj').read_text(encoding='utf-8').splitlines()
+                         if line.startswith(('v ', 'f '))]
+        assert source_rows == exported_rows
+        settings.export_mode = 'illustrative'
+        settings.check_override = ''
+        assert bpy.ops.gnm.export_approximation_record(bundle=True) == {'FINISHED'}
+        wait()
+        illustrative = json.loads(Path(settings.result_path).read_text(encoding='utf-8'))
+        assert illustrative['mode'] == 'illustrative' and illustrative['status'] == 'completed'
+        assert illustrative['check_gate']['proceed'] is False
+        assert 'ILLUSTRATIVE' in bpy.data.texts[settings.result_text].as_string()
+        assert before_objects == set(scene.objects)
+        np.testing.assert_array_equal(vertices, [tuple(v.co) for v in fitted.data.vertices])
+        np.testing.assert_array_equal(targets, [tuple(m.target_empty.matrix_world.translation) for m in scene.gnm_markers if m.is_placed])
+        assert all(p.read_bytes() == data for p, data in before.items())
+        assert bpy.ops.gnm.export_approximation_record(bundle=True) == {'FINISHED'}
+        process = module._JOB['process']
+        assert bpy.ops.gnm.cancel_record_export() == {'FINISHED'}
+        assert process.poll() is not None
+        settings.export_mode = 'NONE'
+        settings.check_override = old_reason
+        print('BLENDER_GATED_SAVED_FIT_EXPORT_PASS')
         # Worker rejection never creates another displayed report or mesh.
         face = Path(source_folder)/'face.obj'
         original = face.read_bytes()
