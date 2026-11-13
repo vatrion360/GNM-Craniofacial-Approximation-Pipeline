@@ -525,7 +525,21 @@ enforces the configured gate. See [workflow, exit codes and limits](docs/SAVED_F
 | `--allow-blocked REASON` | Off | Audited exception; original findings remain visible |
 | `--output-dir DIR` | Required/new | Complete bundle or blocked decision with no face OBJ |
 
-This increment does not export current scene presentation edits/textures,
-standardized captures, scale bars or a final-mesh uncertainty heatmap. Existing
+This increment does not export current scene presentation edits/textures
+or a final-mesh uncertainty heatmap. Existing
 pipeline exports retain their behavior; a labelled scientific export is not a
 claim of anatomical validation.
+
+The separate **Capture Reviewed Saved-fit Bundle** action adds frontal,
+three-quarter and right-profile PNGs with metric scale bars from the reviewed
+frame in the saved report. It renders in a separate CPU Blender process without
+changing the working scene. Missing/stale frames and blocked bundles are refused.
+See [capture requirements, provenance and limits](docs/STANDARDIZED_CAPTURES.md).
+
+| Capture option | Default | Effect |
+|---|---|---|
+| Capture source export_decision.json | Empty/set after successful mesh export | Explicit matching completed bundle |
+| Capture size (px) | 1024 | Square images, 128–4096 pixels |
+| Scale bar (mm) | 50 | Positive display length; does not validate scan scale |
+| CPU samples | 16 | Cycles rendering cost/noise, 1–128 |
+| Capture Reviewed Saved-fit Bundle | Explicit click | Three views and a separate hashed manifest |

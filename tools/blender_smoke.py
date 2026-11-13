@@ -31,6 +31,7 @@ from blender_articulation_checks import run_articulation_checks, run_articulatio
 from blender_profile_checks import run_profile_options, run_profile_external
 from blender_prior_audit_checks import run_prior_audit_checks
 from blender_record_checks import run_record_checks
+from blender_capture_checks import run_capture_checks
 from blender_performance_checks import run_performance_checks
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
 from blender_tissue_checks import run_tissue_checks, run_tissue_undo_checks
@@ -268,6 +269,7 @@ with tempfile.TemporaryDirectory() as directory:
                 if bpy.app.timers.is_registered(addon._offline_poll):
                     bpy.app.timers.unregister(addon._offline_poll)
                 run_record_checks(addon, scene, directory, folder, imported[0])
+                run_capture_checks(addon, scene, directory, folder, imported[0])
                 run_profile_external(addon, scene, model, directory, report)
                 run_prior_audit_checks(addon, scene, model, directory)
                 assert bpy.ops.gnm.run_offline() == {'FINISHED'}
