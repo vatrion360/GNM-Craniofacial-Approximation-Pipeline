@@ -25,6 +25,7 @@ def test_addon_zip_contains_core_and_cli(tmp_path):
                 'gnm_cranio/cranio/check_policy.py',
                 'gnm_cranio/cranio/consistency.py',
                 'gnm_cranio/cranio/tps.py',
+                'gnm_cranio/cranio/local_correction.py',
                 'gnm_cranio/cranio/review_export.py',
                 'gnm_cranio/cranio/capture_plan.py',
                 'gnm_cranio/cranio/capture_render.py',

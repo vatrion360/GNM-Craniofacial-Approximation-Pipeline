@@ -1,5 +1,7 @@
 # Unreleased
 
+- Share local-correction centre selection, confidence-scaled vectors, caps and protection through a NumPy-only preparation API used by the opt-in offline stage. Record selected/rejected rows and preserve frozen statistical inputs for repeatable application. Keep SciPy/default behavior; fix fractional scalp-cap truncation for Python callers supplying an integer face cap. Add legacy-output, malformed-input and installed-Blender regressions. Finalize scene/UI integration remains pending.
+
 - Add an opt-in NumPy local spline backend matching the existing 3-D `-r` kernel, affine tail and zero smoothing. Share cap/damping arithmetic with the unchanged default SciPy path; reject unresolved numerical systems without fallback. Add parity/degeneracy tests, an official-mesh benchmark and installed-Blender oracle comparison. This is the numerical foundation for B1, not a Finalize operator or a default change.
 
 - Add opt-in saved-fit consistency diagnostics in CLI and Blender: recorded QC/contact summaries, sampled local-clearance statistics and new minimum triangle angles on serialized statistical/final meshes. Keep missing anatomical checks unassessed, preserve legacy tolerances, verify source/output hashes, and retain the original meshes and export gates.
