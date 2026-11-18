@@ -97,6 +97,7 @@ Use **Extended 48**, **Paper 32** or **Legacy 27**, then **Add Missing Markers**
 | Placement atlas for selected marker | Off | Show definition, source, side and documented placement caveats for the selected list row |
 | Reference skull | None | Optional annotated mesh from a separate scene; text remains available without it |
 | Refresh Reference View | Explicit click | Show a local-axis snapshot of the reference; mark a reviewed site only if visible |
+| [Manual placement repeatability (A/B)](docs/PLACEMENT_REPEATABILITY.md) | Off | Measure two manual bone picks per site in a clean case copy; export world-mm distances without creating fit markers |
 | Fragment landmark proposals | Off | On request, register a named atlas patch to one active observed bone source; write review-only coordinates to a Blender text block |
 | Proposal review queue | No placements until confirmation | Inspect lowest geometric support first; confirm one site, adjust it with the 3D cursor, or reject it |
 | Patch name / three distance limits (mm) | Empty / unset (0) | Operator supplies a homologous patch, maximum surface gap, local anchor radius and maximum similarity anchor residual; no anatomical defaults |
@@ -189,6 +190,8 @@ follow reviewed sampled bone normals and are not replaced by selected-marker tab
 | `--tissue-compare ID1,ID2,...` | None | Independent per-table fits, corresponding-vertex difference PLYs and summary; fresh output prefix required |
 
 ## Marker-error propagation
+
+The optional [A/B repeatability study](docs/PLACEMENT_REPEATABILITY.md) supplies a same-case measurement report. A2 accepts `--repeatability FILE` with `--paired-iid-isotropic-reason TEXT` as an explicit sensitivity scenario. It never equates a repeat distance with a per-coordinate SD by default.
 
 Optional A2.1 simulations use `python -m cranio.uncertainty`; they refit the shared
 marker-only statistical solver with explicitly supplied placement/depth errors.

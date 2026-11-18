@@ -20,7 +20,8 @@ The latter still do not represent uncertainty.
   supplied `sigma_mm` is **one Cartesian coordinate's SD**, not a 3-D displacement
   distance, radial RMSE, or the SD of distances between repeated placements.
   Conversion from repeat measurements requires a justified statistical model;
-  no automatic conversion is provided in A2.1.
+  there is no default conversion. The optional [paired-repeat scenario](PLACEMENT_REPEATABILITY.md)
+  requires same-case evidence and a written rationale.
 - Depths follow independent parent normal distributions with supplied means/SDs,
   conditioned on depth >= 0. Rejection sampling avoids artificial probability
   mass at zero. Truncation changes the resulting mean and SD: supplied values
@@ -86,6 +87,7 @@ python -m cranio.uncertainty --input markers.csv --npz models/gnm_head.npz --pla
 |---|---|---|
 | `--input`, `--npz`, `--output` | Required | Marker CSV, unchanged local model, new JSON output |
 | `--placement` | Missing | Per-label error JSON; no imputation |
+| `--repeatability FILE` + `--paired-iid-isotropic-reason TEXT` | Off | Alternative to `--placement`: use B2.4 paired measurements under a documented single-pair isotropic sensitivity assumption |
 | `--samples` | 200 | Perturbations per prior scenario; integer >= 2 |
 | `--seed` | 0 | Nonnegative PCG64 seed; no global NumPy random state |
 | `--max-iter` | 30 | Shared solver iteration budget per fit; increase explicitly without relaxing tolerances |
