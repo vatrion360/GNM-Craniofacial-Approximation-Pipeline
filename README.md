@@ -26,6 +26,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Gated scientific/illustrative saved-fit mesh export](docs/SAVED_FIT_EXPORT.md)
 - [Explicit saved-report checks and configured criteria](docs/CHECK_POLICY.md)
 - [Saved-fit consistency diagnostics and triangle quality](docs/POSTFIT_CONSISTENCY.md)
+- [NumPy local spline backend and parity evidence](docs/NUMPY_LOCAL_SPLINE.md)
 - [Operator-declared validation domain and explicit case comparison](docs/VALIDITY_DOMAIN.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
 - [Reviewed tissue measurement directions](docs/TISSUE_DIRECTIONS.md)
@@ -564,3 +565,16 @@ See [metric definitions, output files and limits](docs/POSTFIT_CONSISTENCY.md).
 | `--output-dir DIR` | Required/new | JSON/TXT diagnostics, source record and completion manifest |
 | `--artifacts DIR` | Report folder | Explicit relocated saved outputs |
 | Summarize Saved-fit Consistency | Explicit click | Separate diagnostic job; no fit/default/scene changes |
+
+## NumPy local spline (numerical API, opt-in)
+
+`bounded_tps_correction(..., backend="numpy")` now offers the same existing
+3-D `-r`/affine, zero-smoothing formulation without SciPy in the numerical call.
+Caps and protected-region damping are shared with the SciPy branch. This is the
+foundation for Blender finalization; it does not add a Finalize button or change
+the offline/live defaults. See [API, limits and benchmark](docs/NUMPY_LOCAL_SPLINE.md).
+
+| Numerical API option | Default | Effect |
+|---|---|---|
+| `bounded_tps_correction(..., backend=...)` | `scipy` | Explicit `numpy`; no automatic fallback or smoothing |
+| `LinearPolyharmonic3D(...)(points, chunk_size=...)` | 2048 | Bounded evaluation batches; all centres retained |
