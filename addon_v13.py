@@ -1532,6 +1532,7 @@ class GNM_PT_panel(Panel):
 
         _core_module('blender_atlas').draw(layout, scene)
         _core_module('blender_proposals').draw(layout, scene)
+        _core_module('blender_repeatability').draw(layout, scene)
 
         adjust = layout.box()
         selected = sum(m.adjust_depth_selected for m in scene.gnm_markers)
@@ -4059,6 +4060,7 @@ def register():
     _core_module('blender_atlas').register()
     _core_module('blender_proposals').register(sys.modules[__name__])
     _core_module('blender_proposal_review').register()
+    _core_module('blender_repeatability').register(sys.modules[__name__])
     _core_module('blender_record').register(sys.modules[__name__])
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
@@ -4071,6 +4073,7 @@ def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
     _core_module('blender_record').unregister()
+    _core_module('blender_repeatability').unregister()
     _core_module('blender_proposal_review').unregister()
     _core_module('blender_proposals').unregister()
     _core_module('blender_atlas').unregister()

@@ -242,7 +242,10 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('input', 'npz', 'output'):
         parser.add_argument('--'+name, required=True)
-    parser.add_argument('--placement', help='Placement error JSON; missing values remain unconfigured')
+    inputs = parser.add_mutually_exclusive_group()
+    inputs.add_argument('--repeatability', help='Same-case B2.4 placement_error.json (requires a justified model)')
+    parser.add_argument('--paired-iid-isotropic-reason', help='Justification for the single-pair isotropic sensitivity model')
+    inputs.add_argument('--placement', help='Placement error JSON; missing values remain unconfigured')
     parser.add_argument('--samples', type=int, default=200)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--max-iter', type=int, default=DEFAULT_MAX_ITER)
@@ -264,7 +267,9 @@ def main(argv=None) -> int:
         from .tissue import _json, load_table, table_path
         from .tissue_directions import load_directions
         from .validation import sha256_file, validate_outputs
-        paths = [p for p in (args.input, args.npz, args.placement, args.prior, args.tissue_directions,
+        if bool(args.repeatability) != (args.paired_iid_isotropic_reason is not None):
+            raise ValueError('Use --repeatability and --paired-iid-isotropic-reason together')
+        paths = [p for p in (args.input, args.npz, args.placement, args.repeatability, args.prior, args.tissue_directions,
                             table_path(args.tissue_table) if args.tissue_table else None) if p]
         validate_outputs(paths, [args.output])
         hashes = {str(p): sha256_file(p) for p in paths}
@@ -273,8 +278,13 @@ def main(argv=None) -> int:
         if metadata.get('model_sha256') and metadata['model_sha256'] != hashes[args.npz]:
             raise ValueError('Marker/model SHA-256 mismatch')
         prior = load_prior(args.prior, backend.load().identity_dim) if args.prior else None
+        placement = _json(Path(args.placement).read_text(encoding='utf-8-sig')) if args.placement else None
+        if args.repeatability:
+            from .repeatability import for_uncertainty
+            placement = for_uncertainty(_json(Path(args.repeatability).read_text(encoding='utf-8-sig')),
+                [t.label for t in targets], metadata, args.paired_iid_isotropic_reason)
         result = monte_carlo_identity(backend.load(), targets, metadata,
-            placement=_json(Path(args.placement).read_text(encoding='utf-8-sig')) if args.placement else None,
+            placement=placement,
             samples=args.samples, seed=args.seed, max_iter=args.max_iter, allow_partial=args.allow_partial,
             table=load_table(args.tissue_table) if args.tissue_table else None, depth_labels=args.depth_labels,
             axis_policy=args.tissue_axis,
@@ -284,6 +294,11 @@ def main(argv=None) -> int:
         result.update(input_hashes=hashes, marker_metadata=metadata, skipped=skipped,
                       prior_record=None if prior is None else dict(sha256=prior['sha256'],
                           mean=prior['mean'].tolist(), scale=prior['scale'].tolist()))
+        if args.repeatability:
+            result['repeatability_model'] = dict(method='paired_iid_isotropic_single_pair',
+                input_sha256=hashes[args.repeatability], rationale=args.paired_iid_isotropic_reason,
+                interpretation='Conditional scenario from one pair per site; not a calibrated placement SD.')
+            result['warnings'].append(result['repeatability_model']['interpretation'])
         import platform
         from . import optimize
         result['implementation'] = dict(python=platform.python_version(), platform=platform.platform(),
