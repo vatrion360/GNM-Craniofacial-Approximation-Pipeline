@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add per-site review of fragment proposals in Blender. Confirm or adjust a site on the observed patch using the normal manual placement path, or reject it without placement. Keep optional placement receipts in v3 CSV metadata; no new defaults.
+
 - Add optional, patch-specific bone landmark proposals and a held-out comparison command. Results are snapshots for manual review; nothing changes in marker placement, fitting or exports by default.
 
 - Add an opt-in placement atlas to the Blender marker list: sourced definitions where available and optional reviewed reference-skull views. No change to fitting, placement or export defaults.

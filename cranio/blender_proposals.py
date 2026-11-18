@@ -70,7 +70,22 @@ def _tree(points, triangles):
     return BVHTree.FromPolygons(points.tolist(), triangles.tolist(), all_triangles=True)
 
 
-def snapshot(context):
+def bvh_precision(points):
+    return 8*np.finfo(np.float32).eps*max(1., float(np.max(np.abs(points))))
+
+
+def open_edge(point, w, tri, boundary):
+    tol = bvh_precision(w[tri])
+    for i in range(3):
+        j, k = sorted((tri[i], tri[(i+1)%3]))
+        if (j,k) in boundary:
+            edge, delta = w[k]-w[j], np.array(point)-w[j]
+            if np.linalg.norm(delta-np.clip((delta@edge)/(edge@edge),0.,1.)*edge) <= tol:
+                return True
+    return False
+
+
+def snapshot(context, *, review_inputs=False):
     scene = context.scene
     if not _api._is_mm_scene(scene):
         raise ValueError('Expected metric scene scale 0.001 (one world coordinate per mm)')
@@ -108,7 +123,7 @@ def snapshot(context):
         raise ValueError('Invalid atlas coordinates')
     _, tr, area, _ = _patch(v, t, rg[key])
     graph = context.evaluated_depsgraph_get()
-    w, f, digest, _ = blender_sources.source_geometry(obj, graph, rows[0].flip_normals)
+    w, f, digest, _, polygons = blender_sources.evaluated_geometry(obj, graph, rows[0].flip_normals)
     ids, tf, _, boundary = _patch(w, f, tg[key])
     full = _tree(w, f)
     tree = _tree(w, tf)
@@ -128,6 +143,9 @@ def snapshot(context):
                 sites[label] = v[indices[0]]
             else:
                 omitted[label] = 'incomplete existing marker; review manually'
+            continue
+        if 'gnm_bone_proposal_review' in bone:
+            omitted[label] = 'proposal-assisted placement; not an independent registration anchor'
             continue
         if (m.bone_status != 'observed' or bone is None or scene.objects.get(bone.name) != bone
                 or bone.get('gnm_bone_source_id') != rows[0].uid):
@@ -150,6 +168,15 @@ def snapshot(context):
         anchors[label] = xyz.tolist()
     if len(anchors) < 4:
         raise ValueError('Need four or more paired, noncoplanar observed anchors in this fragment')
+    binding = dict(schema='gnm.bone-proposals.v1', patch=key, atlas_source=source,
+        reference_name=ref.name, reference_geometry_sha256=_digest(v.astype('<f8'),t.astype('<i8')),
+        reference_patch_sha256=_digest(tr.astype('<i8')), reviewed_vertex_ids=vids,
+        target_name=obj.name, target_id=rows[0].uid, target_geometry_sha256=digest,
+        target_patch_sha256=_digest(tf.astype('<i8')), anchors=anchors,
+        limits_mm=dict(surface_gap=limits['gap_mm'], anchor_radius=limits['anchor_radius_mm'],
+                       similarity_anchor_residual=limits['anchor_limit_mm']))
+    if review_inputs:
+        return binding, (w, tf, tree, full, boundary, polygons[ids]), sites
     # Deterministic approximately area-stratified triangle centroids; computational budget only.
     cumulative = np.cumsum(area)
     count = min(256, len(tr))
@@ -163,24 +190,11 @@ def snapshot(context):
         if row['world_mm'] is None:
             continue
         point, _, face, _ = tree.find_nearest(row['world_mm'])
-        # Do not snap to an exposed cut edge. Epsilon here matches float BVH precision.
-        tol = 8*np.finfo(np.float32).eps*max(1., float(np.max(np.abs(w[tf[face]]))))
-        tri = tf[face]
-        for i in range(3):
-            j, k = sorted((tri[i], tri[(i+1)%3]))
-            if (j,k) not in boundary:
-                continue
-            edge, delta = w[k]-w[j], np.array(point)-w[j]
-            if np.linalg.norm(delta-np.clip((delta@edge)/(edge@edge),0.,1.)*edge) <= tol:
-                row.update(status='unsupported', world_mm=None, support_score=0., reason='on open patch boundary')
-                break
+        if open_edge(point, w, tf[face], boundary):
+            row.update(status='unsupported', world_mm=None, support_score=0., reason='on open patch boundary')
     for label, reason in omitted.items():
         result['sites'][label] = dict(status='not_assessed', reason=reason, world_mm=None, support_score=None)
-    result.update(schema='gnm.bone-proposals.v1', patch=key, atlas_source=source,
-        reference_name=ref.name, reference_geometry_sha256=_digest(v.astype('<f8'),t.astype('<i8')),
-        reference_patch_sha256=_digest(tr.astype('<i8')), reviewed_vertex_ids=vids,
-        target_name=obj.name, target_id=rows[0].uid, target_geometry_sha256=digest,
-        target_patch_sha256=_digest(tf.astype('<i8')), anchors=anchors)
+    result.update(binding)
     return result
 
 
@@ -199,6 +213,7 @@ class GNM_OT_propose_landmarks(bpy.types.Operator):
         block = bpy.data.texts.new('GNM Landmark Proposals.json')
         block.write(encoded)
         block.use_fake_user = True
+        _api._core_module('blender_proposal_review').initialize(context, result, block)
         n = sum(r['status']=='needs_review' for r in result['sites'].values())
         self.report({'INFO'}, f'{n} proposals; see Text Editor: {block.name}. No markers placed.')
         return {'FINISHED'}
@@ -214,7 +229,7 @@ def draw(layout, scene):
     for name in ('patch','gap','radius','anchor_limit'):
         box.prop(scene, 'gnm_proposal_'+name)
     box.operator('gnm.propose_landmarks')
-    box.label(text='Snapshot in Text Editor; place reviewed sites manually.')
+    _api._core_module('blender_proposal_review').draw(box, scene)
 
 
 def register(api):

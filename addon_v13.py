@@ -3792,6 +3792,7 @@ def _export_markers(scene, path):
             "plane_marker_labels": [item.label for item in _plane_markers(scene)],
             "restoration_regions": _restoration_records(scene),
             "target_construction": "bone plus operator-reviewed depth/direction; local normal is initial heuristic"}
+    meta.update(_core_module('blender_proposal_review').export_receipts(scene))
     meta.update(_core_module('blender_tissue').scene_age_metadata(scene))
     articulation = _core_module('blender_articulation').snapshot(scene)
     if articulation is not None:
@@ -4057,6 +4058,7 @@ def register():
     _core_module('blender_rules').register(sys.modules[__name__])
     _core_module('blender_atlas').register()
     _core_module('blender_proposals').register(sys.modules[__name__])
+    _core_module('blender_proposal_review').register()
     _core_module('blender_record').register(sys.modules[__name__])
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
@@ -4069,6 +4071,7 @@ def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
     _core_module('blender_record').unregister()
+    _core_module('blender_proposal_review').unregister()
     _core_module('blender_proposals').unregister()
     _core_module('blender_atlas').unregister()
     _core_module('blender_rules').unregister()
