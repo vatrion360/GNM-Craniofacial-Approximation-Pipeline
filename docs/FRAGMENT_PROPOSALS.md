@@ -1,4 +1,4 @@
-# Propose bone landmarks on one observed fragment (B2.2)
+# Propose bone landmarks on one observed fragment (B2.2–B2.3)
 
 Use this optional Blender tool when you have a reviewed bone atlas, homologous
 preserved anatomy and existing observed anchors. It proposes additional **bone**
@@ -29,13 +29,45 @@ There is no bundled atlas, automatic placement, fit update or export gate.
    for correspondences and snapping, maximum distance to a local anchor,
    and maximum similarity residual at any anchor. No preset values have been
    validated. Click **Propose Landmarks (Review Only)**.
-5. Open the new **GNM Landmark Proposals.json** text in Blender's Text Editor
-   (numbered on subsequent runs). Each `needs_review` row contains a candidate
-   in the case world-mm frame. Inspect it against the observed bone; place it
-   manually only if justified. Other rows give reasons with null coordinates.
-   The text is a historical snapshot, not a live overlay. Re-run after editing
-   sources, anchors or patch membership. Failures do not create or update a
-   snapshot; older ones remain. Treat saved text as case data.
+5. Review the queue below the button. It lists only supported candidates,
+   in ascending order of geometric support (ties by label). The complete
+   snapshot, including reasons for withheld sites, is in the Blender Text Editor
+   as **GNM Landmark Proposals.json**. Nothing is placed when you generate the
+   queue or select a row.
+
+### Review one candidate
+
+- **Show at 3D Cursor** moves only the scene cursor to the proposed world
+  position. Inspect it from multiple angles against the actual fragment.
+- **Confirm Proposed Site** creates this one marker using ordinary manual
+  placement, including its normal, depth, manual-fit settings and normal
+  warnings. It does not mark the skin correspondence as reviewed.
+- **Confirm Adjusted Cursor Site** uses the current 3D cursor instead. Move
+  the cursor onto the intended intact surface first (for example with the
+  Cursor tool's surface projection). It snaps to the selected patch only
+  within the configured surface gap. Another closest surface or an open cut
+  edge prevents placement. An adjusted point is an operator decision; the
+  geometric score refers only to the original proposal.
+- **Reject Without Placement** records the decision in this queue and moves
+  to the next pending row. Confirmation also advances the selection. There
+  is no bulk accept. Use Blender Undo to reverse the most recent review action.
+
+Keep the original target active and the original reference selected. Inspect
+and confirm recheck the snapshot, anchors, geometry, patch and limits, including
+articulation review. A stale snapshot needs a new run. Existing placements are
+never overwritten. Proposal-assisted placements cannot become independent
+anchors in another registration. The queue belongs to the scene and can be
+saved in the blend file. Generating a new snapshot replaces its active review
+list, including rejection states. Previous snapshot texts remain available.
+
+The normal v3 marker CSV has the same columns and uses the same exporter as
+manual placement. If any current marker came from the queue, its optional
+`proposal_reviews_at_placement` metadata records snapshot hash, case, source,
+patch, original and accepted world positions, observer (if set), and decision.
+The current bone position is also exported so later movement is visible.
+Re-placing a marker manually creates a new placement. Keep the blend file or
+the original snapshot alongside the CSV if the full proposal evidence is needed.
+Treat saved text as case data.
 
 ## Registration and interpretation
 
