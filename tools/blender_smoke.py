@@ -32,6 +32,7 @@ from blender_profile_checks import run_profile_options, run_profile_external
 from blender_prior_audit_checks import run_prior_audit_checks
 from blender_record_checks import run_record_checks
 from blender_capture_checks import run_capture_checks
+from blender_finalize_checks import run_finalize_checks
 from blender_spline_checks import run_spline_checks, run_preparation_checks
 from blender_performance_checks import run_performance_checks
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
@@ -291,6 +292,8 @@ with tempfile.TemporaryDirectory() as directory:
         run_depth_undo_checks(addon)
         run_tissue_undo_checks(addon)
         run_direction_checks(addon)
+        if os.environ.get('GNM_MODEL_PATH') and os.environ.get('GNM_EXTERNAL_PYTHON'):
+            run_finalize_checks(addon, directory)
     finally:
         addon.unregister()
     assert not bpy.app.timers.is_registered(addon._offline_poll)

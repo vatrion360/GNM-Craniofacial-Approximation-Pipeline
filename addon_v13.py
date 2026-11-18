@@ -3230,6 +3230,25 @@ class GNM_OT_load_live_model(Operator):
         return {"FINISHED"}
 
 
+class GNM_OT_finalize_local(Operator):
+    """Explicit case-bound refit, NumPy local correction and independent neutral copy."""
+    bl_idname = 'gnm.finalize_local'
+    bl_label = 'Finalize Local Fit (New Mesh)'
+    bl_description = 'Refit current markers and live settings, apply bounded correction, and retain an independent world-mm mesh'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        try:
+            obj, record = _core_module('blender_finalize').create(context, sys.modules[__name__])
+        except (OSError, TypeError, ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        status = record['geometry_quality']['status']
+        self.report({'WARNING'} if status == 'needs_review' else {'INFO'},
+                    f'{obj.name}: {status}; full contact and bone clearance not assessed')
+        return {'FINISHED'}
+
+
 class GNM_OT_toggle_live(Operator):
     """Toggle serialized main-thread preview; use external fitting for long jobs."""
     bl_idname = "gnm.toggle_live"
@@ -3648,6 +3667,8 @@ def _draw_live_section(layout, context):
         f"Fit: {st.n_fitted}/{len(scene.gnm_markers)} markers  |  "
         f"RMS {st.rms_mm:.2f} mm  |  {st.last_fit_ms:.0f} ms"))
 
+    box.operator('gnm.finalize_local', icon='MESH_DATA')
+
     pr = box.box()
     pr.label(text="Demographic prior (optional):")
     rowp = pr.row(align=True)
@@ -4008,7 +4029,7 @@ _classes = (
     GNM_OT_select_depth_markers, GNM_OT_adjust_marker_depths,
     # V13:
     GNMLiveSettings, GNM_OT_setup_dual_viewports, GNM_OT_toggle_skull_overlay,
-    GNM_OT_load_live_model, GNM_OT_toggle_live, GNM_OT_delete_marker,
+    GNM_OT_load_live_model, GNM_OT_toggle_live, GNM_OT_finalize_local, GNM_OT_delete_marker,
     GNM_OT_pick_gnm_vertex, GNM_OT_clear_gnm_override,
     GNM_OT_export_landmark_json,
     # V13.2:

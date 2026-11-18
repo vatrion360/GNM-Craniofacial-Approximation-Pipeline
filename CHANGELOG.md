@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add **Finalize Local Fit (New Mesh)** in Blender: fresh marker-constrained fit, optional prepared bone constraints, bounded NumPy correction, independent neutral mesh, provenance, basic stored-mesh QC and Undo. No live or offline default changes.
+
 - Share local-correction centre selection, confidence-scaled vectors, caps and protection through a NumPy-only preparation API used by the opt-in offline stage. Record selected/rejected rows and preserve frozen statistical inputs for repeatable application. Keep SciPy/default behavior; fix fractional scalp-cap truncation for Python callers supplying an integer face cap. Add legacy-output, malformed-input and installed-Blender regressions. Finalize scene/UI integration remains pending.
 
 - Add an opt-in NumPy local spline backend matching the existing 3-D `-r` kernel, affine tail and zero smoothing. Share cap/damping arithmetic with the unchanged default SciPy path; reject unresolved numerical systems without fallback. Add parity/degeneracy tests, an official-mesh benchmark and installed-Blender oracle comparison. This is the numerical foundation for B1, not a Finalize operator or a default change.
