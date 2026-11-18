@@ -572,8 +572,7 @@ See [metric definitions, output files and limits](docs/POSTFIT_CONSISTENCY.md).
 `bounded_tps_correction(..., backend="numpy")` now offers the same existing
 3-D `-r`/affine, zero-smoothing formulation without SciPy in the numerical call.
 Caps and protected-region damping are shared with the SciPy branch. This is the
-foundation for Blender finalization; it does not add a Finalize button or change
-the offline/live defaults. See [API, limits and benchmark](docs/NUMPY_LOCAL_SPLINE.md).
+numerical basis for Blender finalization; offline/live defaults are unchanged. See [API, limits and benchmark](docs/NUMPY_LOCAL_SPLINE.md).
 
 | Numerical API option | Default | Effect |
 |---|---|---|
@@ -597,6 +596,12 @@ fixtures. See [API, replay record and limits](docs/LOCAL_CORRECTION_PREPARATION.
 | `plan.apply(backend=...)` | `scipy` | Explicit `numpy` for Blender-compatible numerical application; repeated calls start from the captured mesh |
 | `plan.record()` | Explicit call | Detached selection/protection audit, not QC or anatomical validation |
 
-This increment does not add a Finalize button. Installed-Blender tests exercise
-the shared preparation and NumPy solver; scene freshness, reversible application
-and the Finalize workflow remain the next integration step.
+In Blender use **GNM Live Reconstruction → Finalize Local Fit (New Mesh)** to
+refit the current markers and create a bounded neutral surface. It requires the
+loaded model, world-mm scene and at least four included markers. Dense mode
+checks the prepared sources. Undo is supported; the source mesh remains intact.
+See [operation, provenance and QC limits](docs/BLENDER_LOCAL_FINALIZE.md).
+
+| Blender control | Default | Effect |
+|---|---|---|
+| Finalize Local Fit (New Mesh) | Explicit click | Current live settings, NumPy correction, independent neutral mesh and basic QC |
