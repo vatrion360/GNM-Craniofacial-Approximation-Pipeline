@@ -27,6 +27,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Explicit saved-report checks and configured criteria](docs/CHECK_POLICY.md)
 - [Saved-fit consistency diagnostics and triangle quality](docs/POSTFIT_CONSISTENCY.md)
 - [NumPy local spline backend and parity evidence](docs/NUMPY_LOCAL_SPLINE.md)
+- [Shared local-correction preparation and selection audit](docs/LOCAL_CORRECTION_PREPARATION.md)
 - [Operator-declared validation domain and explicit case comparison](docs/VALIDITY_DOMAIN.md)
 - [Numerical corrections, geometry QC and frozen CT protocol](docs/SCIENTIFIC_HARDENING.md)
 - [Reviewed tissue measurement directions](docs/TISSUE_DIRECTIONS.md)
@@ -578,3 +579,24 @@ the offline/live defaults. See [API, limits and benchmark](docs/NUMPY_LOCAL_SPLI
 |---|---|---|
 | `bounded_tps_correction(..., backend=...)` | `scipy` | Explicit `numpy`; no automatic fallback or smoothing |
 | `LinearPolyharmonic3D(...)(points, chunk_size=...)` | 2048 | Bounded evaluation batches; all centres retained |
+
+## Shared local-correction preparation (B1.2)
+
+The existing opt-in `--local-correction` stage now uses
+`cranio.local_correction.prepare_local_correction` for ordered marker/dense
+centres, confidence-scaled residuals, regional caps and protection indices.
+The saved JSON records exact centre selection and the existing 3 mm exclusion
+heuristic. Missing regions are not filled. Numerical preparation is NumPy-only;
+the offline default remains SciPy, with identical outputs in the regression
+fixtures. See [API, replay record and limits](docs/LOCAL_CORRECTION_PREPARATION.md).
+
+| API / existing control | Default | Effect |
+|---|---|---|
+| `--local-correction` | Off | Existing stage; now uses shared preparation and records selected rows |
+| `prepare_local_correction(...)` | Explicit numerical call | Detached statistical mesh, centres, vectors and caps; caller supplies reviewed inputs |
+| `plan.apply(backend=...)` | `scipy` | Explicit `numpy` for Blender-compatible numerical application; repeated calls start from the captured mesh |
+| `plan.record()` | Explicit call | Detached selection/protection audit, not QC or anatomical validation |
+
+This increment does not add a Finalize button. Installed-Blender tests exercise
+the shared preparation and NumPy solver; scene freshness, reversible application
+and the Finalize workflow remain the next integration step.

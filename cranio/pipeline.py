@@ -29,7 +29,8 @@ from .geometry import (build_face_dense_regions, build_protected_mask,
 from .io_csv import read_marker_csv
 from .landmarks import (CONSISTENCY_PAIRS, PLACEMENT_HINTS,
                         REGION_OFFSETS_MM)
-from .optimize import (LossConfig, bounded_tps_correction, fit_identity,
+from .local_correction import prepare_local_correction
+from .optimize import (LossConfig, fit_identity,
                        robust_alignment, stability_warnings)
 from .report import write_stats
 from .report import write_run_json
@@ -494,7 +495,6 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     # --- Mesh-ul in spatiul world (mm, Blender) ----------------------------
     v_model = model.generate(c)
     v_world = scale * (v_model @ rot.T) + trans
-    lm_world = v_world[lm_idx]
 
     # --- Etapa 3: corectie locala limitata --------------------------------
     dense_report = None
@@ -522,8 +522,6 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     # model, deci cap-urile functioneaza si fara --skull.
     scalp_caps = (scalp_idx if cfg.skull else
                   build_scalp_mask(mu, vertex_groups, vertex_group_names))
-    cap_vertex = np.full(len(mu), cfg.face_cap_mm)
-    cap_vertex[scalp_caps] = cfg.max_correction_mm
     protected_idx = build_protected_mask(vertex_groups, vertex_group_names)
 
     if cfg.skip_tps:
@@ -532,56 +530,29 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         clamped = np.zeros(len(targets))
         n_scalp_centres = n_face_centres = 0
     else:
-        centers = [lm_world]
-        # Reziduurile markerilor se scaleaza cu increderea: un marker
-        # imprecis (ex. Supraorbitale 0.5) devine constrangere PARTIALA,
-        # nu trage mesh-ul pana la tinta lui (posibil gresita).
-        res_vecs = [(targets_xyz - lm_world) * confidence_weights[:, None]]
-        n_scalp_centres = n_face_centres = 0
+        dense_inputs = {}
         if dense is not None and not cfg.no_dense_tps:
-            from scipy.spatial import cKDTree
-            sidx, dt_w, keep, _ = dense_correspondences(v_world, dense)
-            kept_regions = np.asarray(dense['last_diagnostics']['regions'])
-            if keep.sum() > 0:
-                # Deduplicare: centrele dense aflate aproape de un marker
-                # (ex. Vertex/Eurion sunt in masca de scalp) ar face matricea
-                # TPS aproape singulara (valori usor conflictuale -> camp
-                # oscilant). Markerii au prioritate, centrele se filtreaza.
-                d_to_lm, _ = cKDTree(lm_world).query(v_world[sidx])
-                far = d_to_lm > 3.0
-                sidx, dt_w = sidx[far], dt_w[far]
-                kept_regions = kept_regions[far]
-            rng = np.random.default_rng(cfg.seed)
-            # Centre scalp si faciale, sub-esantionate separat.
-            scalp_id = 'scalp'
-            for is_scalp, cap_n in ((True, cfg.tps_scalp_centres),
-                                    (False, cfg.tps_face_centres)):
-                sel_mask = (kept_regions == scalp_id) if is_scalp else (
-                    kept_regions != scalp_id)
-                cand = np.where(sel_mask)[0]
-                if len(cand) == 0:
-                    continue
-                n_sub = min(cap_n, len(cand))
-                # Indici sortati => perechile (vertex, tinta) raman aliniate.
-                sel = np.sort(rng.choice(cand, size=n_sub, replace=False))
-                centers.append(v_world[sidx[sel]])
-                res_vecs.append(dt_w[sel] - v_world[sidx[sel]])
-                if is_scalp:
-                    n_scalp_centres = len(sel)
-                else:
-                    n_face_centres = len(sel)
-        centers = np.vstack(centers)
-        res_vecs = np.vstack(res_vecs)
-
+            sidx, dt_w, _, _ = dense_correspondences(v_world, dense)
+            dense_inputs = dict(dense_indices=sidx, dense_targets=dt_w,
+                                dense_regions=dense['last_diagnostics']['regions'])
+        prepared = prepare_local_correction(
+            v_world, lm_idx, targets_xyz, confidence_weights,
+            scalp_indices=scalp_caps, protected_indices=protected_idx,
+            face_cap_mm=cfg.face_cap_mm, scalp_cap_mm=cfg.max_correction_mm,
+            protect_damping=cfg.protect_damping, seed=cfg.seed,
+            scalp_centres=cfg.tps_scalp_centres, face_centres=cfg.tps_face_centres,
+            **dense_inputs)
+        centers, res_vecs = prepared.centers, prepared.vectors
+        preparation_record = prepared.record()
+        n_scalp_centres = preparation_record['counts']['scalp']
+        n_face_centres = preparation_record['counts']['face']
+        _csv_meta['local_correction_preparation'] = preparation_record
         logger.info(f"[3] Local TPS correction (face cap {cfg.face_cap_mm:g} mm / "
               f"scalp {cfg.max_correction_mm:g} mm, "
               f"protected-zone damping x{cfg.protect_damping:g}, "
               f"{len(targets)} markers + {n_scalp_centres} scalp + "
               f"{n_face_centres} face)...")
-        v_final, field, clamped = bounded_tps_correction(
-            v_world, centers, res_vecs, cap_vertex,
-            protected_idx=protected_idx,
-            protect_damping=cfg.protect_damping)
+        v_final, field, clamped = prepared.apply()  # existing SciPy default
         mean_corr = float(np.linalg.norm(field, axis=1).mean())
         max_corr = float(np.linalg.norm(field, axis=1).max())
         logger.info(f"    correction: mean {mean_corr:.2f} mm, max {max_corr:.2f} mm")

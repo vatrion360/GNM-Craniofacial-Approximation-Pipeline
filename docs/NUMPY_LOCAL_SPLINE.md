@@ -3,7 +3,8 @@
 The shared numerical API now offers a NumPy-only implementation of the existing
 3-D local displacement spline. This prepares B1 finalization inside Blender;
 **this increment does not add a Finalize button or change live/offline defaults**.
-The offline pipeline still calls the default SciPy backend. SciPy remains an
+The offline pipeline still calls the default SciPy backend, now through
+[shared preparation](LOCAL_CORRECTION_PREPARATION.md). SciPy remains an
 offline dependency. No centres, targets, caps, weights or mesh topology change.
 
 ## Explicit numerical API
@@ -111,6 +112,6 @@ details, model and implementation hashes. It uses one sequential run per backend
 without warm-up; timings are descriptive, not a performance guarantee. The shared
 Linux runtime does not expose a CPU model through `platform.processor()`.
 
-This is the numerical foundation of B1. Shared centre assembly, a reversible
-Blender Finalize operator, result provenance and its end-to-end QC remain the
-next increment. CT evaluation remains manual. See [task evidence](TASK_B1_1.md).
+This is the numerical foundation of B1. [B1.2](LOCAL_CORRECTION_PREPARATION.md)
+adds shared centre assembly and a selection audit. A reversible Blender Finalize
+operator, scene-bound result provenance and its end-to-end QC remain pending. CT evaluation remains manual. See [task evidence](TASK_B1_1.md).
