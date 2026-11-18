@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add an opt-in placement atlas to the Blender marker list: sourced definitions where available and optional reviewed reference-skull views. No change to fitting, placement or export defaults.
+
 - Add **Finalize Local Fit (New Mesh)** in Blender: fresh marker-constrained fit, optional prepared bone constraints, bounded NumPy correction, independent neutral mesh, provenance, basic stored-mesh QC and Undo. No live or offline default changes.
 
 - Share local-correction centre selection, confidence-scaled vectors, caps and protection through a NumPy-only preparation API used by the opt-in offline stage. Record selected/rejected rows and preserve frozen statistical inputs for repeatable application. Keep SciPy/default behavior; fix fractional scalp-cap truncation for Python callers supplying an integer face cap. Add legacy-output, malformed-input and installed-Blender regressions. Finalize scene/UI integration remains pending.

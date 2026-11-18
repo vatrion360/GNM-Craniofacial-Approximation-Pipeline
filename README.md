@@ -14,6 +14,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Marker v3 specification and migration](docs/MARKERS.md)
 - [PDF Table 2, 48-marker set and correspondence changes](docs/PDF_PROTOCOL.md)
 - [Scientific rationale and primary references](docs/SCIENCE.md)
+- [Placement atlas: definitions and optional reviewed reference skull](docs/PLACEMENT_ATLAS.md)
 - [Perpendicular marker placement and local normals](docs/MARKER_NORMALS.md)
 - [Table 3 cranial measurements and reviewed skin-distance controls](docs/CRANIOMETRY.md)
 - [Optional extended bone references and definition review](docs/EXTENDED_BONE_REFERENCES.md)
@@ -90,6 +91,15 @@ Install `dist/gnm_cranio-5.0.0rc10.zip` through Blender's **Install from Disk** 
 Select the local model, import the skull with explicit source units, place/review markers, and export v3 CSV. For **Run Offline Fit and Import**, select the external Python executable from the environment above and a case output folder. The add-on runs the CLI in a separate process, records a log, then imports the completed world-mm OBJ. Each run gets a new case subfolder. The default button uses marker-only statistical fitting with lambda based on the actual included marker count; explicit dense and local-correction switches are available in the panel and CLI. Register all preserved bone sources, review their normals and confirm mandibular articulation before including mandibular constraints.
 
 Use **Extended 48**, **Paper 32** or **Legacy 27**, then **Add Missing Markers**. Existing placements, tissue values and manual picks are retained. The paper's normal-female reference can be applied explicitly with **Apply Table 2 Tissue Depths**; review applicability before case use. Sites marked **Include in fit = off** remain documented but do not affect pose or identity fitting. The default Pogonion candidate is corrected from lower-lip vertex 12284 to chin candidate 12261; review previous cases.
+
+| Placement atlas control | Default | Effect |
+|---|---|---|
+| Placement atlas for selected marker | Off | Show definition, source, side and documented placement caveats for the selected list row |
+| Reference skull | None | Optional annotated mesh from a separate scene; text remains available without it |
+| Refresh Reference View | Explicit click | Show a local-axis snapshot of the reference; mark a reviewed site only if visible |
+
+See [how to prepare reference annotations](docs/PLACEMENT_ATLAS.md). Viewing a
+reference never places a marker in the case or changes its fit weight or review status.
 
 The craniometry panel also offers **Add Extended Bone References (+12)**:
 34 bone positions instead of the standard 22, while the 48 tissue markers and
