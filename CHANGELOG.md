@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add four optional guided skull scenarios in Blender. Preview marker exclusions and case-specific weights, share them with the v3 CSV, and enforce required checks in the existing A5 scientific bundle. No new calibrated weights or default fit changes.
+
 - Add independent A/B manual bone picks in Blender and a same-case repeat-distance report. A2 can explicitly consume the paired evidence with a justified isotropic sensitivity model. No fit or uncertainty defaults changed.
 
 - Add per-site review of fragment proposals in Blender. Confirm or adjust a site on the observed patch using the normal manual placement path, or reject it without placement. Keep optional placement receipts in v3 CSV metadata; no new defaults.

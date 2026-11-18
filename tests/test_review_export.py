@@ -266,6 +266,19 @@ def test_scientific_export_when_explicit_criteria_met(case, tmp_path):
     assert result['label'] == 'SCIENTIFIC EXPORT — NOT VALIDATED'
     assert result['scientific_export_authorization'] == 'not_assessed'
 
+    # The identical A5-green case now declares an absent mandible while a
+    # fitted mandibular point is still present. B3 must hold the actual OBJ.
+    from cranio.scenarios import configure
+    meta = report['marker_metadata']
+    meta['case_id'] = 'synthetic'
+    meta['guided_scenario'] = configure('no_mandible','synthetic','Synthetic gate test')
+    Path(cfg.output_json).write_bytes(canonical_bytes(report))
+    blocked = tmp_path/'scenario-held'
+    decision = read(export_bundle(cfg.output_json,blocked,mode='scientific',check_policy_path=policy_path))
+    assert decision['status']=='blocked' and not (blocked/'face.obj').exists()
+    checks = read(blocked/'record'/'approximation_record.json')['assessments']['check_policy']['checks']
+    assert any(c['id']=='scenario:marker_evidence' and c['status']=='block' for c in checks)
+
 
 def test_moved_artifact_paths_support_windows_reports(case, tmp_path):
     import shutil

@@ -35,6 +35,7 @@ from blender_capture_checks import run_capture_checks
 from blender_proposal_checks import run_proposal_checks
 from blender_queue_checks import run_queue_checks
 from blender_repeatability_checks import run_repeatability_checks
+from blender_scenario_checks import run_scenario_checks
 from blender_atlas_checks import run_atlas_checks
 from blender_finalize_checks import run_finalize_checks
 from blender_spline_checks import run_spline_checks, run_preparation_checks
@@ -300,6 +301,7 @@ with tempfile.TemporaryDirectory() as directory:
         run_proposal_checks(addon)
         run_queue_checks(addon)
         run_repeatability_checks(addon)
+        run_scenario_checks(addon)
         if os.environ.get('GNM_MODEL_PATH') and os.environ.get('GNM_EXTERNAL_PYTHON'):
             run_finalize_checks(addon, directory)
     finally:

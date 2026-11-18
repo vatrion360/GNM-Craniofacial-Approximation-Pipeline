@@ -106,3 +106,5 @@ anatomical inference, calibrated midsagittal confidence, or live-scene checks.
 
 Software tests use synthetic values explicitly labelled as such; no CT results
 are shipped or inferred. See [task evidence](TASK_A5_1.md).
+
+For a report containing an explicitly applied [guided skull scenario](GUIDED_SCENARIOS.md), A5 also checks its marker evidence and required findings. Reports without a guide retain their existing checks.

@@ -249,6 +249,9 @@ def assess(report, policy, override_reason=None):
     for kind in ('bone_range', 'marker_count', 'midline_rms'):
         if not policy['reviewed'] or not any(r['kind'] == kind for r in policy['rules']):
             checks.append(_row('builtin:missing_'+kind, 'not_assessed', kind+' criteria not configured'))
+    if 'guided_scenario' in report['marker_metadata']:
+        from .scenarios import assessment
+        checks.extend(assessment(report,checks))
     states = {row['status'] for row in checks}
     status = next(s for s in ('block', 'not_assessed', 'warn', 'pass') if s in states)
     held = status in ('block', 'not_assessed')
