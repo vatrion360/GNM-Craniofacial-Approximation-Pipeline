@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "interpretation": "Software benchmark on a model mesh with synthetic displacements; not anatomical validation",
+  "model_sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de",
+  "seed": 3101,
+  "centres": 700,
+  "vertices": 17821,
+  "synthetic_displacement_sd_mm": 3.0,
+  "synthetic_uniform_cap_mm": 8.0,
+  "protection_group": "eyes",
+  "damping": 0.25,
+  "bounded_solve_and_evaluate_seconds": {
+    "scipy": 0.23659269199970367,
+    "numpy": 1.2937386200001129
+  },
+  "max_raw_field_difference_mm": 4.637409905175881e-11,
+  "max_bounded_vertex_difference_mm": 4.552379657899578e-11,
+  "engineering_tolerance_mm": 1e-06,
+  "numpy_solver": {
+    "backend": "numpy",
+    "kernel": "linear (-r)",
+    "degree": 1,
+    "smoothing": 0.0,
+    "centre_count": 700,
+    "system_size": 704,
+    "numerical_rank": 704,
+    "coordinate_origin_mm": [
+      4.868392545705678,
+      254.60202402387347,
+      64.6657697128398
+    ],
+    "coordinate_scale_mm": 187.36024851117816,
+    "condition_number": 1081677.9323754886,
+    "rank_tolerance": 7.64483215519492e-11,
+    "relative_backward_error": 5.199061258048371e-18,
+    "backward_error_limit": 1.000444171950221e-11,
+    "interpretation": "Numerical solvability only; not anatomical accuracy or uncertainty"
+  },
+  "runtime": {
+    "python": "3.12.14",
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "system": "Linux",
+    "release": "6.18.57",
+    "machine": "x86_64",
+    "processor": ""
+  },
+  "numerical_environment": {
+    "numpy_build": "Build Dependencies:\n  blas:\n    detection method: pkgconfig\n    found: true\n    include directory: /opt/_internal/cpython-3.12.12/lib/python3.12/site-packages/scipy_openblas64/include\n    lib directory: /opt/_internal/cpython-3.12.12/lib/python3.12/site-packages/scipy_openblas64/lib\n    name: scipy-openblas\n    openblas configuration: OpenBLAS 0.3.30  USE64BITINT DYNAMIC_ARCH NO_AFFINITY\n      Haswell MAX_THREADS=64\n    pc file directory: /project/.openblas\n    version: 0.3.30\n  lapack:\n    detection method: pkgconfig\n    found: true\n    include directory: /opt/_internal/cpython-3.12.12/lib/python3.12/site-packages/scipy_openblas64/include\n    lib directory: /opt/_internal/cpython-3.12.12/lib/python3.12/site-packages/scipy_openblas64/lib\n    name: scipy-openblas\n    openblas configuration: OpenBLAS 0.3.30  USE64BITINT DYNAMIC_ARCH NO_AFFINITY\n      Haswell MAX_THREADS=64\n    pc file directory: /project/.openblas\n    version: 0.3.30\nCompilers:\n  c:\n    commands: cc\n    linker: ld.bfd\n    name: gcc\n    version: 14.2.1\n  c++:\n    commands: c++\n    linker: ld.bfd\n    name: gcc\n    version: 14.2.1\n  cython:\n    commands: cython\n    linker: cython\n    name: cython\n    version: 3.2.1\nMachine Information:\n  build:\n    cpu: x86_64\n    endian: little\n    family: x86_64\n    system: linux\n  host:\n    cpu: x86_64\n    endian: little\n    family: x86_64\n    system: linux\nPython Information:\n  path: /tmp/build-env-aw1mwcap/bin/python\n  version: '3.12'\nSIMD Extensions:\n  baseline:\n  - SSE\n  - SSE2\n  - SSE3\n  found:\n  - SSSE3\n  - SSE41\n  - POPCNT\n  - SSE42\n  - AVX\n  - F16C\n  - FMA3\n  - AVX2\n  not found:\n  - AVX512F\n  - AVX512CD\n  - AVX512_KNL\n  - AVX512_KNM\n  - AVX512_SKX\n  - AVX512_CLX\n  - AVX512_CNL\n  - AVX512_ICL\n  - AVX512_SPR\n\n",
+    "thread_environment": {
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": null,
+      "MKL_NUM_THREADS": null,
+      "BLIS_NUM_THREADS": null
+    }
+  },
+  "implementation_sha256": {
+    "cranio/tps.py": "08c3080aa551bbfc93fcbd0e25ee101cc45e043a5243d94caf53b6f278a3c94a",
+    "cranio/optimize.py": "2bac0a477ec9a352e3a34015120d1c6650404910505adaa657d4010606214ad7",
+    "tools/benchmark_local_spline.py": "59c376b7443f0091a2fc1f939a8d004a67655d7966b80d1d376c745e2ce49a6e"
+  },
+  "timing_note": "One sequential run per backend; no warm-up or speed guarantee. CPU/BLAS and thread counts affect timing."
+}

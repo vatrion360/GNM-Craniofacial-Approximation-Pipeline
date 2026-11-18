@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add an opt-in NumPy local spline backend matching the existing 3-D `-r` kernel, affine tail and zero smoothing. Share cap/damping arithmetic with the unchanged default SciPy path; reject unresolved numerical systems without fallback. Add parity/degeneracy tests, an official-mesh benchmark and installed-Blender oracle comparison. This is the numerical foundation for B1, not a Finalize operator or a default change.
+
 - Add opt-in saved-fit consistency diagnostics in CLI and Blender: recorded QC/contact summaries, sampled local-clearance statistics and new minimum triangle angles on serialized statistical/final meshes. Keep missing anatomical checks unassessed, preserve legacy tolerances, verify source/output hashes, and retain the original meshes and export gates.
 
 - Add explicit reviewed saved-fit captures: frontal, three-quarter and right-profile orthographic PNGs with metric bars, mode/override labels and a hashed manifest. Use an isolated CPU Blender process, preserve the working scene and saved bundle, refuse stale/missing references. No fit/default changes or final-mesh uncertainty claim.

@@ -12,8 +12,8 @@ Etape (TODO.md, Faza 7):
          * distante inter-landmark (prior morfologic) - distance_weight > 0;
          * prior latent MOALE peste +-prior_soft_sigma (in locul singurului
            clip dur)                              - prior_soft_sigma > 0.
-    3. Corectie locala limitata: camp de deplasare reziduala interpolat cu
-       Thin Plate Spline (Bookstein 1989), limitat neted per-vertex.
+    3. Corectie locala limitata: spline poliharmonic 3D (-r, termen afin),
+       limitat neted per-vertex; numele TPS este pastrat pentru compatibilitate.
 
 Regularizarea lambda este aleasa prin cross-validation leave-one-out (LOO)
 daca lam == "auto".
@@ -505,7 +505,7 @@ def fit_identity(mu, basis, lm_idx, targets_xyz, weights, lam="auto",
 # ETAPA 3: CORECTIE LOCALA LIMITATA (TPS + LIMITARE NETEDA)
 # ---------------------------------------------------------------------------
 def bounded_tps_correction(vertices_world, centers, residuals_vec, cap_vertex,
-                           protected_idx=None, protect_damping=1.0):
+                           protected_idx=None, protect_damping=1.0, *, backend='scipy'):
     """Interpoleaza campul de deplasare reziduala cu TPS, limitat per-vertex.
 
     residuals_vec: (C, 3) vectori tinta - pozitie_fit (in spatiul world),
@@ -524,9 +524,15 @@ def bounded_tps_correction(vertices_world, centers, residuals_vec, cap_vertex,
     Vertecsii din ``protected_idx`` (ochi/interior gura/buze - fara ancore
     anatomice) isi vad deplasarea multiplicata cu ``protect_damping``
     (urmeaza aproape doar fitul global neted).
+
+    backend='numpy' explicitly selects the NumPy-only solver. The default SciPy
+    interpolation and the shared cap/damping arithmetic remain unchanged.
     """
-    from scipy.interpolate import RBFInterpolator
+    if backend not in ('scipy', 'numpy'):
+        raise ValueError('Local correction backend must be scipy or numpy')
     vertices_world = finite_array(vertices_world, "mesh vertices")
+    if vertices_world.ndim != 2 or vertices_world.shape[1] != 3 or not len(vertices_world):
+        raise ValueError('Mesh vertices must be a nonempty N by 3 array')
     centers = validate_points(centers, "local correction centres", minimum=4, rank=3)
     residuals_vec = finite_array(residuals_vec, "local displacements", centers.shape)
     cap_vertex = finite_array(cap_vertex, "correction caps", (len(vertices_world),))
@@ -534,13 +540,24 @@ def bounded_tps_correction(vertices_world, centers, residuals_vec, cap_vertex,
         raise ValueError("Correction caps must be positive and damping must be in [0, 1]")
     if len(np.unique(centers, axis=0)) != len(centers):
         raise ValueError("Duplicate local correction centres; review marker correspondences")
+    if protected_idx is not None:
+        protected_idx = np.asarray(protected_idx)
+        if (protected_idx.ndim != 1 or (protected_idx.size and protected_idx.dtype.kind not in 'iu')
+                or np.any(protected_idx < 0) or np.any(protected_idx >= len(vertices_world))
+                or len(np.unique(protected_idx)) != len(protected_idx)):
+            raise ValueError('Protected vertices require distinct valid integer indices')
     # 3-D biharmonic/polyharmonic kernel (-r in SciPy), with affine tail.
     # r^2 log(r) is the classical 2-D TPS kernel, not the 3-D bending kernel.
-    origin = centers.mean(axis=0)
-    rbf = RBFInterpolator(centers - origin, residuals_vec,
-                          kernel="linear", degree=1, smoothing=0.0)
-    field = np.vstack([rbf(vertices_world[i:i + 2048] - origin)
-                       for i in range(0, len(vertices_world), 2048)])
+    if backend == 'numpy':
+        from .tps import LinearPolyharmonic3D
+        field = LinearPolyharmonic3D(centers, residuals_vec)(vertices_world)
+    else:
+        from scipy.interpolate import RBFInterpolator
+        origin = centers.mean(axis=0)
+        rbf = RBFInterpolator(centers - origin, residuals_vec,
+                              kernel="linear", degree=1, smoothing=0.0)
+        field = np.vstack([rbf(vertices_world[i:i + 2048] - origin)
+                           for i in range(0, len(vertices_world), 2048)])
     finite_array(field, "interpolated correction")
 
     field_mags = np.linalg.norm(field, axis=1)
