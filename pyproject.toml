@@ -24,7 +24,7 @@ packages = ["cranio", "cranio.backend", "cranio.rules"]
 py-modules = ["gnm_reconstruct"]
 
 [tool.setuptools.package-data]
-cranio = ["data/tissue/*.json"]
+cranio = ["data/scenarios.json", "data/tissue/*.json"]
 "cranio.rules" = ["*.json"]
 
 [tool.pytest.ini_options]

@@ -17,7 +17,7 @@ def _markers(scene, addon, sources):
     patches = {}
     records = []
     for item in scene.gnm_markers:
-        included = item.is_placed and item.use_for_fit
+        included = item.is_placed and addon._marker_terms(scene,item)[0]
         vertex = addon._resolve_vertex(item)
         row = dict(label=item.label, included=bool(included), vertex=vertex,
                    placed=bool(item.is_placed), mapping_reviewed=bool(item.mapping_reviewed),
@@ -135,4 +135,5 @@ def create(context, addon):
         mandible_pose=addon._core_module('blender_articulation').snapshot(scene),
         dense_enabled=bool(snap['dense']), dense_scalp_only=bool(st.dense_scalp_only),
         bone_sampling_seed=live.skull['seed'] if dense is not None else None)
+    record.update(addon._core_module('blender_scenarios').metadata(scene))
     return _publish(context, source, vertices, record), record

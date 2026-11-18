@@ -1,0 +1,29 @@
+{
+  "revision": "B3.1",
+  "profiles": {
+    "complete": {
+      "title": "Complete skull",
+      "prompt": "Document which bones are preserved and how mandibular articulation was reviewed. Completeness is an operator description.",
+      "exclude_mandible": false, "required_checks": ["builtin:proper_transform"],
+      "weights": {}, "weight_status": "calibrate"
+    },
+    "partial": {
+      "title": "Partial skull / mixed fragments",
+      "prompt": "List the preserved regions and side of each fragment separately. Exclude ambiguous labels explicitly; one side of the vault says nothing about the opposite mandibular side.",
+      "exclude_mandible": false, "required_checks": ["builtin:proper_transform", "builtin:side_labels"],
+      "weights": {}, "weight_status": "calibrate"
+    },
+    "no_mandible": {
+      "title": "Mandible absent",
+      "prompt": "Confirm that enabled bone sources are cranial or nasal. Classify mixed sources before scientific export. Known mandibular marker labels are withheld.",
+      "exclude_mandible": true, "required_checks": ["builtin:proper_transform", "absent_mandible"],
+      "weights": {}, "weight_status": "calibrate"
+    },
+    "deformed": {
+      "title": "Deformed skull",
+      "prompt": "Document affected regions and any exclusions. Deformation is not diagnosed or corrected. Review full geometry QC for the saved scientific export.",
+      "exclude_mandible": false, "required_checks": ["builtin:proper_transform", "builtin:geometry"],
+      "weights": {}, "weight_status": "calibrate"
+    }
+  }
+}

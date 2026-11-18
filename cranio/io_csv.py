@@ -137,6 +137,8 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
                 if articulation not in ('', '0', '1'):
                     raise ValueError('articulation_reviewed must be 0 or 1')
                 record['articulation_reviewed'] = None if articulation == '' else articulation == '1'
+                if 'guided_scenario' in metadata:
+                    record['csv_base_weight'] = weight
                 records[label] = record
             if not use_for_fit:
                 skipped.append((label, 'documentation only (use_for_fit=0)'))

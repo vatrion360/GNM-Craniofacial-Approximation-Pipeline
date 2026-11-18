@@ -1428,7 +1428,7 @@ class GNM_OT_audit_landmarks(Operator):
 
     def execute(self, context):
         scene = context.scene
-        rows = [item for item in scene.gnm_markers if item.is_placed and item.use_for_fit]
+        rows = [item for item in scene.gnm_markers if item.is_placed and _marker_terms(scene,item)[0]]
         bones = {item.label: item.bone_empty.matrix_world.translation[:] for item in rows}
         result = _core_module('marker_audit').audit_landmarks(
             [item.label for item in rows], [_resolve_vertex(item) for item in rows],
@@ -1487,6 +1487,12 @@ class GNM_UL_markers(UIList):
         side_str = "[M]" if item.side == 0 else ("[R]" if item.side == -1 else "[L]")
         row.label(text=f"{side_str} {item.label}")
         row.prop(item, "use_for_fit", text="")
+        if context.scene.gnm_guide_active:
+            try:
+                included,weight,reason = _marker_terms(context.scene,item)
+                row.label(text=f'{weight:g}' if included else reason)
+            except ValueError:
+                row.label(text='Stale guide')
         row.prop(item, "tissue_depth_mm", text="mm")
         # V13: iconita de status a correspondentei GNM (manual > V12 > JSON).
         # Protejata cu try/except: nu trebuie sa crape lista daca modelul
@@ -1533,6 +1539,7 @@ class GNM_PT_panel(Panel):
         _core_module('blender_atlas').draw(layout, scene)
         _core_module('blender_proposals').draw(layout, scene)
         _core_module('blender_repeatability').draw(layout, scene)
+        _core_module('blender_scenarios').draw(layout, scene)
 
         adjust = layout.box()
         selected = sum(m.adjust_depth_selected for m in scene.gnm_markers)
@@ -2497,8 +2504,21 @@ def _fingerprint(scene):
                       item.bone_empty.get('gnm_bone_source_id', ''), item.bone_empty.get('gnm_source_sha256_at_placement', ''),
                       round(b.x, 3), round(b.y, 3), round(b.z, 3),
                       round(t.x, 3), round(t.y, 3), round(t.z, 3)))
+    if getattr(scene,'gnm_guide_active',''):
+        parts.append(scene.gnm_guide_active)
     parts.append(_core_module('blender_craniometry').fingerprint(scene))
     return tuple(parts)
+
+
+def _marker_terms(scene, item):
+    weight = _weight_of(item.label, item)
+    if not getattr(scene, 'gnm_guide_active', ''):
+        return item.use_for_fit, weight, ''
+    try:
+        spec = _core_module('blender_scenarios').active(scene)
+    except ValueError:
+        return False,weight,'stale guide; clear or reapply'
+    return _core_module('scenarios').decision(spec,item.label,item.bone_status,item.use_for_fit,weight)
 
 
 def _included_fit_markers(scene):
@@ -2508,7 +2528,7 @@ def _included_fit_markers(scene):
     in panel drawing. Full validation remains in the actual fit/export path.
     """
     for item in scene.gnm_markers:
-        if item.is_placed and item.use_for_fit:
+        if item.is_placed and item.use_for_fit and (not getattr(scene,'gnm_guide_active','') or _marker_terms(scene,item)[0]):
             vertex = _resolve_vertex(item)
             if vertex is not None:
                 yield item, vertex
@@ -2518,13 +2538,15 @@ def _build_snapshot(scene):
     """Colecteaza perechile (eticheta, vertex, tinta-piele, pondere) pentru
     markerii plasati si mapati. Ruleaza pe MAIN thread (citeste bpy)."""
     _core_module('blender_articulation').require_review(scene)
+    if getattr(scene,'gnm_guide_active',''):
+        _core_module('blender_scenarios').active(scene)
     labels, verts, tgts, ws = [], [], [], []
     for item, vid in _included_fit_markers(scene):
         p = item.target_empty.matrix_world.translation
         labels.append(item.label)
         verts.append(vid)
         tgts.append((p.x, p.y, p.z))
-        ws.append(_weight_of(item.label, item))
+        ws.append(_marker_terms(scene,item)[1])
     if not scene.gnm_settings.mandible_aligned and any(label in _MARKER_DATA.MANDIBULAR_LANDMARKS for label in labels):
         raise ValueError('Review mandibular articulation before using mandibular landmarks')
     if scene.gnm_live.dense_enabled and _LIVE.skull is None:
@@ -3750,9 +3772,10 @@ def _export_markers(scene, path):
     rows = []
     for item in scene.gnm_markers:
         vid = _resolve_vertex(item)
+        included, weight, _ = _marker_terms(scene,item)
         row = dict(label=item.label, vertex=vid if vid is not None else '',
-                   placed=int(item.is_placed), x='', y='', z='', weight=_weight_of(item.label, item),
-                   tissue_source=item.tissue_source, use_for_fit=int(item.use_for_fit),
+                   placed=int(item.is_placed), x='', y='', z='', weight=weight,
+                   tissue_source=item.tissue_source, use_for_fit=int(included),
                    bone_status=item.bone_status, mapping_reviewed=int(item.mapping_reviewed),
                    mapping_source='operator-selected' if item.gnm_vertex_override >= 0 else _VERTEX_DATA.MAPPING_REVISION,
                    marker_notes=item.marker_notes)
@@ -3793,6 +3816,7 @@ def _export_markers(scene, path):
             "plane_marker_labels": [item.label for item in _plane_markers(scene)],
             "restoration_regions": _restoration_records(scene),
             "target_construction": "bone plus operator-reviewed depth/direction; local normal is initial heuristic"}
+    meta.update(_core_module('blender_scenarios').metadata(scene))
     meta.update(_core_module('blender_proposal_review').export_receipts(scene))
     meta.update(_core_module('blender_tissue').scene_age_metadata(scene))
     articulation = _core_module('blender_articulation').snapshot(scene)
@@ -3924,7 +3948,7 @@ class GNM_OT_run_offline(Operator):
     @classmethod
     def poll(cls, context):
         return (_OFFLINE.get('process') is None and
-                sum(item.is_placed and item.use_for_fit for item in context.scene.gnm_markers) >= 4)
+                sum(item.is_placed and _marker_terms(context.scene,item)[0] for item in context.scene.gnm_markers) >= 4)
 
     def execute(self, context):
         import uuid
@@ -4061,6 +4085,7 @@ def register():
     _core_module('blender_proposals').register(sys.modules[__name__])
     _core_module('blender_proposal_review').register()
     _core_module('blender_repeatability').register(sys.modules[__name__])
+    _core_module('blender_scenarios').register(sys.modules[__name__])
     _core_module('blender_record').register(sys.modules[__name__])
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
@@ -4073,6 +4098,7 @@ def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
     _core_module('blender_record').unregister()
+    _core_module('blender_scenarios').unregister()
     _core_module('blender_repeatability').unregister()
     _core_module('blender_proposal_review').unregister()
     _core_module('blender_proposals').unregister()

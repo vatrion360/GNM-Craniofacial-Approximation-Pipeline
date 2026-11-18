@@ -10,6 +10,7 @@ def build(destination=None):
     files = [(root / 'addon_v13.py', 'gnm_cranio/__init__.py'),
              (root / 'gnm_reconstruct.py', 'gnm_cranio/gnm_reconstruct.py'),
              (root / 'landmark_vertex_map.json', 'gnm_cranio/landmark_vertex_map.json'),
+             (root / 'cranio/data/scenarios.json', 'gnm_cranio/cranio/data/scenarios.json'),
              (root / 'LICENSE', 'gnm_cranio/LICENSE'),
              (root / 'NOTICE', 'gnm_cranio/NOTICE'),
              (root / 'README.md', 'gnm_cranio/README.md')]
