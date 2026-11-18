@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add optional, patch-specific bone landmark proposals and a held-out comparison command. Results are snapshots for manual review; nothing changes in marker placement, fitting or exports by default.
+
 - Add an opt-in placement atlas to the Blender marker list: sourced definitions where available and optional reviewed reference-skull views. No change to fitting, placement or export defaults.
 
 - Add **Finalize Local Fit (New Mesh)** in Blender: fresh marker-constrained fit, optional prepared bone constraints, bounded NumPy correction, independent neutral mesh, provenance, basic stored-mesh QC and Undo. No live or offline default changes.

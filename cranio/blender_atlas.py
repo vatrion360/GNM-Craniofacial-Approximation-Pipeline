@@ -21,7 +21,7 @@ def active_label(scene):
     return scene.gnm_markers[i].label if 0 <= i < len(scene.gnm_markers) else None
 
 
-def _reference(scene, label):
+def reference_object(scene):
     obj = scene.gnm_atlas_skull
     if obj is None:
         raise ValueError('No reference skull selected; use the text card')
@@ -31,6 +31,11 @@ def _reference(scene, label):
     source = obj.get(SOURCE)
     if not isinstance(source, str) or not source.strip():
         raise ValueError('Document the reference skull and annotation source in its gnm_atlas_source property')
+    return obj, source.strip()
+
+
+def _reference(scene, label):
+    obj, source = reference_object(scene)
     group = obj.vertex_groups.get(PREFIX+label)
     if group is None:
         raise ValueError(f'No reviewed reference vertex for {label}; use the text card')
