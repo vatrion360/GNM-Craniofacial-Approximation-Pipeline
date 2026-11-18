@@ -97,6 +97,10 @@ Use **Extended 48**, **Paper 32** or **Legacy 27**, then **Add Missing Markers**
 | Placement atlas for selected marker | Off | Show definition, source, side and documented placement caveats for the selected list row |
 | Reference skull | None | Optional annotated mesh from a separate scene; text remains available without it |
 | Refresh Reference View | Explicit click | Show a local-axis snapshot of the reference; mark a reviewed site only if visible |
+| Fragment landmark proposals | Off | On request, register a named atlas patch to one active observed bone source; write review-only coordinates to a Blender text block |
+| Patch name / three distance limits (mm) | Empty / unset (0) | Operator supplies a homologous patch, maximum surface gap, local anchor radius and maximum similarity anchor residual; no anatomical defaults |
+
+See [fragment registration, input preparation and scoring](docs/FRAGMENT_PROPOSALS.md).
 
 See [how to prepare reference annotations](docs/PLACEMENT_ATLAS.md). Viewing a
 reference never places a marker in the case or changes its fit weight or review status.
