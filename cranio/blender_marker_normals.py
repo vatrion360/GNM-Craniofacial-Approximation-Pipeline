@@ -26,7 +26,7 @@ def calculate(scene, obj, point, depsgraph, *, seed_polygon=None, previous=None)
     source = next((row for row in scene.gnm_bone_sources
                    if row.enabled and row.source_object == obj), None)
     inferred = any(row.enabled and row.result_object == obj and obj.get('gnm_region_patch') == row.uid
-                   and obj.get('gnm_reconstructed_via_mirroring') for row in scene.gnm_restoration_regions)
+                   and (obj.get('gnm_reconstructed_via_mirroring') or obj.get('gnm_external_donor')) for row in scene.gnm_restoration_regions)
     if source is None and not inferred:
         raise ValueError('Choose a registered observed source or an enabled inferred patch')
     if source and generated_surface(obj):
@@ -53,6 +53,14 @@ def calculate(scene, obj, point, depsgraph, *, seed_polygon=None, previous=None)
                   bone_provenance='observed' if source else 'inferred',
                   explicit_normal_flip=bool(source.flip_normals) if source else False,
                   exterior_normals_reviewed=bool(source.normals_reviewed) if source else False)
+    if obj.data.get('gnm_origin_kind') is not None:
+        from . import surface_origin as origin, blender_surface_origin as adapter
+        index=int(polygons[result['seed_triangle']])
+        kind=obj.data['gnm_origin_kind']
+        if obj.data.attributes[origin.ATTRIBUTE].data[index].value!=origin.CODES[kind]:
+            raise ValueError('Face origin differs from its managed fragment')
+        result['face_origin']=dict(origin=kind,polygon=index,source_id=result['source_id'],
+            geometry_sha256=digest,lineage_sha256=adapter.lineage(obj),point_mm=[float(x) for x in point])
     if source is None:
         result['warnings'].append('Inferred bone: this is not observed surface evidence')
     elif not source.normals_reviewed:

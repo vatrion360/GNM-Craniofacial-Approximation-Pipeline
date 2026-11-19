@@ -76,7 +76,7 @@ The inherited Pogonion index **12284 belongs to GNM's `lower_lip` group**, confi
 
 ## Damaged or intentionally modified crania
 
-The article describes missing dentition and digitally repaired bone. The add-on therefore records **observed**, **digitally repaired**, **inferred**, or **not recorded** provenance per site, plus placement/direction notes. Repaired and inferred points used in fitting are flagged in the offline report. These categories do not change weights automatically: their uncertainty is unknown.
+The article describes missing dentition and digitally repaired bone. The add-on therefore records **observed**, **digitally repaired**, **inferred**, or **not recorded** provenance per site, plus placement/direction notes. Repaired and inferred points used in fitting are flagged in the offline report. These categories alone do not change weights: their uncertainty is unknown. A separate [face-origin policy](FACE_ORIGIN.md) can explicitly adjust weights for placements on tagged fragments.
 
 A case-level cranial-modification field triggers a report warning about the general GNM identity model's applicability. Vault or damaged sites can be retained for documentation while excluded from both preview and offline pose/identity fitting. Their coordinates remain in CSV/JSON; exclusion is not a substitute for a model that represents the altered anatomy. Keep the original scan and restoration history.
 

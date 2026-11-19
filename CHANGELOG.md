@@ -1,5 +1,7 @@
 # Unreleased
 
+- Track markers on original, mirrored and external donor faces in Blender, v3 CSV and derived records. Optional case-specific factors adjust fit weights and placement uncertainty; unset factors do not supply missing evidence. Existing untagged workflows are unchanged.
+
 - Add four optional guided skull scenarios in Blender. Preview marker exclusions and case-specific weights, share them with the v3 CSV, and enforce required checks in the existing A5 scientific bundle. No new calibrated weights or default fit changes.
 
 - Add independent A/B manual bone picks in Blender and a same-case repeat-distance report. A2 can explicitly consume the paired evidence with a justified isotropic sensitivity model. No fit or uncertainty defaults changed.

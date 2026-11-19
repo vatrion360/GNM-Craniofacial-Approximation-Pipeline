@@ -1,5 +1,7 @@
 # Mixed fragments, duplicate audit and adaptive lambda (5.0.0rc3 / add-on 16)
 
+For explicit polygon provenance on preserved, mirrored or external donor fragments see [Face origin](FACE_ORIGIN.md).
+
 ## Landmark audit
 
 The pinned official GNM asset has **48 registry labels and 48 distinct skin-vertex candidates**. There are no exact registry duplicates. The 32 paper positions overlap with 11 of the original 27; these shared labels are stored once, producing 48 entries, not 59. The [machine-readable audit](landmark_audit.json) records the model hash and a reproducible proximity search:

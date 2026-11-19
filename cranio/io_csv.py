@@ -46,6 +46,15 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
         raise ValueError("v3 requires units='mm' and coordinate_space='world'")
     if metadata.get("units", "mm") != "mm":
         raise ValueError("Marker units must be mm; explicitly convert before fitting")
+    origin_policy=None
+    if 'face_origins' in metadata or 'face_origin_policy' in metadata:
+        from . import surface_origin as origin
+        if version!=3:
+            raise ValueError('Face provenance requires v3 marker rows')
+        if 'face_origin_policy' in metadata:
+            origin_policy=origin.policy(metadata['face_origin_policy'])
+            if origin_policy['case_id']!=metadata.get('case_id') or not isinstance(metadata.get('face_origin_base_weights'),dict):
+                raise ValueError('Origin factors require matching case and pre-factor weights')
     start = 2 if version > 1 else 0
     while start < len(lines) and (lines[start].lstrip().startswith('#') or not lines[start].strip()):
         start += 1
@@ -139,6 +148,21 @@ def read_marker_csv(csv_path, index_to_label, label_to_vertex):
                 record['articulation_reviewed'] = None if articulation == '' else articulation == '1'
                 if 'guided_scenario' in metadata:
                     record['csv_base_weight'] = weight
+                if 'face_origins' in metadata or 'face_origin_policy' in metadata:
+                    origins = metadata.get('face_origins',{})
+                    if not isinstance(origins,dict):
+                        raise ValueError('Face origins must be an object keyed by marker label')
+                    if label in origins:
+                        record['face_origin']=origin.validate_receipt(origins[label],record)
+                    if origin_policy and use_for_fit:
+                        if label not in origins:
+                            raise ValueError('Active provenance policy requires a face receipt for each included marker')
+                        kind=record['face_origin']['origin']
+                        f=1. if kind=='original' else origin_policy[kind]['weight_factor']
+                        base=metadata['face_origin_base_weights'].get(label)
+                        if f is None or type(base) not in (int,float) or not 0<base<=1 or weight!=base*f:
+                            raise ValueError('CSV weight differs from the configured origin factor')
+                        record.update(weight_before_origin_factor=base,origin_weight_factor=f)
                 records[label] = record
             if not use_for_fit:
                 skipped.append((label, 'documentation only (use_for_fit=0)'))
