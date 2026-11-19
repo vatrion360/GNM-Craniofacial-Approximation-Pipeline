@@ -144,6 +144,7 @@ def run_articulation_checks(addon, directory):
         assert core._matrix(jaw)==before_apply and st.history==saved
         core.cancel(scene)
         separated=qc.check_surfaces((V,T),(V+[0,0,5],T))
+        assert json.loads(json.dumps(separated, allow_nan=False)) == separated
         assert separated['intersection_triangle_pairs']==0 and separated['lower_in_upper']['inside_vertices']==0
         overlap=qc.check_surfaces((V,T),(V+.5,T),.1)
         assert overlap['intersection_triangle_pairs']>0 and overlap['lower_in_upper']['inside_vertices']>0

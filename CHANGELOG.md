@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fix saving a reviewed mandibular pose when Blender’s NumPy returns a float32 dental boundary tolerance. The review JSON now stores the computed value as a number.
+
 - Add a manual study ledger for paired CT evaluation and historical inventory. Freeze case meshes, import reviewed surface fields or anatomical point pairs, and report subject-weighted summaries with failures and study arms kept distinct. Does not run CT registration, fit a mesh or change defaults.
 
 - Add an optional saved-fit dental comparison in Blender and the CLI. Compare reviewed incisor/canine positions on observed dentition with the two saved GNM meshes; optionally measure a tooth-to-fitted-lip chord difference. No new tooth fit, thresholds or default behavior.
