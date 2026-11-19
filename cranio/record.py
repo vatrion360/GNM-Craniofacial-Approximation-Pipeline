@@ -16,7 +16,7 @@ from .tissue import _json
 OUTPUT_KEYS = ('output', 'output_statistical', 'output_error_mesh', 'output_stats')
 PATH_SETTINGS = {'input', 'output', 'output_statistical', 'output_error_mesh', 'output_stats',
                  'output_json', 'npz', 'skull', 'prior', 'landmark_map', 'protocol',
-                 'case_metadata', 'craniometry', 'tissue_table', 'tissue_directions', 'profile_constraint'}
+                 'case_metadata', 'craniometry', 'tissue_table', 'tissue_directions', 'profile_constraint', 'anomaly_policy'}
 INTERPRETATION = ('Derived view of the canonical run report, not a new fit or scientific approval. '
                   'Fit residuals and local displacement are not accuracy or calibrated uncertainty. '
                   'Recorded input hashes are not revalidated by this command.')

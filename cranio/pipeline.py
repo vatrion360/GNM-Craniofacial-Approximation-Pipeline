@@ -91,6 +91,8 @@ def _nasal_diagnostic_report(bone_positions, skull_points, v_final):
 def run_pipeline(cfg: PipelineConfig) -> int:
     """Public API: user input failures return 2, including missing dependencies."""
     try:
+        if cfg.anomaly_policy and (cfg.protocol or cfg.prior_compare or cfg.tissue_compare):
+            raise ValueError('Anomaly policies are not supported in frozen protocols or batch comparisons; use a separate fit')
         if cfg.prior_compare:
             from .prior_compare import run_comparison
             return run_comparison(cfg)
@@ -107,7 +109,7 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
     """Ruleaza pipeline-ul complet. Returneaza 0 (succes) sau 2 (fatal)."""
     cfg.fill_default_outputs()
     cfg.validate()
-    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.protocol, cfg.case_metadata, cfg.craniometry, cfg.tissue_directions, cfg.profile_constraint) if path}
+    input_hashes = {path: sha256_file(path) for path in (cfg.input, cfg.npz, cfg.skull, cfg.prior, cfg.landmark_map, cfg.protocol, cfg.case_metadata, cfg.craniometry, cfg.tissue_directions, cfg.profile_constraint, cfg.anomaly_policy) if path}
     tissue_table = None
     if cfg.tissue_table:
         from .tissue import load_table, table_path
@@ -191,6 +193,17 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
         if unknown:
             warnings_list.append(
                 "--exclude: labels not found in the CSV: " + ", ".join(sorted(unknown)))
+    _csv_meta.pop('anomaly_screen', None)  # Never trust a derived result from CSV.
+    if cfg.anomaly_policy:
+        from .anomaly import screen, load_policy, report_text
+        policy = load_policy(cfg.anomaly_policy)
+        targets, omitted, audit = screen(policy, _csv_meta, document, targets,
+                                         [t.label for t in targets] + [label for label, _ in skipped])
+        if sha256_file(cfg.anomaly_policy) != input_hashes[cfg.anomaly_policy]:
+            raise ValueError('Anomaly policy changed during loading')
+        skipped.extend(omitted)
+        _csv_meta['anomaly_screen'] = audit
+        logger.info(report_text(audit))
     if tissue_table is not None:
         from .tissue_application import apply_table
         targets, _csv_meta, selection = apply_table(targets, _csv_meta, tissue_table, cfg.tissue_labels, cfg.tissue_axis, directions, cfg.case_posture)
@@ -656,6 +669,8 @@ def _run_pipeline(cfg: PipelineConfig) -> int:
 
     extra = None
     extra_parts = []
+    if cfg.anomaly_policy:
+        extra_parts.append(report_text(_csv_meta['anomaly_screen']))
     if tissue_table is None and 'age_context' in _csv_meta:
         from .age_context import age_text
         extra_parts.append(age_text(_csv_meta['age_context']))

@@ -7,7 +7,7 @@ from .provenance import implementation_manifest
 from .validation import has_documented_tissue_source, sha256_file, validate_outputs
 
 CASE_FIELDS = {'input', 'output', 'output_error_mesh', 'output_stats', 'output_json',
-    'output_statistical', 'npz', 'skull', 'prior', 'prior_justification', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'overwrite', 'require_qc', 'tissue_table', 'tissue_directions', 'case_posture'}
+    'output_statistical', 'npz', 'skull', 'prior', 'prior_justification', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'overwrite', 'require_qc', 'anomaly_policy', 'tissue_table', 'tissue_directions', 'case_posture'}
 
 
 def scientific_settings(config):
@@ -22,6 +22,8 @@ def _is_sha256(value):
 def frozen_from_report(report, protocol_id, split_sha256):
     if not isinstance(protocol_id, str) or not protocol_id.strip() or not _is_sha256(split_sha256):
         raise ValueError('Protocol ID and immutable subject-split SHA-256 required')
+    if report['config'].get('anomaly_policy'):
+        raise ValueError('Anomaly policies are not supported in frozen protocols yet')
     if report['config'].get('profile_constraint'):
         raise ValueError('Profile refinement is not supported in frozen protocols yet')
     if report['config']['geometry_qc'] != 'full':

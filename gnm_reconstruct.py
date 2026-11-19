@@ -104,6 +104,7 @@ def parse_args(argv=None) -> PipelineConfig:
     parser.add_argument('--case-metadata', default=None)
     parser.add_argument('--profile-constraint', default=None,
                         help='Reviewed segmented profile JSON; opt-in fixed-pose identity refinement (marker-only)')
+    parser.add_argument('--anomaly-policy', help='Case-bound descriptive bone screens and optional marker actions (JSON)')
     parser.add_argument('--craniometry', default=None,
                         help='Case craniometry JSON in world mm; otherwise uses embedded CSV metadata')
     parser.add_argument('--measurement-weight', type=float, default=0.,
@@ -139,7 +140,7 @@ def parse_args(argv=None) -> PipelineConfig:
         landmark_map=args.landmark_map,
         protocol=args.protocol,
         case_metadata=args.case_metadata,
-        craniometry=args.craniometry,
+        craniometry=args.craniometry, anomaly_policy=args.anomaly_policy,
         profile_constraint=args.profile_constraint,
         measurement_weight=args.measurement_weight,
         max_iter=args.max_iter,

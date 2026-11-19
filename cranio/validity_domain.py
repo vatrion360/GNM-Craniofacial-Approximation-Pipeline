@@ -84,7 +84,7 @@ def run_signature(report):
         settings={k: v for k, v in report['config'].items() if k not in PATH_SETTINGS},
         input_roles=sorted(report['inputs']),
         shared_assets={k: row['sha256'] for k, row in report['inputs'].items() if k in
-                       {'prior', 'landmark_map', 'protocol', 'tissue_table', 'tissue_directions'}},
+                       {'prior', 'landmark_map', 'protocol', 'tissue_table', 'tissue_directions', 'anomaly_policy'}},
         source_sha256=implementation['source_sha256'],
         software={k: software.get(k) for k in ('pipeline', 'python', 'numpy', 'scipy', 'trimesh')},
         numerical_environment=software.get('numerical_environment'))
