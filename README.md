@@ -44,6 +44,8 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [V19 task comparison and revised implementation plan (Romanian)](docs/TASKS_V19_REVIEW.md)
 - [Change log](CHANGELOG.md)
 
+To rerun synthetic or external cases against a saved numerical reference, see the [offline baseline runner](docs/OFFLINE_BASELINE.md).
+
 ## Quick start
 
 Python 3.10+; the current local test environment is Python 3.12 on Linux.

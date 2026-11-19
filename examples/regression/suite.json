@@ -1,0 +1,17 @@
+{
+  "mean_model": [
+    "--input",
+    "../synthetic_markers.csv",
+    "--regularization",
+    "20"
+  ],
+  "sparse_offset": [
+    "--input",
+    "sparse_offset.csv",
+    "--regularization",
+    "adaptive",
+    "--local-correction",
+    "--max-iter",
+    "150"
+  ]
+}

@@ -1,0 +1,213 @@
+{
+  "cases": {
+    "mean_model": {
+      "config": {
+        "case_posture": null,
+        "clip_sigma": 3.0,
+        "dense_max_rows": 1500,
+        "dense_nose_weight": 0.7,
+        "dense_samples": 200000,
+        "dense_weight": 0.5,
+        "depth_weighting": "none",
+        "distance_weight": 0.0,
+        "exclude": [],
+        "exclude_outliers": false,
+        "face_cap_mm": 8.0,
+        "geometry_qc": "basic",
+        "identity_subspace": "all",
+        "lambda_base": 1.0,
+        "lambda_max": 1000.0,
+        "lambda_min": 0.3,
+        "max_correction_mm": 15.0,
+        "max_iter": 30,
+        "measurement_weight": 0.0,
+        "no_dense_fit": false,
+        "no_dense_tps": false,
+        "no_face_dense": false,
+        "overwrite": false,
+        "prior_compare": false,
+        "prior_justification": null,
+        "prior_soft_sigma": 0.0,
+        "prior_soft_weight": 4.0,
+        "prior_weight": 1.0,
+        "protect_damping": 0.25,
+        "regularization": "20",
+        "require_qc": false,
+        "scalp_offset_mm": 5.0,
+        "seed": 42,
+        "skip_tps": true,
+        "skull_flip_normals": false,
+        "skull_normals_reviewed": false,
+        "strict": false,
+        "symmetry_weight": 0.0,
+        "tissue_axis": "unconfigured",
+        "tissue_compare": null,
+        "tissue_labels": [],
+        "tolerance": 1e-05,
+        "tps_face_centres": 200,
+        "tps_scalp_centres": 500
+      },
+      "converged": true,
+      "inputs": {
+        "markers": {
+          "sha256": "a225146462357ff5ee3ef8952de14e28706cfb76289c390b218fc45fc987b169"
+        },
+        "model": {
+          "sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de"
+        }
+      },
+      "lambda": 20.0,
+      "metrics": {
+        "alignment": {
+          "count": 48,
+          "max_mm": 1.5106649264969368e-13,
+          "mean_mm": 4.622948236451505e-14,
+          "median_mm": 4.1583447479068616e-14,
+          "p95_mm": 8.039057749757474e-14,
+          "rmse_mm": 5.43332764295018e-14
+        },
+        "final_fit": {
+          "count": 48,
+          "max_mm": 1.3043830727131805e-13,
+          "mean_mm": 7.18659992937116e-14,
+          "median_mm": 7.043625960249678e-14,
+          "p95_mm": 1.172350042698518e-13,
+          "rmse_mm": 7.552709993623617e-14
+        },
+        "local_displacement": {
+          "count": 17821,
+          "max_mm": 0.0,
+          "mean_mm": 0.0,
+          "median_mm": 0.0,
+          "p95_mm": 0.0,
+          "rmse_mm": 0.0
+        },
+        "statistical_fit": {
+          "count": 48,
+          "max_mm": 1.3043830727131805e-13,
+          "mean_mm": 7.18659992937116e-14,
+          "median_mm": 7.043625960249678e-14,
+          "p95_mm": 1.172350042698518e-13,
+          "rmse_mm": 7.552709993623617e-14
+        }
+      },
+      "outputs": {
+        "output": {
+          "sha256": "70872e9df5c8720d65891fb73684728930b61ba9d6dad20e37477ff90cde867c"
+        },
+        "output_error_mesh": {
+          "sha256": "6f68adb8d77853e0a83309532bb9f57f67a1869d88e053c3d23cfd1590b6e16c"
+        },
+        "output_statistical": {
+          "sha256": "70872e9df5c8720d65891fb73684728930b61ba9d6dad20e37477ff90cde867c"
+        }
+      },
+      "scale": 1.0000000000000004
+    },
+    "sparse_offset": {
+      "config": {
+        "case_posture": null,
+        "clip_sigma": 3.0,
+        "dense_max_rows": 1500,
+        "dense_nose_weight": 0.7,
+        "dense_samples": 200000,
+        "dense_weight": 0.5,
+        "depth_weighting": "none",
+        "distance_weight": 0.0,
+        "exclude": [],
+        "exclude_outliers": false,
+        "face_cap_mm": 8.0,
+        "geometry_qc": "basic",
+        "identity_subspace": "all",
+        "lambda_base": 1.0,
+        "lambda_max": 1000.0,
+        "lambda_min": 0.3,
+        "max_correction_mm": 15.0,
+        "max_iter": 150,
+        "measurement_weight": 0.0,
+        "no_dense_fit": false,
+        "no_dense_tps": false,
+        "no_face_dense": false,
+        "overwrite": false,
+        "prior_compare": false,
+        "prior_justification": null,
+        "prior_soft_sigma": 0.0,
+        "prior_soft_weight": 4.0,
+        "prior_weight": 1.0,
+        "protect_damping": 0.25,
+        "regularization": "adaptive",
+        "require_qc": false,
+        "scalp_offset_mm": 5.0,
+        "seed": 42,
+        "skip_tps": false,
+        "skull_flip_normals": false,
+        "skull_normals_reviewed": false,
+        "strict": false,
+        "symmetry_weight": 0.0,
+        "tissue_axis": "unconfigured",
+        "tissue_compare": null,
+        "tissue_labels": [],
+        "tolerance": 1e-05,
+        "tps_face_centres": 200,
+        "tps_scalp_centres": 500
+      },
+      "converged": true,
+      "inputs": {
+        "markers": {
+          "sha256": "42d0255f1fdcb73c8bd9837d2f620639ede18b9ffc4442214d5cc133b56acb68"
+        },
+        "model": {
+          "sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de"
+        }
+      },
+      "lambda": 6.0,
+      "metrics": {
+        "alignment": {
+          "count": 8,
+          "max_mm": 2.452020423531278,
+          "mean_mm": 0.6635964606404129,
+          "median_mm": 0.4513459620727853,
+          "p95_mm": 1.807469894081539,
+          "rmse_mm": 0.9588626888413606
+        },
+        "final_fit": {
+          "count": 8,
+          "max_mm": 0.025911905937434844,
+          "mean_mm": 0.0034649375756308975,
+          "median_mm": 0.00018020568563871823,
+          "p95_mm": 0.017115408408707462,
+          "rmse_mm": 0.009168221804902243
+        },
+        "local_displacement": {
+          "count": 17821,
+          "max_mm": 2.017293807981806,
+          "mean_mm": 0.49784421405751966,
+          "median_mm": 0.29624711115446667,
+          "p95_mm": 1.4737893406171698,
+          "rmse_mm": 0.6837998240740985
+        },
+        "statistical_fit": {
+          "count": 8,
+          "max_mm": 1.7175567014894546,
+          "mean_mm": 0.47484775612934027,
+          "median_mm": 0.32153635968961836,
+          "p95_mm": 1.3023119771328764,
+          "rmse_mm": 0.6848553734017379
+        }
+      },
+      "outputs": {
+        "output": {
+          "sha256": "157d1a1a1dc271bd118c334d0b40737dbc3d2c66983272d1fcf402bb0ec1fc64"
+        },
+        "output_error_mesh": {
+          "sha256": "d88741079e7cfff4533a9a8023af6766cb00e3d1907cc0b902b9f6d640de0277"
+        },
+        "output_statistical": {
+          "sha256": "e35e889921d8f300a2099037ba04153a49aaba988f6debf5827e0c53b0376161"
+        }
+      },
+      "scale": 0.993754429806209
+    }
+  },
+  "schema": "gnm.offline-baseline.v1"
+}
