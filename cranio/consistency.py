@@ -193,6 +193,14 @@ def text_report(summary):
     return '\n'.join(lines)+'\n'
 
 
+def saved_obj_mesh(data):
+    """Read the restricted pipeline OBJ without changing its vertex indexing."""
+    lines, _ = geometry_lines(data)
+    vertices = np.array([[float(v) for v in line.split()[1:]] for line in lines if line.startswith('v ')])
+    triangles = np.array([[int(v)-1 for v in line.split()[1:]] for line in lines if line.startswith('f ')])
+    return vertices, triangles
+
+
 def build_summary(report_path, output_dir, *, artifacts=None):
     """Verify saved artifacts via A7, then publish a separate completion manifest."""
     from .export import atomic_text
@@ -219,10 +227,7 @@ def build_summary(report_path, output_dir, *, artifacts=None):
             raise ValueError('Saved artifact checksum changed: '+key)
         pinned[path] = row['sha256']
         if key in ('output', 'output_statistical'):
-            lines, _ = geometry_lines(data)
-            vertices = np.array([[float(v) for v in line.split()[1:]] for line in lines if line.startswith('v ')])
-            triangles = np.array([[int(v)-1 for v in line.split()[1:]] for line in lines if line.startswith('f ')])
-            meshes['final' if key == 'output' else 'statistical'] = vertices, triangles
+            meshes['final' if key == 'output' else 'statistical'] = saved_obj_mesh(data)
     summary = summarize(report, meshes)
     summary.update(source_report_sha256=_digest(raw),
         source_outputs={key: dict(sha256=report['outputs'][key]['sha256']) for key in OUTPUT_KEYS})

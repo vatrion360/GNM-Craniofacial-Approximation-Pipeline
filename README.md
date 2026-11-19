@@ -46,6 +46,8 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 
 To rerun synthetic or external cases against a saved numerical reference, see the [offline baseline runner](docs/OFFLINE_BASELINE.md).
 
+For a registered skull and face, [measure the fraction of reviewed facial vertices inside bone](docs/MESH_COHERENCE.md).
+
 ## Quick start
 
 Python 3.10+; the current local test environment is Python 3.12 on Linux.
