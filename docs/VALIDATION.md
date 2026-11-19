@@ -271,6 +271,8 @@ Run this on each advertised Blender/OS pair and record exact versions, asset has
 
 ## Independent scientific validation programme
 
+The [manual validation case ledger](validation_protocol.md) implements the case freeze and reporting steps. Its synthetic checks are not subject-level validation.
+
 1. Define intended population, age range, preservation state and use case before testing. Separate method development from a locked external subject test set. Keep subjects disjoint; do not split vertices of the same subject across train and test and call it independent validation.
 2. Acquire appropriately governed, paired skull/face data in a consistent physical frame. Document segmentation, pose, expression, imaging resolution, tissue compression, dental status and missing anatomy. No additional scanning is implied by this software.
 3. Have independent specialists annotate predefined bone/skin landmarks with documented definitions. Quantify repeatability/interobserver error and distinguish measured from inferred/mirrored points.
