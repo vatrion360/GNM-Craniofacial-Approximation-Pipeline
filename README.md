@@ -318,6 +318,7 @@ is unchanged. [Manifest, objective, acceptance gates and limits](docs/SAGITTAL_P
 | Reviewed sagittal profile offline | Off | Opt-in fixed-pose identity refinement; currently marker-only |
 | Profile JSON | Empty | Reviewed model/case/source hashes, plane, segmented path, depths and positive SDs |
 | `python -m cranio.profile --template PATH` | Explicit command | Write blank manifest; refuse overwrite; no guessed scientific data |
+| `--anomaly-policy PATH` | Absent | [Case-bound bone screens](docs/ANOMALY_SCREEN.md); measure reviewed observations, optionally flag, reduce marker weights or exclude named markers using sourced bounds |
 | `--profile-constraint PATH` | Absent | Same NumPy refinement as Blender's external pipeline; manifest copied by addon |
 | Acceptance gates | Explicit manifest limits | Reject candidate if any profile point worsens, marker limit or plane band fails |
 

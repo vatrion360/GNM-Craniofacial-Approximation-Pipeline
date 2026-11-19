@@ -156,7 +156,7 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
               "model": {"path": os.path.abspath(cfg.npz), "sha256": model_hash}}
     if cfg.skull:
         inputs["skull"] = {"path": os.path.abspath(cfg.skull), "sha256": sha256_file(cfg.skull)}
-    for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'tissue_directions', 'profile_constraint'):
+    for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'tissue_directions', 'profile_constraint', 'anomaly_policy'):
         if getattr(cfg, name):
             inputs[name] = dict(path=os.path.abspath(getattr(cfg, name)), sha256=sha256_file(getattr(cfg, name)))
     if cfg.tissue_table:
@@ -205,6 +205,8 @@ def write_run_json(cfg, metadata, model_hash, targets, skipped, excluded_auto,
                       for t, a, b, c in zip(targets, alignment, fit, final)],
         "skipped": skipped, "auto_excluded": excluded_auto, "warnings": warnings_list,
     }
+    if not cfg.anomaly_policy:
+        report['config'].pop('anomaly_policy')
     for row, weight in zip(report['landmarks'], fit_info.diagnostics['final_irls_weights']):
         row['baseline_final_irls_weight' if cfg.profile_constraint else 'final_irls_weight'] = weight
     with atomic_text(cfg.output_json) as stream:

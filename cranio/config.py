@@ -90,6 +90,7 @@ class PipelineConfig:
     skull_flip_normals: bool = False
     geometry_qc: str = 'basic'
     require_qc: bool = False
+    anomaly_policy: Optional[str] = None
 
 
     def validate(self):
@@ -140,7 +141,7 @@ class PipelineConfig:
             raise ValueError(f"Model not found: {self.npz}; see docs/INSTALL.md")
         if self.skull and not os.path.isfile(self.skull):
             raise ValueError(f"Skull not found: {self.skull}")
-        for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'tissue_directions', 'profile_constraint'):
+        for name in ('prior', 'landmark_map', 'protocol', 'case_metadata', 'craniometry', 'tissue_directions', 'profile_constraint', 'anomaly_policy'):
             if getattr(self, name) and not os.path.isfile(getattr(self, name)):
                 raise ValueError(f'{name} not found: {getattr(self, name)}')
         if self.skull and not self.skull_normals_reviewed:
@@ -175,14 +176,14 @@ class PipelineConfig:
             if not math.isfinite(value) or value <= 0:
                 raise ValueError("regularization must be 'auto', 'adaptive' or finite and positive")
         from .validation import validate_outputs
-        validate_outputs([self.input, self.npz, self.skull, self.prior, self.landmark_map, self.protocol, self.case_metadata, self.craniometry, self.tissue_directions, self.profile_constraint, *tissue_inputs],
+        validate_outputs([self.input, self.npz, self.skull, self.prior, self.landmark_map, self.protocol, self.case_metadata, self.craniometry, self.tissue_directions, self.profile_constraint, self.anomaly_policy, *tissue_inputs],
                          [self.output, self.output_error_mesh, self.output_stats,
                           self.output_json, self.output_statistical], self.overwrite)
 
     def fill_default_outputs(self):
         """Completeaza caile de iesire implicite din numele intrarii."""
         for name in ("input", "npz", "skull", "output", "output_stats", "output_error_mesh",
-                     "output_json", "output_statistical", "prior", "landmark_map", "protocol", "case_metadata", "craniometry", "tissue_table", "tissue_directions", "profile_constraint"):
+                     "output_json", "output_statistical", "prior", "landmark_map", "protocol", "case_metadata", "craniometry", "tissue_table", "tissue_directions", "profile_constraint", "anomaly_policy"):
             value = getattr(self, name)
             if value is not None:
                 setattr(self, name, os.fspath(value))
