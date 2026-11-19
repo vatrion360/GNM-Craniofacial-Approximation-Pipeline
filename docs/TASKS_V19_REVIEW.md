@@ -122,7 +122,7 @@ de acceptare din task sunt îndeplinite.
 | Task | Stare | Ce trebuie păstrat / adăugat |
 | --- | --- | --- |
 | T0.1 | Audit istoric existent; actualizare necesară | `docs/AUDIT.md` este din septembrie. Nu crea simultan `audit.md`: coliziune de nume pe Windows. |
-| T0.2 | Parțial | Exemple sintetice și teste end-to-end există; lipsește runnerul comparativ cu configurații externe. CT-urile nu sunt o condiție pentru dezvoltare. |
+| T0.2 | Implementat pentru regresie offline | Runnerul [T0.2](OFFLINE_BASELINE.md) repetă fituri din configurații externe și compară un snapshot numeric. Referința inclusă acoperă două cazuri sintetice. |
 | T0.3 | Parțial | `quality.py` are reversări de normale, degenerări, contacte și clearance local. Lipsesc interfața unitară, unele metrici regionale/profil și unghiul minim. |
 | A1.1–A1.3 | Parțial | Există un tabel citat și selecția/aplicarea lui; lipsesc schema generală, migrarea tuturor constantelor și comparația între tabele. |
 | A1.4 | Lipsește | Nu există ponderare explicită după SD. Ponderile curente sunt influențe relative. |

@@ -1,0 +1,11 @@
+# gnm-marker-csv v3
+# {"coordinate_space": "world", "model_sha256": "e3710378cbf8c765f79a9cef5732376fc995f52b5541195e8945dacaaa5c43de", "purpose": "Synthetic eight-marker regression case with a +3 mm world-Y perturbation at Rhinion", "synthetic": true, "units": "mm", "version": 3}
+label,vertex,placed,x,y,z,weight,bone_x,bone_y,bone_z,tissue_depth_mm,tissue_source,use_for_fit,bone_status,mapping_reviewed,mapping_source,marker_notes
+Nasion,12319,1,0.05016312375664711,305.63739013671875,123.53564453125,1,,,,,synthetic mean-model target; not FSTT data,,,1,synthetic model correspondence,
+Rhinion,12310,1,0.07422878593206406,283.8289794921875,139.1437530517578,1,,,,,synthetic perturbed target; not FSTT data,,,1,synthetic model correspondence,
+Glabella,12337,1,0.008949332870543003,321.34539794921875,125.07393646240234,1,,,,,synthetic mean-model target; not FSTT data,,,1,synthetic model correspondence,
+Pogonion,12261,1,0.010846679098904133,204.25637817382812,128.770263671875,1,,,,,synthetic mean-model target; not FSTT data,,,1,synthetic model correspondence,
+Gnathion,12258,1,0.03161752223968506,192.25697326660156,124.79936981201172,1,,,,,synthetic mean-model target; not FSTT data,,,1,synthetic model correspondence,
+Gonion_Dr,8737,1,-64.65754699707031,228.146728515625,52.205650329589844,1,,,,,synthetic mean-model target; not FSTT data,,,1,synthetic model correspondence,
+Gonion_St,2609,1,64.67449188232422,228.16473388671875,52.249755859375,1,,,,,synthetic mean-model target; not FSTT data,,,1,synthetic model correspondence,
+Orbita_Dr_Ext,7426,1,-43.8456916809082,299.9802551269531,105.77447509765625,1,,,,,synthetic mean-model target; not FSTT data,,,1,synthetic model correspondence,
