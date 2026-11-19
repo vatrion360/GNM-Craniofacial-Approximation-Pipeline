@@ -128,6 +128,9 @@ def monte_carlo_identity(model, targets, metadata, *, placement=None, samples=20
     weights = finite_array([t.weight for t in targets], 'weights', (len(targets),))
     config = placement_config(placement if placement is not None else
                               dict(schema_version=1, placement={}), labels)
+    if 'face_origin_policy' in metadata:
+        from .surface_origin import apply_sd
+        config=apply_sd(config,metadata)
     if (not isinstance(depth_labels, (list, tuple)) or any(not isinstance(x, str) for x in depth_labels)
             or len(set(depth_labels)) != len(depth_labels)):
         raise ValueError('depth_labels must be a distinct list/tuple of labels')

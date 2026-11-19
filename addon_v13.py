@@ -83,6 +83,7 @@ def _plane_markers(scene):
     return [item for item in scene.gnm_markers
             if item.side == 0 and item.bone_empty is not None
             and item.use_for_plane and item.bone_status == 'observed'
+            and not item.bone_empty.get('gnm_repaired_face')
             and item.label not in _MARKER_DATA.MANDIBULAR_LANDMARKS]
 
 
@@ -223,7 +224,8 @@ def _bone_sources(scene, dense=False):
         if not row.enabled or (dense and not row.use_dense):
             continue
         obj = row.source_object
-        if obj is None or obj.name not in scene.objects or _core_module('blender_sources').generated_surface(obj):
+        if (obj is None or obj.name not in scene.objects or _core_module('blender_sources').generated_surface(obj)
+                or any(r.donor_reference==obj for r in scene.gnm_restoration_regions)):
             raise ValueError('Registered bone source is missing or is generated geometry')
         rows.append(row)
     return rows
@@ -231,6 +233,8 @@ def _bone_sources(scene, dense=False):
 
 def _register_bone_source(scene, obj):
     import uuid
+    if any(r.donor_reference==obj for r in scene.gnm_restoration_regions):
+        raise ValueError('Known external donor reference cannot be registered as observed case bone')
     if obj.type != 'MESH' or _core_module('blender_sources').generated_surface(obj):
         raise ValueError('Register preserved bone only; generated faces, pegs and inferred patches are excluded')
     row = next((row for row in scene.gnm_bone_sources if row.source_object == obj), None)
@@ -744,6 +748,11 @@ def _place_marker_at(context, item, location, hit_object, face_index=None):
         scene.collection.objects.link(obj)
         setattr(item, attr, obj)
     _record_marker_surface(item, hit_object, geometry_digest=record['source_geometry_sha256'])
+    if 'face_origin' in record:
+        record['face_origin']['point_mm']=list(item.bone_empty.location)
+        if record['face_origin']['origin']!='original':
+            item.bone_empty['gnm_repaired_face']=True
+        item.bone_empty['gnm_face_origin_at_placement'] = json.dumps(record['face_origin'],allow_nan=False,sort_keys=True)
     mesh = bpy.data.meshes.new('Peg')
     bm = bmesh.new()
     try:
@@ -951,7 +960,8 @@ class GNM_OT_recenter_on_plane(Operator):
             if o.get('gnm_region_patch') and o.get('gnm_restoration_metadata'):
                 import json
                 metadata = json.loads(o['gnm_restoration_metadata'])
-                metadata['plane_origin_mm'] = list(Vector(metadata['plane_origin_mm']) + offset)
+                if 'plane_origin_mm' in metadata:
+                    metadata['plane_origin_mm'] = list(Vector(metadata['plane_origin_mm']) + offset)
                 previous = Vector(metadata.get('post_generation_translation_mm', (0, 0, 0)))
                 metadata['post_generation_translation_mm'] = list(previous + offset)
                 o['gnm_restoration_metadata'] = json.dumps(metadata)
@@ -1247,6 +1257,7 @@ class GNM_OT_capturi_standardizate(Operator):
 
 class GNMRestorationRegion(PropertyGroup):
     uid: StringProperty()
+    donor_reference: PointerProperty(type=bpy.types.Object)
     name: StringProperty(name='Region', default='Preserved fragment')
     enabled: BoolProperty(default=True)
     source_object: PointerProperty(name='Preserved source', type=bpy.types.Object,
@@ -1255,7 +1266,8 @@ class GNMRestorationRegion(PropertyGroup):
     anatomy: EnumProperty(name='Anatomy', items=[('CRANIUM', 'Cranium', ''),
         ('MANDIBLE', 'Mandible', ''), ('NASAL', 'Nasal / central', ''), ('OTHER', 'Other', '')])
     action: EnumProperty(name='Action', items=[('KEEP', 'Keep preserved', 'Protect this original fragment without mirroring'),
-        ('MIRROR', 'Mirror selected region', 'Generate an inferred patch on the opposite side; originals remain untouched')], default='KEEP')
+        ('MIRROR', 'Mirror selected region', 'Generate an inferred patch on the opposite side; originals remain untouched'),
+        ('DONOR', 'External donor copy', 'Created by Copy Aligned External Donor Region')], default='KEEP')
     donor_side: EnumProperty(name='Anatomical donor side', items=[('DR', 'Right', ''), ('ST', 'Left', '')])
     plane_object: PointerProperty(name='Region reference plane', type=bpy.types.Object,
         description='Optional local XY plane; required for an unarticulated mandible')
@@ -1287,6 +1299,9 @@ def _restoration_records(scene):
                       mandible_articulated=scene.gnm_settings.mandible_aligned)
         if item.result_object and item.result_object.get('gnm_region_patch') == item.uid:
             record['generated_patch'] = json.loads(item.result_object.get('gnm_restoration_metadata', '{}'))
+            if item.result_object.data.get('gnm_origin_kind'):
+                record['region_id'] = item.uid
+                record['face_origin'] = item.result_object.data['gnm_origin_kind']
         records.append(record)
     return records
 
@@ -1391,6 +1406,9 @@ class GNM_OT_mirror_reconstruct(Operator):
                 mesh = bpy.data.meshes.new('GNM_Inferred_' + row.name)
                 mesh.from_pydata(vertices, [], faces)
                 mesh.update()
+                if scene.gnm_tag_mirrors or (obj is not None and obj.data.get('gnm_origin_kind')=='mirrored'):
+                    _core_module('blender_surface_origin').tag(mesh,'mirrored')
+                    metadata['origin']='mirrored'
                 if obj is None:
                     obj = bpy.data.objects.new('GNM_Inferred_' + row.name, mesh)
                     scene.collection.objects.link(obj)
@@ -1487,7 +1505,7 @@ class GNM_UL_markers(UIList):
         side_str = "[M]" if item.side == 0 else ("[R]" if item.side == -1 else "[L]")
         row.label(text=f"{side_str} {item.label}")
         row.prop(item, "use_for_fit", text="")
-        if context.scene.gnm_guide_active:
+        if context.scene.gnm_guide_active or context.scene.gnm_origin_policy:
             try:
                 included,weight,reason = _marker_terms(context.scene,item)
                 row.label(text=f'{weight:g}' if included else reason)
@@ -1613,15 +1631,19 @@ class GNM_PT_panel(Panel):
         if scene.gnm_restoration_regions:
             region = scene.gnm_restoration_regions[scene.gnm_restoration_active_index]
             box2.prop(region, 'name')
-            box2.prop(region, 'source_object')
+            if region.action!='DONOR':
+                box2.prop(region, 'source_object')
+                box2.prop(region, 'action')
+            else:
+                box2.label(text='External donor copy; never observed bone')
             box2.prop(region, 'anatomy')
-            box2.prop(region, 'action')
             if region.action == 'MIRROR':
                 if region.source_object:
                     box2.prop_search(region, 'vertex_group', region.source_object, 'vertex_groups')
                 box2.prop(region, 'donor_side')
                 box2.prop(region, 'plane_object')
             box2.prop(region, 'notes')
+        _core_module('blender_surface_origin').draw(box2,scene)
         box2.prop(settings, 'aplica_materiale_distincte')
         row2 = box2.row(align=True)
         row2.operator('gnm.toggle_plane_preview', icon='MESH_PLANE', text='Plane')
@@ -2143,7 +2165,7 @@ def _update_gerasimov_ghost(scene, ger):
 # -----------------------------------------------------------------------
 def _record_marker_surface(item, hit_object, geometry_digest=None):
     scene = bpy.context.scene
-    inferred = hit_object is not None and bool(hit_object.get('gnm_reconstructed_via_mirroring'))
+    inferred = hit_object is not None and bool(hit_object.get('gnm_reconstructed_via_mirroring') or hit_object.get('gnm_external_donor'))
     source = next((r for r in _bone_sources(scene) if r.source_object == hit_object), None)
     if not inferred and source is None:
         raise ValueError('Marker source is not registered observed bone')
@@ -2506,19 +2528,26 @@ def _fingerprint(scene):
                       round(t.x, 3), round(t.y, 3), round(t.z, 3)))
     if getattr(scene,'gnm_guide_active',''):
         parts.append(scene.gnm_guide_active)
+    if getattr(scene,'gnm_origin_policy',''):
+        parts.append(scene.gnm_origin_policy)
     parts.append(_core_module('blender_craniometry').fingerprint(scene))
     return tuple(parts)
 
 
-def _marker_terms(scene, item):
+def _marker_terms(scene, item, *, origin_factors=True):
     weight = _weight_of(item.label, item)
-    if not getattr(scene, 'gnm_guide_active', ''):
-        return item.use_for_fit, weight, ''
-    try:
-        spec = _core_module('blender_scenarios').active(scene)
-    except ValueError:
-        return False,weight,'stale guide; clear or reapply'
-    return _core_module('scenarios').decision(spec,item.label,item.bone_status,item.use_for_fit,weight)
+    terms = item.use_for_fit,weight,''
+    if item.bone_empty and item.bone_empty.get('gnm_repaired_face') and item.bone_status!='reconstructed':
+        return False,weight,'repaired face mislabelled; review provenance'
+    if getattr(scene, 'gnm_guide_active', ''):
+        try:
+            spec = _core_module('blender_scenarios').active(scene)
+        except ValueError:
+            return False,weight,'stale guide; clear or reapply'
+        terms = _core_module('scenarios').decision(spec,item.label,item.bone_status,*terms[:2])
+    if origin_factors and getattr(scene,'gnm_origin_policy',''):
+        return _core_module('blender_surface_origin').terms(scene,item,*terms)
+    return terms
 
 
 def _included_fit_markers(scene):
@@ -2528,7 +2557,7 @@ def _included_fit_markers(scene):
     in panel drawing. Full validation remains in the actual fit/export path.
     """
     for item in scene.gnm_markers:
-        if item.is_placed and item.use_for_fit and (not getattr(scene,'gnm_guide_active','') or _marker_terms(scene,item)[0]):
+        if item.is_placed and item.use_for_fit and _marker_terms(scene,item)[0]:
             vertex = _resolve_vertex(item)
             if vertex is not None:
                 yield item, vertex
@@ -2538,6 +2567,8 @@ def _build_snapshot(scene):
     """Colecteaza perechile (eticheta, vertex, tinta-piele, pondere) pentru
     markerii plasati si mapati. Ruleaza pe MAIN thread (citeste bpy)."""
     _core_module('blender_articulation').require_review(scene)
+    if getattr(scene,'gnm_origin_policy',''):
+        _core_module('blender_surface_origin').metadata(scene,None)
     if getattr(scene,'gnm_guide_active',''):
         _core_module('blender_scenarios').active(scene)
     labels, verts, tgts, ws = [], [], [], []
@@ -3816,6 +3847,7 @@ def _export_markers(scene, path):
             "plane_marker_labels": [item.label for item in _plane_markers(scene)],
             "restoration_regions": _restoration_records(scene),
             "target_construction": "bone plus operator-reviewed depth/direction; local normal is initial heuristic"}
+    meta.update(_core_module('blender_surface_origin').metadata(scene,manifest))
     meta.update(_core_module('blender_scenarios').metadata(scene))
     meta.update(_core_module('blender_proposal_review').export_receipts(scene))
     meta.update(_core_module('blender_tissue').scene_age_metadata(scene))
@@ -4086,6 +4118,7 @@ def register():
     _core_module('blender_proposal_review').register()
     _core_module('blender_repeatability').register(sys.modules[__name__])
     _core_module('blender_scenarios').register(sys.modules[__name__])
+    _core_module('blender_surface_origin').register(sys.modules[__name__])
     _core_module('blender_record').register(sys.modules[__name__])
     # V13: reset fingerprint-uri la incarcarea unui .blend (persistent +
     # dedup, pentru a supravietui reload-ului F8 fara dubluri).
@@ -4098,6 +4131,7 @@ def unregister():
     # Stop the external process, preview timer and handlers first.
     _stop_offline()
     _core_module('blender_record').unregister()
+    _core_module('blender_surface_origin').unregister()
     _core_module('blender_scenarios').unregister()
     _core_module('blender_repeatability').unregister()
     _core_module('blender_proposal_review').unregister()

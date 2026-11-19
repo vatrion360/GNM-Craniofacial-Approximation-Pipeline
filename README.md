@@ -21,6 +21,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Opt-in anatomical reference frame and standardized views](docs/REFERENCE_FRAME.md)
 - [Protocol-defined cranial features and conditional intervals](docs/CRANIAL_FEATURES.md)
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
+- [Original, mirrored and donor bone: placement and fit policy](docs/FACE_ORIGIN.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Optional derived approximation record and provenance](docs/APPROXIMATION_RECORD.md)
 - [Export a saved-fit approximation record from Blender](docs/BLENDER_APPROXIMATION_RECORD.md)
@@ -98,6 +99,7 @@ Use **Extended 48**, **Paper 32** or **Legacy 27**, then **Add Missing Markers**
 | Reference skull | None | Optional annotated mesh from a separate scene; text remains available without it |
 | Refresh Reference View | Explicit click | Show a local-axis snapshot of the reference; mark a reviewed site only if visible |
 | [Manual placement repeatability (A/B)](docs/PLACEMENT_REPEATABILITY.md) | Off | Measure two manual bone picks per site in a clean case copy; export world-mm distances without creating fit markers |
+| [Face provenance and donor regions](docs/FACE_ORIGIN.md) | Off | Tag reviewed fragments, record which polygon was picked and optionally adjust marker weights and placement SD by origin |
 | [Guided skull scenario](docs/GUIDED_SCENARIOS.md) | Off | Preview and apply case-specific marker exclusions, optional sourced weights and required scientific export checks |
 | Fragment landmark proposals | Off | On request, register a named atlas patch to one active observed bone source; write review-only coordinates to a Blender text block |
 | Proposal review queue | No placements until confirmation | Inspect lowest geometric support first; confirm one site, adjust it with the 3D cursor, or reject it |

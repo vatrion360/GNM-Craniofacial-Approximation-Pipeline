@@ -5,7 +5,8 @@ import numpy as np
 
 def generated_surface(obj):
     """Generated faces/pegs/patches cannot be registered as observed bone."""
-    return (any(obj.get(key) for key in ('gnm_generated', 'gnm_report', 'gnm_region_patch', 'gnm_reconstructed_via_mirroring'))
+    return ((obj.type == 'MESH' and obj.data.get('gnm_origin_kind') in ('mirrored','donor'))
+            or any(obj.get(key) for key in ('gnm_generated', 'gnm_report', 'gnm_region_patch', 'gnm_reconstructed_via_mirroring'))
             or obj.name.startswith(('GNM_HEAD', 'GNM_Offline_', 'GNM_BAT_', 'GNM_LM_', 'GNM_GERASIMOV')))
 
 
@@ -24,6 +25,9 @@ def evaluated_geometry(obj, depsgraph, flip_normals=False):
     """
     if obj.type != 'MESH' or obj.mode != 'OBJECT':
         raise ValueError('Use a mesh in Object Mode')
+    if obj.data.get('gnm_origin_kind') is not None or obj.data.attributes.get('gnm_bone_origin') is not None:
+        from .blender_surface_origin import check
+        check(obj.data,obj)
     evaluated = obj.evaluated_get(depsgraph)
     mesh = evaluated.to_mesh()
     try:

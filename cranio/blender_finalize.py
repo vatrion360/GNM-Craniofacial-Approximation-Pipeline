@@ -40,7 +40,7 @@ def _markers(scene, addon, sources):
                     patch = next((r.result_object for r in scene.gnm_restoration_regions if r.enabled
                         and r.uid == source and r.result_object and scene.objects.get(r.result_object.name) == r.result_object
                         and r.result_object.get('gnm_region_patch') == source
-                        and r.result_object.get('gnm_reconstructed_via_mirroring')), None)
+                        and (r.result_object.get('gnm_reconstructed_via_mirroring') or r.result_object.get('gnm_external_donor'))), None)
                     if patch is not None:
                         patches[source] = addon._core_module('blender_sources').evaluated_geometry(
                             patch, bpy.context.evaluated_depsgraph_get())[2]
@@ -135,5 +135,6 @@ def create(context, addon):
         mandible_pose=addon._core_module('blender_articulation').snapshot(scene),
         dense_enabled=bool(snap['dense']), dense_scalp_only=bool(st.dense_scalp_only),
         bone_sampling_seed=live.skull['seed'] if dense is not None else None)
+    record.update(addon._core_module('blender_surface_origin').metadata(scene,sources))
     record.update(addon._core_module('blender_scenarios').metadata(scene))
     return _publish(context, source, vertices, record), record
