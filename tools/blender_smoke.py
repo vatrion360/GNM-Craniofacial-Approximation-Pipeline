@@ -41,6 +41,7 @@ from blender_atlas_checks import run_atlas_checks
 from blender_finalize_checks import run_finalize_checks
 from blender_spline_checks import run_spline_checks, run_preparation_checks
 from blender_performance_checks import run_performance_checks
+from blender_dental_checks import run_dental_pick, run_saved_dental
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
 from blender_tissue_checks import run_tissue_checks, run_tissue_undo_checks
 from blender_context_checks import run_context_checks
@@ -276,6 +277,7 @@ with tempfile.TemporaryDirectory() as directory:
                 # timer returning None, unlike Blender's event loop.
                 if bpy.app.timers.is_registered(addon._offline_poll):
                     bpy.app.timers.unregister(addon._offline_poll)
+                run_saved_dental(scene, directory, folder)
                 run_record_checks(addon, scene, directory, folder, imported[0])
                 run_capture_checks(addon, scene, directory, folder, imported[0])
                 run_spline_checks(addon, model, directory, os.environ['GNM_EXTERNAL_PYTHON'])
@@ -303,6 +305,7 @@ with tempfile.TemporaryDirectory() as directory:
         run_queue_checks(addon)
         run_repeatability_checks(addon)
         run_scenario_checks(addon)
+        run_dental_pick(addon)
         run_surface_origin_checks(addon)
         if os.environ.get('GNM_MODEL_PATH') and os.environ.get('GNM_EXTERNAL_PYTHON'):
             run_finalize_checks(addon, directory)

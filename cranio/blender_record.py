@@ -5,16 +5,20 @@ import textwrap
 import uuid
 
 import bpy
-from bpy.props import EnumProperty, PointerProperty, StringProperty, IntProperty, FloatProperty
+from bpy.props import BoolProperty, EnumProperty, PointerProperty, StringProperty, IntProperty, FloatProperty
 from bpy.types import Operator, Panel, PropertyGroup
 
-from . import record_job
+from . import record_job, blender_dental
 
 _api = None
 _JOB = dict(process=None, log=None, scene=None, folder=None, request=None)
 
 
 class GNMRecordSettings(PropertyGroup):
+    show_dental: BoolProperty(name='Observed vs fitted dentition', default=False)
+    dental_sites: StringProperty(name='Dental sites JSON', subtype='FILE_PATH')
+    dental_output: StringProperty(name='New dental comparison JSON', subtype='FILE_PATH')
+    dental_status: StringProperty(default='')
     report_path: StringProperty(name='Saved fit report JSON', subtype='FILE_PATH')
     output_parent: StringProperty(name='Output parent folder', subtype='DIR_PATH',
         description='A new record subfolder is created here; empty uses the source report folder')
@@ -301,6 +305,7 @@ class GNM_PT_record(Panel):
         column.operator('gnm.export_approximation_record', text='Summarize Saved-fit Consistency').diagnostics = True
         column.label(text='Diagnostics only; missing checks stay not assessed')
         column.separator()
+        blender_dental.draw(column, settings)
         column.prop(settings, 'export_mode')
         export = column.row()
         export.enabled = settings.export_mode != 'NONE'
@@ -323,7 +328,7 @@ class GNM_PT_record(Panel):
         layout.label(text='Integrity and provenance are not scientific validation')
 
 
-CLASSES = (GNMRecordSettings, GNM_OT_record_use_active, GNM_OT_record_export, GNM_OT_capture_bundle, GNM_OT_record_cancel, GNM_PT_record)
+CLASSES = (GNMRecordSettings, blender_dental.GNM_OT_dental_consistency, GNM_OT_record_use_active, GNM_OT_record_export, GNM_OT_capture_bundle, GNM_OT_record_cancel, GNM_PT_record)
 
 
 def register(addon):
