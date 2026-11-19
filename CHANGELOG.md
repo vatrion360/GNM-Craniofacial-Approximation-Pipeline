@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add an optional offline mesh-coherence command to count eligible facial vertices inside a reviewed closed bone volume, with explicit boundary and incomplete results.
+
 - Add a source-checkout runner to record and replay offline fits against compact regression snapshots, with two synthetic cases.
 
 - Fix saving a reviewed mandibular pose when Blender’s NumPy returns a float32 dental boundary tolerance. The review JSON now stores the computed value as a number.
