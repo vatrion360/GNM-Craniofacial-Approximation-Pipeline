@@ -64,5 +64,5 @@ def check_surfaces(lower, upper, tolerance_mm=None):
         intersection_triangle_pairs=intersections, lower_in_upper=counts[0], upper_in_lower=counts[1],
         minimum_sampled_vertex_gap_mm=min(gaps), vertex_samples=len(gaps), contact_tolerance_mm=tolerance_mm,
         vertices_within_contact_tolerance=None if tolerance_mm is None else sum(g <= tolerance_mm for g in gaps),
-        numerical_boundary_epsilon_mm=epsilon,
+        numerical_boundary_epsilon_mm=float(epsilon),
         interpretation='Geometric indicators only; no certified non-penetration, physiological occlusion or suitable jaw pose')
