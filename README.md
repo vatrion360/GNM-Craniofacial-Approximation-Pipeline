@@ -25,6 +25,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Optional derived approximation record and provenance](docs/APPROXIMATION_RECORD.md)
 - [Export a saved-fit approximation record from Blender](docs/BLENDER_APPROXIMATION_RECORD.md)
+- [Observed incisors and canines vs the neutral saved fit](docs/DENTAL_CONSISTENCY.md)
 - [Gated scientific/illustrative saved-fit mesh export](docs/SAVED_FIT_EXPORT.md)
 - [Explicit saved-report checks and configured criteria](docs/CHECK_POLICY.md)
 - [Saved-fit consistency diagnostics and triangle quality](docs/POSTFIT_CONSISTENCY.md)
@@ -587,6 +588,7 @@ See [metric definitions, output files and limits](docs/POSTFIT_CONSISTENCY.md).
 | `--report FILE` | Required | Completed saved world-mm report |
 | `--output-dir DIR` | Required/new | JSON/TXT diagnostics, source record and completion manifest |
 | `--artifacts DIR` | Report folder | Explicit relocated saved outputs |
+| [Observed vs fitted dentition](docs/DENTAL_CONSISTENCY.md) / `python -m cranio.dental_consistency` | Off | Compare reviewed tooth sites on both saved meshes; optionally report the change in tooth-to-fitted-lip distance |
 | Summarize Saved-fit Consistency | Explicit click | Separate diagnostic job; no fit/default/scene changes |
 
 ## NumPy local spline (numerical API, opt-in)

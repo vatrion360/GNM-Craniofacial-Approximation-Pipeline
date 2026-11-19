@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add an optional saved-fit dental comparison in Blender and the CLI. Compare reviewed incisor/canine positions on observed dentition with the two saved GNM meshes; optionally measure a tooth-to-fitted-lip chord difference. No new tooth fit, thresholds or default behavior.
+
 - Add optional C1 bone geometry and reviewed dentition screens in offline fits. The case policy and per-marker actions are recorded; missing evidence stays unassessed. No bundled anatomical bounds, diagnoses or default fit changes.
 
 - Track markers on original, mirrored and external donor faces in Blender, v3 CSV and derived records. Optional case-specific factors adjust fit weights and placement uncertainty; unset factors do not supply missing evidence. Existing untagged workflows are unchanged.
