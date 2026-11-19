@@ -22,6 +22,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 - [Protocol-defined cranial features and conditional intervals](docs/CRANIAL_FEATURES.md)
 - [Mixed fragments, duplicates and adaptive lambda](docs/FRAGMENT_RESTORATION.md)
 - [Original, mirrored and donor bone: placement and fit policy](docs/FACE_ORIGIN.md)
+- [Manual CloudCompare/CT evaluation: lock cases, import distances, summarize by subject](docs/validation_protocol.md)
 - [Validation protocol and current evidence](docs/VALIDATION.md)
 - [Optional derived approximation record and provenance](docs/APPROXIMATION_RECORD.md)
 - [Export a saved-fit approximation record from Blender](docs/BLENDER_APPROXIMATION_RECORD.md)
@@ -629,3 +630,9 @@ See [operation, provenance and QC limits](docs/BLENDER_LOCAL_FINALIZE.md).
 | Blender control | Default | Effect |
 |---|---|---|
 | Finalize Local Fit (New Mesh) | Explicit click | Current live settings, NumPy correction, independent neutral mesh and basic QC |
+
+## Manual validation case ledger (C3)
+
+| Offline command | Default | Purpose |
+|---|---|---|
+| `python -m cranio.validation_cases init / freeze / summarize` | Not run during fitting | [Freeze a study arm and import external surface distances or paired anatomical coordinates](docs/validation_protocol.md); separate observer sessions, missing cases and nonblind analyses |

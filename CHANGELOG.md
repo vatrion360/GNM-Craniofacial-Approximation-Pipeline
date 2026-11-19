@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add a manual study ledger for paired CT evaluation and historical inventory. Freeze case meshes, import reviewed surface fields or anatomical point pairs, and report subject-weighted summaries with failures and study arms kept distinct. Does not run CT registration, fit a mesh or change defaults.
+
 - Add an optional saved-fit dental comparison in Blender and the CLI. Compare reviewed incisor/canine positions on observed dentition with the two saved GNM meshes; optionally measure a tooth-to-fitted-lip chord difference. No new tooth fit, thresholds or default behavior.
 
 - Add optional C1 bone geometry and reviewed dentition screens in offline fits. The case policy and per-marker actions are recorded; missing evidence stays unassessed. No bundled anatomical bounds, diagnoses or default fit changes.
