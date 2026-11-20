@@ -23,7 +23,7 @@ python gnm_reconstruct.py --input case.csv --npz /models/gnm_head.npz --output o
 
 `--tissue-table` accepts a bundled ID or a local schema-valid JSON file. IDs do
 not trigger downloads. The input CSV is never rewritten. Without replacement
-labels, every case target and weight remains unchanged. With explicit labels,
+labels, every case target is preserved. Weights change only if SD weighting is enabled. With explicit labels,
 those values **including manual/individual measurements** are deliberately
 replaced; all other markers retain their values. There is no provenance-based
 guess about which manual values should be overridden.
@@ -127,7 +127,7 @@ No subject CT accuracy, cohort applicability, direction equivalence
 or calibrated uncertainty is established by these tests. CT validation remains
 with the project author. No new anatomical constants or model weights are added.
 
-## Optional SD weighting (A1.4, offline CLI)
+## Optional SD weighting (A1.4, offline fits)
 
 `--depth-weighting sd --tissue-table ID_OR_JSON` multiplies the existing fit
 weight of each included marker by `1 / sd_mm^2` from the matching landmark row.
@@ -178,6 +178,16 @@ TXT reports name the mode and warnings. Frozen protocols include the mode and
 source table hash. `--tissue-compare` passes the mode to every independent fit
 and names it in its summary; differences are sensitivity maps, not accuracy.
 
-This step exposes the switch in the **offline CLI only**. The shared NumPy
-solver/preview adapter accepts the same prepared weights, but there is no new
-live Blender checkbox or automatic change to scene marker values.
+In Blender, open **Offline fit (external Python)**, enable **Weight offline fit
+by tissue SD**, and choose the **SD reference**. Choose **Local JSON table**
+to supply a versioned table with documented SDs. This selector is shared with
+the tissue scenario panel. Run **Run Offline Fit and Import** directly, without
+applying table depths to the scene. Both arms of an offline prior comparison
+also use the selected weighting.
+
+Each weighted run saves the exact input bytes as `weighting_table.json` in its
+case folder. The JSON report identifies that copy by path and SHA-256. After
+an ordinary fit, Blender shows how many retained markers had an SD. For
+example, `0/47` means all 47 retained markers used their base weights. The
+count covers landmarks only. Regional factors for dense fitting appear in the
+JSON report.

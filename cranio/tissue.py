@@ -168,10 +168,14 @@ def table_path(source: str | Path) -> Path:
     return Path(source).expanduser()
 
 
-def load_table(source: str | Path) -> TissueTable:
-    raw = table_path(source).read_bytes()
+def parse_table(raw: bytes) -> TissueTable:
+    """Validate, decode and hash the same bytes used for a recorded table."""
     document, warnings = validate_table(_json(raw.decode('utf-8-sig')))
     return TissueTable(document, warnings, hashlib.sha256(raw).hexdigest())
+
+
+def load_table(source: str | Path) -> TissueTable:
+    return parse_table(table_path(source).read_bytes())
 
 
 def write_table(path: str | Path, document: dict) -> None:
