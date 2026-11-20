@@ -236,10 +236,11 @@ def distances(path, column, separator, signed):
             values.append(v)
     if not values:
         raise ValueError('Empty distance field')
-    return _metrics(values,signed)
+    return distance_summary(values,signed)
 
 
-def _metrics(values,signed):
+def distance_summary(values, signed):
+    """Summarize a nonempty sequence of finite world-mm distances with equal sample weights."""
     a=np.array(values)
     scale=float(np.max(np.abs(a)))
     norm=a/scale if scale else a
@@ -270,7 +271,7 @@ def paired_points(path, separator, sites):
             measured[site]=value
     if set(measured)!=set(sites):
         raise ValueError('Missing planned paired site; document the unavailable outcome')
-    return _metrics(list(measured.values()),False), measured
+    return distance_summary(list(measured.values()),False), measured
 
 
 def _csv(rows,keys):

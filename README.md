@@ -46,7 +46,7 @@ A Blender marker add-on and an offline, auditable fitting pipeline for **supervi
 
 To rerun synthetic or external cases against a saved numerical reference, see the [offline baseline runner](docs/OFFLINE_BASELINE.md).
 
-For a registered skull and face, [measure facial vertices inside bone, uncovered bone area and regional thickness along reviewed directions](docs/MESH_COHERENCE.md).
+For a registered skull and face, [measure facial vertices inside bone, uncovered bone area, regional directional thickness and profile error against a withheld skin reference](docs/MESH_COHERENCE.md).
 
 ## Quick start
 

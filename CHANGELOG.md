@@ -1,5 +1,7 @@
 # Unreleased
 
+- Compare homologous cutaneous profile sites on a fitted face and a withheld registered reference. Report 3D and sagittal-plane errors in mm, eligible-site counts and omissions.
+
 - Add regional tissue thickness to the offline coherence report. Reviewed bone sites and signed directions give individual distances, skin endpoints and regional summaries in mm.
 
 - Measure the area of reviewed external bone without skin coverage along outward normals, using a case-specific search distance and explicit bone and skin facet selections.
