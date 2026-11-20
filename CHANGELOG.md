@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add regional tissue thickness to the offline coherence report. Reviewed bone sites and signed directions give individual distances, skin endpoints and regional summaries in mm.
+
 - Measure the area of reviewed external bone without skin coverage along outward normals, using a case-specific search distance and explicit bone and skin facet selections.
 
 - Add an optional offline mesh-coherence command to count eligible facial vertices inside a reviewed closed bone volume, with explicit boundary and incomplete results.
