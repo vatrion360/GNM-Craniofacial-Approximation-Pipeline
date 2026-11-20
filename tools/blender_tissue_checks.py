@@ -183,7 +183,7 @@ def run_offline_weighting_checks(addon, scene, directory, baseline_folder, basel
         assert snapshot.read_bytes() == raw
         report = json.loads((folder / 'face_report.json').read_text(encoding='utf-8'))
         assert report['config']['depth_weighting'] == 'sd'
-        assert Path(report['inputs']['tissue_table']['path']) == snapshot
+        assert snapshot.samefile(report['inputs']['tissue_table']['path'])
         assert report['inputs']['tissue_table']['sha256'] == hashlib.sha256(raw).hexdigest()
         metadata = report['marker_metadata']
         assert metadata['tissue_application']['replaced_labels'] == []
