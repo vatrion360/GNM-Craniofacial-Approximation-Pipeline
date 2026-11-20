@@ -1,6 +1,6 @@
 # T0.3 · Measuring coherence between bone and skin
 
-Use this offline comparison on a facial surface and bone segmentation already registered in the same world coordinate frame, in millimetres. The command accepts independent reviews for facial vertices inside bone, bone surface without cutaneous coverage and regional directional thickness. You can supply any combination in one run. The report also gives the minimum triangle angle across the complete saved face using the existing mesh-quality calculation.
+Use this offline comparison on a facial surface and bone segmentation already registered in the same world coordinate frame, in millimetres. The command accepts independent reviews for facial vertices inside bone, bone surface without cutaneous coverage, regional directional thickness and error at homologous profile points. You can supply any combination in one run. The report also gives the minimum triangle angle across the complete saved face using the existing mesh-quality calculation.
 
 ## Facial vertices inside a reviewed bone volume
 
@@ -150,4 +150,55 @@ Read `regional_thickness.regions` for the individual sites, measured and request
 
 The synthetic example gives **3.75 mm** along the oblique vector. One distinct cutaneous crossing is required within the finite forward segment, including its endpoints. Contact gives zero. Hits from adjacent facets at the same point are grouped. Distinct skin layers, an intervening skull surface, a grazing unresolved intersection, an inward direction or a miss give a null thickness with a reason. Each measured site records its origin, unit axis, endpoint and original skin triangle IDs for inspection. Its numerical tolerance in mm is 64 machine epsilons times the larger of the search limit and the maximum absolute source-facet coordinate. The whole skull is checked for an intervening surface on the segment. Interpretation still depends on the completeness of the segmentation.
 
-Independent reference-face profile error remains open in the T0.3 command. Existing per-fit contacts and deformation diagnostics are available in [saved-fit consistency](POSTFIT_CONSISTENCY.md).
+## Profile error against a withheld skin reference
+
+Use a measured skin surface from the **same subject** that was withheld from the fitting operator, including any facial depths derived from that reference. Preserve the registered skull frame and scale in mm. The evaluator records the segmentation and registration sources, identifies the midsagittal section on the skull and locates the planned homologous skin sites on both faces. Choose the site definitions and the tolerance around the plane before inspecting errors. Exclude non-skin geometry, including lateral scan residues. For a missing or ambiguous landmark, keep its name and record a reason.
+
+1. Supply the saved approximation and reference to obtain the hashes of all three meshes. The reference accepts triangulated STL, PLY or the restricted OBJ format described above.
+
+   ```sh
+   python -m cranio.coherence --skull bone.stl --face fitted.obj --profile-reference reference_skin.stl
+   ```
+
+2. For each site, record the zero-based triangle index and its three barycentric weights on **each** surface. The meshes may have different vertex counts and triangle orders. The marker example above shows how to compute weights from a selected world-mm point. Verify corner order against each saved file. For an exact vertex, assign weight 1 to its corner. Declare the midsagittal plane with its origin, normal and permitted absolute point-to-plane distance in mm. The normal can have either sign.
+
+   The following illustrates the review format. Replace the example facet IDs, plane and tolerance with the reviewed case data.
+
+   ```json
+   {
+     "schema": "gnm.profile-error-review.v1",
+     "skull_sha256": "<skull hash>",
+     "face_sha256": "<approximation hash>",
+     "reference_sha256": "<reference hash>",
+     "reference_source": "<subject skin segmentation revision and evaluation record>",
+     "reference_access": "withheld",
+     "registration_source": "<shared skull-based world-mm registration record>",
+     "plane": {
+       "origin_mm": [0, 0, 0],
+       "normal_world": [1, 0, 0],
+       "source": "<reviewed skull-based plane definition>",
+       "tolerance_mm": 1
+     },
+     "sites": {
+       "Gl": {
+         "approx": {"triangle": 12, "barycentric": [0.5, 0.25, 0.25]},
+         "reference": {"triangle": 43, "barycentric": [0, 1, 0]}
+       },
+       "Pg": {"reason": "Cutaneous chin landmark outside the reference scan"}
+     }
+   }
+   ```
+
+3. Run the calculation. The other coherence reviews can be included in the same command.
+
+   ```sh
+   python -m cranio.coherence --skull bone.stl --face fitted.obj --profile-reference reference_skin.stl --profile-review profile_review.json
+   ```
+
+Each measured site reports its two original world coordinates, their signed offsets from the plane, the **3D Euclidean distance** and the **distance projected into the sagittal plane**. For example, a discrepancy of 3 and 4 mm along orthogonal in-plane axes gives a profile error of 5 mm. An additional 1 mm perpendicular to the plane gives a 3D distance of √26 mm (about 5.10 mm), provided both points meet the declared plane tolerance. The command performs no ICP or other fit. The outcomes describe sampled homologous sites, not distances along the intervening contour.
+
+Read `profile_error.measured_count` alongside `site_count`. Both summaries give MAE, median, RMSE and P95 in mm, with equal weight per measured site. The 3D summary uses the C3 paired-point calculation. Inspect `sites` for explicit omissions, degenerate facets or off-plane anchors. A partial result summarizes only eligible sites. Zero eligible sites yield null summaries.
+
+`reference_access` describes access during fitting. Use `seen` for a previously inspected reference and `used` for a conditioned fit. Both leave the independent outcome unassessed. Byte-identical reference and fitted face or skull files also leave it unassessed. The evaluator is responsible for verifying subject identity, homology and independence. The [C3 study protocol](validation_protocol.md) records blinding, retrospective and conditioned arms, frozen runs and subject-level results. Historical approximations without a measured reference have no independent profile score.
+
+For recorded per-fit contacts and deformation diagnostics see [saved-fit consistency](POSTFIT_CONSISTENCY.md).

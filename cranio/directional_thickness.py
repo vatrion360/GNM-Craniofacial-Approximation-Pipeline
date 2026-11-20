@@ -21,6 +21,14 @@ def _vector(value, label):
     return np.asarray(value, dtype=float)
 
 
+def barycentric_point(tri, value):
+    """Locate a reviewed point in the stored corner order of its triangle."""
+    weights = _vector(value, 'barycentric')
+    if (np.any(weights < 0) or np.any(weights > 1) or abs(math.fsum(weights)-1.) > ROUND_OFF):
+        raise ValueError('Barycentric weights must lie on the selected triangle and sum to one')
+    return weights, (weights / weights.sum()) @ tri
+
+
 def _named_rows(value, label):
     if not isinstance(value, dict) or not value or not all(key.strip() for key in value):
         raise ValueError(f'Expected named {label}')
@@ -73,11 +81,8 @@ def _site(row, skull, skin, skin_ids, reach):
     index = row['bone_triangle']
     if type(index) is not int or not 0 <= index < len(skull.faces):
         raise ValueError('Invalid source bone triangle index')
-    weights = _vector(row['barycentric'], 'barycentric')
-    if (np.any(weights < 0) or np.any(weights > 1) or abs(math.fsum(weights)-1.) > ROUND_OFF):
-        raise ValueError('Barycentric weights must lie on the selected bone triangle and sum to one')
     tri = skull.triangles[index]
-    origin = (weights / weights.sum()) @ tri
+    weights, origin = barycentric_point(tri, row['barycentric'])
     result = dict(status='not_assessed', reason=None, thickness_mm=None, bone_triangle=index,
                   barycentric=weights.tolist(), bone_xyz_mm=origin.tolist(), direction_source=row['direction_source'])
     axis = None if row['axis_world'] is None else unit_vector(_vector(row['axis_world'], 'axis_world'), 'axis_world')

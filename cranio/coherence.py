@@ -12,23 +12,24 @@ from .anomaly import documented
 from .bone_coverage import measure_coverage
 from .consistency import saved_obj_mesh, triangle_angles
 from .directional_thickness import measure_thickness
+from .profile_error import measure_profile
 from .record import canonical_bytes
 from .tissue import _json
 
 
-def _skull_mesh(raw, suffix):
+def _surface_mesh(raw, suffix):
     if suffix == '.obj':
         vertices, faces = saved_obj_mesh(raw)
     elif suffix in ('.ply', '.stl'):
         mesh = trimesh.load(io.BytesIO(raw), file_type=suffix[1:], process=False)
         if not isinstance(mesh, trimesh.Trimesh):
-            raise ValueError('Expected one triangulated skull mesh')
+            raise ValueError('Expected one triangulated mesh')
         vertices, faces = mesh.vertices, mesh.faces
     else:
-        raise ValueError('Supported skull formats are STL, PLY and pipeline OBJ')
+        raise ValueError('Supported surface formats are STL, PLY and pipeline OBJ')
     if (not len(faces) or faces.shape[1:] != (3,) or faces.min() < 0
             or faces.max() >= len(vertices) or not np.isfinite(vertices).all()):
-        raise ValueError('Invalid skull triangle geometry')
+        raise ValueError('Invalid surface triangle geometry')
     # STL repeats vertices per facet. Weld exact coordinate matches only.
     points, inverse = np.unique(vertices[faces].reshape(-1, 3), axis=0, return_inverse=True)
     return trimesh.Trimesh(points, inverse.reshape(-1, 3), process=False)
@@ -84,12 +85,13 @@ def _classify(mesh, points):
     return classes, epsilon
 
 
-def measure(skull_path, face_path, review_path=None, *, coverage_review_path=None, thickness_review_path=None):
+def measure(skull_path, face_path, review_path=None, *, coverage_review_path=None, thickness_review_path=None,
+            profile_reference_path=None, profile_review_path=None):
     skull_path, face_path = Path(skull_path), Path(face_path)
     skull_raw, face_raw = skull_path.read_bytes(), face_path.read_bytes()
     if face_path.suffix.lower() != '.obj':
         raise ValueError('Use a saved face OBJ with its original vertex order')
-    skull = _skull_mesh(skull_raw, skull_path.suffix.lower())
+    skull = _surface_mesh(skull_raw, skull_path.suffix.lower())
     face = saved_obj_mesh(face_raw)
     hashes = dict(skull=hashlib.sha256(skull_raw).hexdigest(), face=hashlib.sha256(face_raw).hexdigest())
     metric = dict(status='not_assessed', percent=None,
@@ -97,6 +99,16 @@ def measure(skull_path, face_path, review_path=None, *, coverage_review_path=Non
                   reason='No reviewed bone volume and facial vertex selection')
     result = dict(schema='gnm.mesh-coherence.v1', units='mm', input_sha256=hashes,
                   face_mesh_angles=triangle_angles(*face), skin_in_bone=metric)
+    if profile_review_path is not None and profile_reference_path is None:
+        raise ValueError('A profile review requires --profile-reference in the registered world-mm frame')
+    if profile_reference_path is not None:
+        path = Path(profile_reference_path)
+        raw = path.read_bytes()
+        reference = _surface_mesh(raw, path.suffix.lower())
+        profile_hashes = dict(hashes, reference=hashlib.sha256(raw).hexdigest())
+        result['input_sha256'] = profile_hashes
+        review_raw = Path(profile_review_path).read_bytes() if profile_review_path is not None else None
+        result['profile_error'] = measure_profile(face, reference, profile_hashes, review_raw)
     if coverage_review_path is not None:
         result['bone_without_skin_coverage'] = measure_coverage(
             skull, face, hashes, Path(coverage_review_path).read_bytes())
@@ -143,10 +155,13 @@ def main(argv=None):
     parser.add_argument('--review')
     parser.add_argument('--coverage-review', help='Reviewed bone and skin facets and outward search distance')
     parser.add_argument('--thickness-review', help='Regional bone sites, signed world axes and skin facets')
+    parser.add_argument('--profile-reference', help='Registered subject skin reference (STL, PLY or pipeline OBJ)')
+    parser.add_argument('--profile-review', help='Sagittal plane and homologous profile surface anchors')
     args = parser.parse_args(argv)
     try:
         result = measure(args.skull, args.face, args.review, coverage_review_path=args.coverage_review,
-                         thickness_review_path=args.thickness_review)
+                         thickness_review_path=args.thickness_review, profile_reference_path=args.profile_reference,
+                         profile_review_path=args.profile_review)
         print(canonical_bytes(result).decode('utf-8'), end='')
     except (OSError, ValueError, OverflowError) as exc:
         print(f'Cannot measure mesh coherence: {exc}', file=sys.stderr)
