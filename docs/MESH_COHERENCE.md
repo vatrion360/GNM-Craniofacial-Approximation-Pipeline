@@ -1,6 +1,6 @@
 # T0.3 · Measuring coherence between bone and skin
 
-Use this offline comparison on a facial surface and bone segmentation already registered in the same world coordinate frame, in millimetres. Supply a vertex review to measure facial vertices inside bone, a facet review to measure bone surface without skin coverage, or both in one command. The report also gives the minimum triangle angle across the complete saved face using the existing mesh-quality calculation.
+Use this offline comparison on a facial surface and bone segmentation already registered in the same world coordinate frame, in millimetres. The command accepts independent reviews for facial vertices inside bone, bone surface without cutaneous coverage and regional directional thickness. You can supply any combination in one run. The report also gives the minimum triangle angle across the complete saved face using the existing mesh-quality calculation.
 
 ## Facial vertices inside a reviewed bone volume
 
@@ -96,4 +96,58 @@ The calculation clips candidate skin triangles to each bone triangle's outward d
 
 Unreviewed normals or incomplete skin extent, degenerate selected facets, and duplicate or inconsistently oriented bone facets yield `not_assessed` and a null percentage. File-hash mismatches and invalid indices return exit 2. The operator verifies the skin extent and normal direction for each component, including isolated triangles. Anatomical interpretation and accuracy against an independent reference require additional evidence.
 
-Regional tissue thickness requires documented measurement directions and profile error requires homologous reference points. Existing per-fit contacts and deformation diagnostics are available in [saved-fit consistency](POSTFIT_CONSISTENCY.md).
+## Regional thickness along documented directions
+
+Measure the distance from a point on an external bone triangle to the selected cutaneous surface, along an explicitly signed world-space direction. The result for a fitted OBJ describes the **approximation**. To measure CT-derived thickness, use the corresponding bone and skin segmentations from that subject in the same world-mm frame. A segmented open patch can be used on either side.
+
+Use the inventory command to obtain both file hashes. For each region, select the skin facets that correspond to the bone sites and verify their extent in the mesh editor. Teeth, folded internal surfaces and scan residues can create additional crossings. Give each sampled site a name. Record the source bone triangle in saved file order, its outward winding, and the three barycentric weights locating the site within it. The weights correspond in order to the first, second and third corners of the triangle and must sum to one. For example, `[1, 0, 0]` selects its first corner. A site can be away from all three vertices. Use the same sampling sites, axes, search distance and masks when comparing runs on the same geometry. Update the hashes and review the masks for each new mesh.
+
+For a placed marker, use its bone endpoint. If you have the three saved world-mm triangle corners `a, b, c` (in file order) and the original world-mm endpoint `p`, the following gives candidate barycentric weights. Check the reconstructed point against the endpoint at the precision of your stored coordinates and verify the weights lie inside the triangle before saving them. A substantial discrepancy requires reviewing the triangle, frame or endpoint.
+
+```python
+import numpy as np
+a, b, c, p = np.asarray([a, b, c, p], dtype=float)
+uv, _, rank, _ = np.linalg.lstsq(np.column_stack((b - a, c - a)), p - a, rcond=None)
+assert rank == 2
+w = np.array([1.0 - uv.sum(), *uv])
+print(w.tolist(), "reconstructed endpoint error (mm)", np.linalg.norm(w @ np.array([a,b,c]) - p))
+```
+
+Supply the signed bone-to-skin vector as `axis_world`. For a reviewed marker axis with a positive length you can use tip minus bone in world mm. For a source-defined direction, record the protocol and its signed orientation in this case's anatomical frame. The command normalizes that vector. Set `reviewed` to true only after checking the anchor, winding, direction definition and corresponding skin selection. Use false and null direction fields to keep a pending site in the counts. The search limit is supplied by the operator.
+
+This synthetic review describes an oblique ray through parallel planes 3 mm apart. Replace the geometry, mask, source text and distance with your case values.
+
+```json
+{
+  "schema": "gnm.thickness-review.v1",
+  "skull_sha256": "<skull hash>",
+  "face_sha256": "<face hash>",
+  "review_source": "Synthetic planes in a common world-mm frame",
+  "max_distance_mm": 10,
+  "regions": {
+    "patch": {
+      "skin_triangles": [0],
+      "sites": {
+        "A": {
+          "bone_triangle": 0,
+          "barycentric": [0.5, 0.25, 0.25],
+          "axis_world": [3, 0, 4],
+          "direction_source": "Synthetic outward 3:4 axis in the world XZ plane",
+          "reviewed": true
+        }
+      }
+    }
+  }
+}
+```
+
+```sh
+python -m pip install ".[coherence]"
+python -m cranio.coherence --skull bone.stl --face fitted.obj --thickness-review thickness.json
+```
+
+Read `regional_thickness.regions` for the individual sites, measured and requested counts, and the minimum, median and maximum in mm over measured sites. Each named site counts once, so these statistics depend on sampling and carry no area or population weighting. A partial region retains successful measurements and identifies every omission. If all sites are unavailable, the summary is null.
+
+The synthetic example gives **3.75 mm** along the oblique vector. One distinct cutaneous crossing is required within the finite forward segment, including its endpoints. Contact gives zero. Hits from adjacent facets at the same point are grouped. Distinct skin layers, an intervening skull surface, a grazing unresolved intersection, an inward direction or a miss give a null thickness with a reason. Each measured site records its origin, unit axis, endpoint and original skin triangle IDs for inspection. Its numerical tolerance in mm is 64 machine epsilons times the larger of the search limit and the maximum absolute source-facet coordinate. The whole skull is checked for an intervening surface on the segment. Interpretation still depends on the completeness of the segmentation.
+
+Independent reference-face profile error remains open in the T0.3 command. Existing per-fit contacts and deformation diagnostics are available in [saved-fit consistency](POSTFIT_CONSISTENCY.md).
