@@ -9,6 +9,7 @@ import numpy as np
 import trimesh
 
 from .anomaly import documented
+from .bone_coverage import measure_coverage
 from .consistency import saved_obj_mesh, triangle_angles
 from .record import canonical_bytes
 from .tissue import _json
@@ -82,7 +83,7 @@ def _classify(mesh, points):
     return classes, epsilon
 
 
-def measure(skull_path, face_path, review_path=None):
+def measure(skull_path, face_path, review_path=None, *, coverage_review_path=None):
     skull_path, face_path = Path(skull_path), Path(face_path)
     skull_raw, face_raw = skull_path.read_bytes(), face_path.read_bytes()
     if face_path.suffix.lower() != '.obj':
@@ -95,6 +96,9 @@ def measure(skull_path, face_path, review_path=None):
                   reason='No reviewed bone volume and facial vertex selection')
     result = dict(schema='gnm.mesh-coherence.v1', units='mm', input_sha256=hashes,
                   face_mesh_angles=triangle_angles(*face), skin_in_bone=metric)
+    if coverage_review_path is not None:
+        result['bone_without_skin_coverage'] = measure_coverage(
+            skull, face, hashes, Path(coverage_review_path).read_bytes())
     if review_path is None:
         return result
     raw = Path(review_path).read_bytes()
@@ -134,9 +138,10 @@ def main(argv=None):
     parser.add_argument('--skull', required=True)
     parser.add_argument('--face', required=True)
     parser.add_argument('--review')
+    parser.add_argument('--coverage-review', help='Reviewed bone and skin facets and outward search distance')
     args = parser.parse_args(argv)
     try:
-        result = measure(args.skull, args.face, args.review)
+        result = measure(args.skull, args.face, args.review, coverage_review_path=args.coverage_review)
         print(canonical_bytes(result).decode('utf-8'), end='')
     except (OSError, ValueError, OverflowError) as exc:
         print(f'Cannot measure mesh coherence: {exc}', file=sys.stderr)

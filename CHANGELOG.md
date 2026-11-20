@@ -1,5 +1,7 @@
 # Unreleased
 
+- Measure the area of reviewed external bone without skin coverage along outward normals, using a case-specific search distance and explicit bone and skin facet selections.
+
 - Add an optional offline mesh-coherence command to count eligible facial vertices inside a reviewed closed bone volume, with explicit boundary and incomplete results.
 
 - Add a source-checkout runner to record and replay offline fits against compact regression snapshots, with two synthetic cases.
