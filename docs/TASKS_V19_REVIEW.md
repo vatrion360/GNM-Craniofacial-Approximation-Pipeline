@@ -60,7 +60,7 @@ revizie. Fișierele `test_addon_v13_headless.py` și `v13-test/` nu sunt prezent
 
 ## 2. Răspunsurile auditului T0.1
 
-Toate referințele `fișier:linie` de mai jos se referă la commit-ul indicat sus.
+Pentru revizia de după PR #63, vezi [auditul T0.1 din 20 noiembrie](AUDIT.md). Răspunsurile de mai jos și referințele `fișier:linie` descriu commit-ul din 29 octombrie.
 Sursa poate fi consultată la:
 https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline/tree/49a8ac1dfe263ef5c7c176a513fc05b67dc858e2
 
@@ -121,7 +121,7 @@ de acceptare din task sunt îndeplinite.
 
 | Task | Stare | Ce trebuie păstrat / adăugat |
 | --- | --- | --- |
-| T0.1 | Audit istoric existent; actualizare necesară | `docs/AUDIT.md` este din septembrie. Nu crea simultan `audit.md`: coliziune de nume pe Windows. |
+| T0.1 | Actualizat după PR #63 | [Auditul T0.1](AUDIT.md) documentează cele opt întrebări la revizia `af97f88`, cu surse fixate pe commit și verificări Python, Blender și T0.2. |
 | T0.2 | Implementat pentru regresie offline | Runnerul [T0.2](OFFLINE_BASELINE.md) repetă fituri din configurații externe și compară un snapshot numeric. Referința inclusă acoperă două cazuri sintetice. |
 | T0.3 | Indicatori geometrici implementați în CLI | [CLI pentru coerență](MESH_COHERENCE.md) măsoară procentul de vertecși faciali eligibili în volumul osos revizuit. [Raportul post-fit](POSTFIT_CONSISTENCY.md) acoperă unghiul minim, deformările și contactele înregistrate. Opțiunea `--coverage-review` măsoară aria osoasă fără acoperire cutanată pe normala exterioară, în limita distanței documentate. Opțiunea `--thickness-review` măsoară grosimile la puncte osoase pe direcții documentate și raportează minimul, mediana și maximul pe regiune. Opțiunile `--profile-reference` și `--profile-review` măsoară eroarea la repere cutanate omoloage, în 3D și în planul sagital documentat. Verificările pe geometrii sintetice sunt distincte de validarea manuală pe subiecți CT. |
 | A1.1–A1.3 | Parțial | Există un tabel citat și selecția/aplicarea lui; lipsesc schema generală, migrarea tuturor constantelor și comparația între tabele. |
