@@ -123,7 +123,7 @@ de acceptare din task sunt îndeplinite.
 | --- | --- | --- |
 | T0.1 | Audit istoric existent; actualizare necesară | `docs/AUDIT.md` este din septembrie. Nu crea simultan `audit.md`: coliziune de nume pe Windows. |
 | T0.2 | Implementat pentru regresie offline | Runnerul [T0.2](OFFLINE_BASELINE.md) repetă fituri din configurații externe și compară un snapshot numeric. Referința inclusă acoperă două cazuri sintetice. |
-| T0.3 | Parțial | [CLI pentru coerență](MESH_COHERENCE.md) măsoară procentul de vertecși faciali eligibili în volumul osos revizuit. [Raportul post-fit](POSTFIT_CONSISTENCY.md) acoperă unghiul minim, deformările și contactele înregistrate. Acoperirea suprafeței osoase, grosimile regionale și profilul de referință rămân deschise în CLI-ul T0.3. |
+| T0.3 | Parțial | [CLI pentru coerență](MESH_COHERENCE.md) măsoară procentul de vertecși faciali eligibili în volumul osos revizuit. [Raportul post-fit](POSTFIT_CONSISTENCY.md) acoperă unghiul minim, deformările și contactele înregistrate. Opțiunea `--coverage-review` măsoară aria osoasă fără acoperire cutanată pe normala exterioară, în limita distanței documentate. Grosimile regionale și eroarea de profil față de o referință rămân deschise în CLI-ul T0.3. |
 | A1.1–A1.3 | Parțial | Există un tabel citat și selecția/aplicarea lui; lipsesc schema generală, migrarea tuturor constantelor și comparația între tabele. |
 | A1.4 | Lipsește | Nu există ponderare explicită după SD. Ponderile curente sunt influențe relative. |
 | A1.5 | Parțial | Normale și proveniența direcției există; lipsește direcția definită de fiecare sursă tisulară. |
