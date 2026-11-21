@@ -113,15 +113,23 @@ def make_template(marker_path, table, labels):
     """Copy exact v3 anchors into an unreviewed template; never infer directions."""
     from .io_csv import read_marker_csv
     targets, _, meta = read_marker_csv(marker_path, {}, {})
-    if meta['version'] != 3 or not labels or len(set(labels)) != len(labels):
-        raise ValueError('Template requires v3 and distinct explicit labels')
-    targets = {t.label: t for t in targets}
+    if meta['version'] != 3:
+        raise ValueError('Template requires v3 marker records')
+    records = {target.label: meta['marker_records'][target.label] for target in targets}
+    return template_from_records(records, table, labels)
+
+
+def template_from_records(records, table, labels):
+    """Build the unreviewed manifest from explicit sites in the case's world-mm frame."""
+    if not labels or len(set(labels)) != len(labels):
+        raise ValueError('Template requires distinct explicit labels')
+    table_rows = table.document['landmarks']
     rows = {}
     for label in labels:
-        row = meta['marker_records'].get(label, {})
-        if label not in targets or 'bone_xyz_mm' not in row:
+        row = records.get(label, {})
+        if 'bone_xyz_mm' not in row:
             raise ValueError(f'{label}: placed included marker with bone coordinates required')
-        tissue_row = table.document['landmarks'].get(label)
+        tissue_row = table_rows.get(label)
         if tissue_row is None:
             raise ValueError(f'{label}: absent from tissue table')
         rows[label] = dict(bone_xyz_mm=row['bone_xyz_mm'], axis_world=None,

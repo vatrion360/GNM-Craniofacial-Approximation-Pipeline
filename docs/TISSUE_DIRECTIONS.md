@@ -34,7 +34,7 @@ rescales by the largest component before taking the norm, avoiding overflow.
 
 ## Prepare the manifest
 
-Export the case CSV v3 first, including bone endpoints. Generate an **unreviewed**
+From the CLI, export the case CSV v3 first, including bone endpoints. Generate an **unreviewed**
 template, copying exact anchors and source hashes without guessing any axes:
 
 ```bash
@@ -105,8 +105,17 @@ weights into a directional covariance or calibrated uncertainty estimate.
 
 In **Versioned tissue-table scenario**, select the table and placed markers using
 the existing depth checkboxes. Choose **Depth direction → Reviewed source
-directions**, select **Direction JSON**, review the manifest/frame and acknowledge
-**I reviewed the direction definitions and frame**. Then press
+directions**. To start a manifest, enter a new filename in **Direction JSON**
+and press **Create Unreviewed Direction Template**. Blender writes the current
+world-mm bone anchors and the recorded placement geometry hashes for the checked
+markers. This works before loading a GNM model and can include a placed marker
+excluded from fitting. Existing files are protected. The CLI accepts only markers
+included in the exported fit.
+
+Complete the signed vectors, source definitions and any required anatomical frame
+in the JSON as described above. If you already have a completed manifest, select
+that file directly. Review it and acknowledge **I reviewed the direction definitions
+and frame**. Then press
 **Replace Selected Depths from Table**. Changing mode, table or file path clears
 the acknowledgement. Merely changing settings does not move any markers.
 
