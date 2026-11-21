@@ -1,5 +1,7 @@
 # Validation and release gates
 
+For 5.1.0rc1 / add-on 20.0.0 see [T-FINAL](T_FINAL.md).
+
 ## Evidence for 5.0.0rc10 / add-on 19.0.0
 
 Local execution on 2026-10-16 with the reviewed official GNM asset: **211 passed,

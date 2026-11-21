@@ -1,7 +1,8 @@
 import ast
 from pathlib import Path
 import zipfile
-from tools.build_addon import build
+from tools.build_addon import build, default_archive
+from cranio import __version__
 
 
 def test_addon_zip_contains_core_and_cli(tmp_path):
@@ -49,6 +50,26 @@ def test_addon_zip_contains_core_and_cli(tmp_path):
         for name in names:
             if name.endswith('.py'):
                 compile(archive.read(name), name, 'exec')
+
+
+def test_candidate_archive_identity_and_reproducibility(tmp_path):
+    first = build(tmp_path / 'first.zip')
+    second = build(tmp_path / 'second.zip')
+    assert first.read_bytes() == second.read_bytes()
+    assert default_archive().name == f'gnm_cranio-{__version__}.zip'
+    with zipfile.ZipFile(first) as archive:
+        infos = archive.infolist()
+        assert all(info.date_time == (1980, 1, 1, 0, 0, 0) for info in infos)
+        assert archive.namelist() == sorted(set(archive.namelist()))
+        citation = archive.read('gnm_cranio/CITATION.cff').decode().splitlines()
+        assert f'version: {__version__}' in citation
+        source = ast.parse(archive.read('gnm_cranio/__init__.py').decode('utf-8'))
+        info = next(ast.literal_eval(node.value) for node in source.body if isinstance(node, ast.Assign)
+                    and any(isinstance(t, ast.Name) and t.id == 'bl_info' for t in node.targets))
+        addon_version = '.'.join(map(str, info['version']))
+        changelog = archive.read('gnm_cranio/CHANGELOG.md').decode()
+        assert f'# {__version__} / add-on {addon_version}' in changelog.splitlines()
+        assert 'gnm_cranio/docs/T_FINAL.md' in archive.namelist()
 
 
 def test_no_background_thread_creation_in_blender():

@@ -49,7 +49,9 @@ from blender_uncertainty_checks import run_uncertainty_checks
 from blender_direction_checks import run_direction_checks
 from blender_postfit_checks import run_postfit_checks
 
-archive = root / 'dist' / 'gnm_cranio-5.0.0rc10.zip'
+from build_addon import default_archive
+
+archive = default_archive()
 with tempfile.TemporaryDirectory() as directory:
     with zipfile.ZipFile(archive) as z:
         z.extractall(directory)

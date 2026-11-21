@@ -1,4 +1,4 @@
-"""GNM Craniofacial Markers 19.0.0 / software package 5.0.0rc10.
+"""GNM Craniofacial Markers 20.0.0 / software package 5.1.0rc1.
 
 Install the complete ZIP built with tools/build_addon.py. The bundled numerical
 core is imported under the add-on namespace. Optional previews run serially in
@@ -35,7 +35,7 @@ from bpy_extras import view3d_utils
 bl_info = {
     "name": "GNM Scientific Markers",
     "author": "VATRION",
-    "version": (19, 0, 0),
+    "version": (20, 0, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > GNM Markers",
     "category": "3D View",

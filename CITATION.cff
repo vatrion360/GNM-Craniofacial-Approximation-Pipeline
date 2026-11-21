@@ -1,13 +1,11 @@
-cff-version: 5.0.0
+cff-version: 1.2.0
 message: "If you use this software in your research, please cite it using the metadata below."
 authors:
   - name: "VATRION"
-    website: "https://github.com"
+    website: "https://github.com/vatrion360"
 title: "GNM-Craniofacial-Approximation-Pipeline: Blender add-on and offline fitting pipeline for supervised craniofacial approximation"
-version: 5.0.0rc8
-date-released: 2026-10-13
-doi: 10.5281/zenodo.23333535
-repository-code: "https://github.com/GNM-Craniofacial-Approximation-Pipeline"
+version: 5.1.0rc1
+repository-code: "https://github.com/vatrion360/GNM-Craniofacial-Approximation-Pipeline"
 license: Apache-2.0
 keywords:
   - "3d-skull"
