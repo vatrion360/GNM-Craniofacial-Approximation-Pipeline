@@ -1,5 +1,7 @@
 # Unreleased
 
+- Create an unreviewed tissue direction JSON directly from checked Blender markers, including world-mm bone anchors and available placement geometry hashes.
+
 - Expose optional tissue SD weighting when launching an offline fit from Blender. Each weighted run archives its reference table. Blender shows how many retained markers have an SD after an ordinary fit.
 
 - Compare homologous cutaneous profile sites on a fitted face and a withheld registered reference. Report 3D and sagittal-plane errors in mm, eligible-site counts and omissions.

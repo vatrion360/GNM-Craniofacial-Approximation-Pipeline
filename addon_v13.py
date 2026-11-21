@@ -565,6 +565,38 @@ class GNM_OT_apply_paper_tissues(Operator):
         return {'FINISHED'}
 
 
+class GNM_OT_create_direction_template(Operator):
+    bl_idname = 'gnm.create_direction_template'
+    bl_label = 'Create Unreviewed Direction Template'
+    bl_description = 'Write a new Direction JSON for the checked markers, leaving axes and frame for review'
+
+    @classmethod
+    def poll(cls, context):
+        settings = context.scene.gnm_settings
+        return (settings.tissue_axis_mode == 'SOURCE' and settings.tissue_table != 'NONE' and
+                any(m.adjust_depth_selected for m in context.scene.gnm_markers))
+
+    def execute(self, context):
+        settings = context.scene.gnm_settings
+        try:
+            if not settings.tissue_directions_path.strip():
+                raise ValueError('Enter a new file path in Direction JSON')
+            count = _core_module('blender_tissue').create_direction_template(
+                sys.modules[__name__], context, bpy.path.abspath(settings.tissue_directions_path))
+        except FileExistsError:
+            settings.tissue_status = 'Direction JSON already exists. Choose a new file for the template.'
+            self.report({'ERROR'}, settings.tissue_status)
+            return {'CANCELLED'}
+        except (ValueError, OSError, RuntimeError) as exc:
+            settings.tissue_status = str(exc)
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        settings.tissue_source_reviewed = False
+        settings.tissue_status = f'Created template for {count} markers. Complete and review the directions before Apply.'
+        self.report({'INFO'}, settings.tissue_status)
+        return {'FINISHED'}
+
+
 class GNM_OT_apply_tissue_table(Operator):
     bl_idname = 'gnm.apply_tissue_table'
     bl_label = 'Replace Selected Depths from Table'
@@ -1588,6 +1620,7 @@ class GNM_PT_panel(Panel):
         tissue_box.prop(settings, 'tissue_axis_mode')
         if settings.tissue_axis_mode == 'SOURCE':
             tissue_box.prop(settings, 'tissue_directions_path')
+            tissue_box.operator('gnm.create_direction_template', icon='FILE_NEW')
             tissue_box.prop(settings, 'tissue_source_reviewed')
         else:
             tissue_box.prop(settings, 'tissue_axis_existing')
@@ -4107,7 +4140,7 @@ _classes = (
     GNM_OT_recenter_on_plane, GNM_OT_asymmetry_report, GNM_OT_session_report,
     GNM_OT_capturi_standardizate, GNM_OT_mirror_reconstruct, GNM_OT_export_csv,
     GNM_UL_markers, GNM_PT_panel, GNM_OT_run_offline, GNM_OT_cancel_offline,
-    GNM_OT_check_python, GNM_OT_apply_paper_tissues, GNM_OT_apply_tissue_table,
+    GNM_OT_check_python, GNM_OT_apply_paper_tissues, GNM_OT_create_direction_template, GNM_OT_apply_tissue_table,
     GNM_OT_select_depth_markers, GNM_OT_adjust_marker_depths,
     # V13:
     GNMLiveSettings, GNM_OT_setup_dual_viewports, GNM_OT_toggle_skull_overlay,

@@ -28,21 +28,24 @@ def offline_weight_table(settings):
     return raw
 
 
-def apply_selected_table(addon, context, source, axis_acknowledged=False, direction_source=None, source_acknowledged=False):
-    """Explicit placed-marker replacement, preserving unselected case data and undo."""
-    if direction_source is not None and not source_acknowledged:
-        raise ValueError('Review the source direction manifest and frame explicitly before Apply')
-    if direction_source is None and not axis_acknowledged:
-        raise ValueError('Accept existing marker axes explicitly; source directions are not enforced')
+def _selected_marker_records(addon, context, check_source):
+    scene = context.scene
+    if not addon._is_mm_scene(scene):
+        raise ValueError('Expected metric scene scale 0.001: 1 Blender coordinate = 1 mm')
+    context.view_layer.update()
     selected = [m for m in context.scene.gnm_markers if m.adjust_depth_selected]
     if not selected:
         raise ValueError('Select at least one marker using the depth adjustment checkboxes')
-    targets, records = [], {}
+    records = {}
     source_digests = {}  # Per-transaction only: evaluate each selected surface once.
-    for i, item in enumerate(selected):
+    for item in selected:
         if not item.is_placed:
             raise ValueError(f'{item.label}: place bone and skin endpoints first')
-        if direction_source is not None and item.bone_empty.get('gnm_source_sha256_at_placement'):
+        if item.bone_empty.name not in scene.objects or item.target_empty.name not in scene.objects:
+            raise ValueError(f'{item.label}: marker endpoints must belong to the current scene')
+        if item.label in records:
+            raise ValueError(f'Duplicate selected landmark: {item.label}')
+        if check_source and item.bone_empty.get('gnm_source_sha256_at_placement'):
             normals = addon._core_module('blender_marker_normals')
             obj = normals.marker_source(context.scene, item)
             source_row = next((s for s in context.scene.gnm_bone_sources if s.enabled and s.source_object == obj), None)
@@ -56,10 +59,40 @@ def apply_selected_table(addon, context, source, axis_acknowledged=False, direct
                 raise ValueError(f'{item.label}: source changed since placement; review/re-place before applying directions')
         bone = np.asarray(item.bone_empty.matrix_world.translation, dtype=float)
         point = np.asarray(item.target_empty.matrix_world.translation, dtype=float)
-        targets.append(MarkerTarget(item.label, i, point, 1.))
         records[item.label] = dict(bone_xyz_mm=bone.tolist(), target_xyz_mm=point.tolist(),
             tissue_depth_mm=float(item.tissue_depth_mm), tissue_source=item.tissue_source,
             bone_source_geometry_sha256=item.bone_empty.get('gnm_source_sha256_at_placement', ''))
+    return selected, records
+
+
+def create_direction_template(addon, context, path):
+    """Write a new, unreviewed manifest from Blender's depth selection."""
+    from .tissue_directions import template_from_records
+    settings = context.scene.gnm_settings
+    table = load_table(selected_table_path(settings))
+    selected, records = _selected_marker_records(addon, context, check_source=True)
+    document = template_from_records(records, table, [item.label for item in selected])
+    raw = (json.dumps(document, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode('utf-8')
+    destination = Path(path)
+    stream = destination.open('xb')
+    try:
+        with stream:
+            stream.write(raw)
+    except OSError:
+        destination.unlink()
+        raise
+    return len(selected)
+
+
+def apply_selected_table(addon, context, source, axis_acknowledged=False, direction_source=None, source_acknowledged=False):
+    """Explicit placed-marker replacement, preserving unselected case data and undo."""
+    if direction_source is not None and not source_acknowledged:
+        raise ValueError('Review the source direction manifest and frame explicitly before Apply')
+    if direction_source is None and not axis_acknowledged:
+        raise ValueError('Accept existing marker axes explicitly; source directions are not enforced')
+    selected, records = _selected_marker_records(addon, context, check_source=direction_source is not None)
+    targets = [MarkerTarget(item.label, i, np.asarray(records[item.label]['target_xyz_mm']), 1.)
+               for i, item in enumerate(selected)]
     directions = None
     if direction_source is not None:
         from .tissue_directions import load_directions

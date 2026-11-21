@@ -20,12 +20,6 @@ def run_direction_checks(addon):
         table = tissue.empty_table('synthetic_direction')
         table['landmarks']['Nasion'] = dict(central_mm=4., measurement_direction='vertical')
         tissue.write_table(table_path, table)
-        manifest = dict(schema_version=1, units='mm', coordinate_space='world',
-            table_sha256s=[tissue.load_table(table_path).sha256],
-            frame=dict(vertical_world=[1.,0.,0.], reviewed=True, definition='Synthetic case vertical, not scene Z'),
-            landmarks=dict(Nasion=dict(bone_xyz_mm=[0.,3.,4.], axis_world=[1.,0.,0.], measurement_direction='vertical',
-                                       reviewed=True, definition='Synthetic test direction')))
-        path.write_text(json.dumps(manifest))
         try:
             settings = scene.gnm_settings
             assert settings.tissue_axis_mode == 'EXISTING' and not settings.tissue_source_reviewed
@@ -33,6 +27,49 @@ def run_direction_checks(addon):
             settings.tissue_axis_mode, settings.tissue_directions_path = 'SOURCE', str(path)
             item = scene.gnm_markers[0]
             before_target = np.array(item.target_empty.matrix_world.translation)
+            scene.gnm_markers[1].adjust_depth_selected = True
+            try:
+                assert bpy.ops.gnm.create_direction_template() == {'CANCELLED'}
+            except RuntimeError as exc:
+                assert 'Rhinion: absent from tissue table' in str(exc)
+            assert not path.exists() and item.depth_adjustment_history == '[]'
+            scene.gnm_markers[1].adjust_depth_selected = False
+            assert bpy.ops.gnm.create_direction_template() == {'FINISHED'}
+            raw = path.read_bytes()
+            manifest = json.loads(raw)
+            assert set(manifest['landmarks']) == {'Nasion'}
+            row = manifest['landmarks']['Nasion']
+            assert row['bone_xyz_mm'] == list(item.bone_empty.matrix_world.translation)
+            assert row['axis_world'] is None and row['reviewed'] is False
+            assert row['measurement_direction'] == 'vertical'
+            assert row['bone_source_geometry_sha256'] is None
+            assert manifest['table_sha256s'] == [tissue.load_table(table_path).sha256]
+            assert manifest['frame']['vertical_world'] is None and not manifest['frame']['reviewed']
+            assert not settings.tissue_source_reviewed and item.depth_adjustment_history == '[]'
+            if os.environ.get('GNM_MODEL_PATH'):
+                scene.gnm_live.npz_path = os.environ['GNM_MODEL_PATH']
+                csv = Path(directory)/'template-input.csv'
+                addon._export_markers(scene, str(csv))
+                cli = addon._core_module('tissue_directions')
+                assert manifest == cli.make_template(csv, tissue.load_table(table_path), ['Nasion'])
+            try:
+                assert bpy.ops.gnm.create_direction_template() == {'CANCELLED'}
+            except RuntimeError as exc:
+                assert 'already exists' in str(exc)
+            assert path.read_bytes() == raw
+            # Even an acknowledged template has no reviewed source direction.
+            settings.tissue_source_reviewed = True
+            try:
+                assert bpy.ops.gnm.apply_tissue_table() == {'CANCELLED'}
+            except RuntimeError as exc:
+                assert 'reviewed=true' in str(exc)
+            assert item.depth_adjustment_history == '[]'
+            np.testing.assert_array_equal(item.target_empty.matrix_world.translation, before_target)
+            settings.tissue_source_reviewed = False
+            manifest['frame'].update(vertical_world=[1.,0.,0.], reviewed=True,
+                                     definition='Synthetic case vertical, not scene Z')
+            row.update(axis_world=[1.,0.,0.], reviewed=True, definition='Synthetic test direction')
+            path.write_text(json.dumps(manifest), encoding='utf-8')
             try:
                 adapter.apply_selected_table(addon, bpy.context, table_path, direction_source=path)
             except ValueError as exc:
@@ -115,6 +152,22 @@ def run_direction_checks(addon):
             path.write_text(json.dumps(manifest))
             assert adapter.apply_selected_table(addon,bpy.context,table_path,
                 direction_source=path,source_acknowledged=True) == 1
+            output = Path(directory)/'repere-revizuite.json'
+            settings = scene.gnm_settings  # Undo/Redo replaced the original RNA.
+            settings.tissue_directions_path = str(output)
+            item.use_for_fit = False
+            assert bpy.ops.gnm.create_direction_template() == {'FINISHED'}
+            template_row = json.loads(output.read_bytes())['landmarks']['Nasion']
+            assert template_row['bone_source_geometry_sha256'] == digest
+            assert not item.use_for_fit and template_row['axis_world'] is None
+            output.unlink()
+            scene.unit_settings.scale_length = 1.
+            try:
+                assert bpy.ops.gnm.create_direction_template() == {'CANCELLED'}
+            except RuntimeError as exc:
+                assert 'scale 0.001' in str(exc)
+            assert not output.exists()
+            scene.unit_settings.scale_length = .001
             before = np.array(item.target_empty.matrix_world.translation)
             obj.location.x = 1.
             bpy.context.view_layer.update()
@@ -126,6 +179,12 @@ def run_direction_checks(addon):
             else:
                 raise AssertionError('Changed source geometry accepted')
             np.testing.assert_array_equal(item.target_empty.matrix_world.translation, before)
+            try:
+                assert bpy.ops.gnm.create_direction_template() == {'CANCELLED'}
+            except RuntimeError as exc:
+                assert 'source changed' in str(exc)
+            assert not output.exists()
+            print('BLENDER_DIRECTION_TEMPLATE_PASS')
             print('BLENDER_TISSUE_SOURCE_DIRECTIONS_PASS')
         finally:
             bpy.context.window.scene = bpy.data.scenes[previous]
