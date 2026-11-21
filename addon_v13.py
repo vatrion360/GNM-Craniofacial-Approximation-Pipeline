@@ -321,6 +321,9 @@ class GNMSettings(PropertyGroup):
     protocol_id: StringProperty(name='Protocol / revision')
     offline_dense: BoolProperty(name='Include registered bones offline', default=False)
     local_correction: BoolProperty(name='Local correction offline', default=False)
+    offline_depth_weighting: BoolProperty(name='Weight offline fit by tissue SD', default=False,
+        description='Scale fit weights using standard deviations from the selected tissue table. '
+                    'Missing SD retains the base weight. Marker targets stay at their current positions')
     profile_enabled: BoolProperty(name='Reviewed sagittal profile offline', default=False,
         description='Fixed-pose refinement from an explicit reviewed JSON manifest; no live preview change')
     profile_path: StringProperty(name='Profile JSON', subtype='FILE_PATH', default='')
@@ -575,8 +578,8 @@ class GNM_OT_apply_tissue_table(Operator):
 
     def execute(self, context):
         settings = context.scene.gnm_settings
-        source = bpy.path.abspath(settings.tissue_table_path) if settings.tissue_table == 'FILE' else settings.tissue_table
         try:
+            source = _core_module('blender_tissue').selected_table_path(settings)
             directions = None
             if settings.tissue_axis_mode == 'SOURCE':
                 if not settings.tissue_directions_path:
@@ -1692,6 +1695,13 @@ class GNM_PT_panel(Panel):
         box.prop(settings, "case_directory")
         box.prop(settings, 'offline_dense')
         box.prop(settings, 'local_correction')
+        box.prop(settings, 'offline_depth_weighting')
+        if settings.offline_depth_weighting:
+            box.prop(settings, 'tissue_table', text='SD reference')
+            if settings.tissue_table == 'FILE':
+                box.prop(settings, 'tissue_table_path')
+            elif settings.tissue_table != 'NONE':
+                box.label(text='Bundled table has no SD values')
         box.prop(settings, 'profile_enabled')
         if settings.profile_enabled:
             box.prop(settings, 'profile_path')
@@ -3905,6 +3915,12 @@ def _offline_poll():
             raise ValueError('Incomplete run report')
         if report['outputs']['output']['sha256'] != _core_module('validation').sha256_file(folder / 'face.obj'):
             raise ValueError('Output checksum mismatch')
+        status = f"Completed; RMSE {report['metrics']['final_fit']['rmse_mm']:.2f} mm"
+        if report.get('config', {}).get('depth_weighting') == 'sd':
+            weighting = report['marker_metadata']['depth_weighting']
+            labels = weighting['retained_labels']
+            with_sd = sum(weighting['landmarks'][label]['sd_mm'] is not None for label in labels)
+            status += f". Table SD available for {with_sd}/{len(labels)} retained markers."
         # Our OBJ writer uses world-mm v/f records; do not invoke an importer
         # whose axis/unit defaults may silently rotate or rescale the result.
         vertices, faces = [], []
@@ -3921,7 +3937,7 @@ def _offline_poll():
         obj = bpy.data.objects.new('GNM_Offline_' + folder.name, mesh)
         obj['gnm_report'] = str(folder / 'face_report.json')
         scene.collection.objects.link(obj)
-        scene.gnm_settings.offline_status = f"Completed; RMSE {report['metrics']['final_fit']['rmse_mm']:.2f} mm"
+        scene.gnm_settings.offline_status = status
     except Exception as exc:
         scene.gnm_settings.offline_status = f"Result import failed: {exc}"
     return None
@@ -3993,6 +4009,7 @@ class GNM_OT_run_offline(Operator):
             # Fail before creating a case folder or launching the fit. In
             # particular, .py/ELF files cannot be executed by Windows.
             profile_arguments = _profile_offline_arguments(scene)
+            weight_table = _core_module('blender_tissue').offline_weight_table(settings)
             _load_prior(scene)
             selected_prior = _LIVE.prior
             reason = scene.gnm_live.prior_justification or None
@@ -4019,6 +4036,10 @@ class GNM_OT_run_offline(Operator):
                        '--lambda-base', str(scene.gnm_live.lambda_base),
                        '--lambda-min', str(scene.gnm_live.lambda_min),
                        '--lambda-max', str(scene.gnm_live.lambda_max)]
+            if weight_table is not None:
+                table_copy = folder / 'weighting_table.json'
+                table_copy.write_bytes(weight_table)
+                arguments += ['--depth-weighting', 'sd', '--tissue-table', str(table_copy)]
             if profile_arguments:
                 # Preserve the exact manifest beside the exported case for replay.
                 profile_copy = folder / 'profile_constraint.json'

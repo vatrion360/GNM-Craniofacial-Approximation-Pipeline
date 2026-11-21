@@ -191,7 +191,7 @@ follow reviewed sampled bone normals and are not replaced by selected-marker tab
 | --- | --- | --- |
 | `--case-posture TEXT` | Unknown | Declared acquisition posture; selected-table mismatch/unknown warnings only, no geometric correction |
 | `--case-metadata FILE` | None | Case JSON; optional reviewed `age_at_death_estimate` is reported and compared with the selected tissue range, without changing geometry |
-| `--depth-weighting {none,sd}` | `none` | Offline only: optional `1/SD_mm²` multipliers from the selected table; missing SD retains base weight with warning; sensitivity, not calibrated uncertainty |
+| `--depth-weighting {none,sd}` | `none` | Optional `1/SD_mm²` multipliers from the selected table. Also available in Blender’s [offline fit panel](docs/TISSUE_SCENARIOS.md#optional-sd-weighting-a14-offline-fits). Missing SD retains the base weight. |
 | `--tissue-table ID_OR_JSON` | None | Select/report a table; does not by itself replace targets |
 | `--tissue-labels LABEL ...` | Empty | Explicit authorization to replace these case depths/targets |
 | `--tissue-axis {existing,source}` | Unconfigured | Preserve current axes explicitly, or use reviewed world-frame source directions |

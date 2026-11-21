@@ -43,7 +43,7 @@ from blender_spline_checks import run_spline_checks, run_preparation_checks
 from blender_performance_checks import run_performance_checks
 from blender_dental_checks import run_dental_pick, run_saved_dental
 from blender_depth_checks import run_depth_checks, run_depth_undo_checks
-from blender_tissue_checks import run_tissue_checks, run_tissue_undo_checks
+from blender_tissue_checks import run_tissue_checks, run_tissue_undo_checks, run_offline_weighting_checks
 from blender_context_checks import run_context_checks
 from blender_uncertainty_checks import run_uncertainty_checks
 from blender_direction_checks import run_direction_checks
@@ -282,6 +282,7 @@ with tempfile.TemporaryDirectory() as directory:
                 run_capture_checks(addon, scene, directory, folder, imported[0])
                 run_spline_checks(addon, model, directory, os.environ['GNM_EXTERNAL_PYTHON'])
                 run_preparation_checks(addon, model, directory, os.environ['GNM_EXTERNAL_PYTHON'])
+                run_offline_weighting_checks(addon, scene, directory, folder, report)
                 run_profile_external(addon, scene, model, directory, report)
                 run_prior_audit_checks(addon, scene, model, directory)
                 assert bpy.ops.gnm.run_offline() == {'FINISHED'}

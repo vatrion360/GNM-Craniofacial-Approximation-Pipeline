@@ -1,10 +1,31 @@
 """Main-thread Blender adapter; uses the same target planner as the offline fit."""
 import json
+from pathlib import Path
 import numpy as np
 from .io_csv import MarkerTarget
-from .tissue import load_table
+from .tissue import load_table, parse_table, table_path
 from .tissue_application import apply_table
 from .blender_marker_depths import _apply_changes
+
+
+def selected_table_path(settings):
+    if settings.tissue_table == 'NONE':
+        raise ValueError('Select a tissue table')
+    if settings.tissue_table == 'FILE':
+        import bpy
+        if not settings.tissue_table_path.strip():
+            raise ValueError('Select a local tissue table JSON file')
+        return Path(bpy.path.abspath(settings.tissue_table_path)).expanduser()
+    return table_path(settings.tissue_table)
+
+
+def offline_weight_table(settings):
+    """Capture one version for the external run before creating its case directory."""
+    if not settings.offline_depth_weighting:
+        return None
+    raw = selected_table_path(settings).read_bytes()
+    parse_table(raw)
+    return raw
 
 
 def apply_selected_table(addon, context, source, axis_acknowledged=False, direction_source=None, source_acknowledged=False):

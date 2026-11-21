@@ -1,8 +1,10 @@
 """Actual RNA/geometry, audit persistence and failure rollback for table application."""
+import hashlib
 import json
 import os
 from pathlib import Path
 import tempfile
+import time
 import bpy
 import numpy as np
 
@@ -132,6 +134,72 @@ def run_tissue_checks(addon):
         addon._request_refit = original_refit
         bpy.context.window.scene = previous
         bpy.data.scenes.remove(scene)
+
+
+def run_offline_weighting_checks(addon, scene, directory, baseline_folder, baseline_report):
+    settings = scene.gnm_settings
+    assert not settings.offline_depth_weighting
+    assert baseline_report['config']['depth_weighting'] == 'none'
+    assert 'tissue_table' not in baseline_report['inputs']
+    assert not (baseline_folder / 'weighting_table.json').exists()
+    tissue = addon._core_module('tissue')
+    adapter = addon._core_module('blender_tissue')
+    source = Path(directory) / 'țesut sintetic.json'
+    old_selection = settings.tissue_table, settings.tissue_table_path
+    try:
+        settings.tissue_table, settings.tissue_table_path = 'FILE', str(source)
+        assert adapter.offline_weight_table(settings) is None
+        settings.offline_depth_weighting = True
+        source.write_text('{}', encoding='utf-8')
+        existing = set(Path(settings.case_directory).iterdir())
+        for selection, path in [('NONE', ''), ('FILE', ''), ('FILE', str(source))]:
+            settings.tissue_table, settings.tissue_table_path = selection, path
+            try:
+                assert bpy.ops.gnm.run_offline() == {'CANCELLED'}
+            except RuntimeError:
+                pass
+            assert settings.offline_status.startswith('Cannot start:')
+            assert addon._OFFLINE['process'] is None
+            assert set(Path(settings.case_directory).iterdir()) == existing
+
+        settings.tissue_table = 'legacy_hardcoded'
+        assert adapter.offline_weight_table(settings) == tissue.table_path('legacy_hardcoded').read_bytes()
+        settings.tissue_table = 'FILE'
+        doc = tissue.empty_table('synthetic')
+        doc['citation'] = 'Synthetic software check only'
+        doc['landmarks']['Nasion'] = dict(central_mm=40., sd_mm=2.)
+        raw = json.dumps(doc, indent=1).encode('utf-8-sig')
+        source.write_bytes(raw)
+        assert bpy.ops.gnm.run_offline() == {'FINISHED'}
+        folder = Path(addon._OFFLINE['folder'])
+        source.write_text('{}', encoding='utf-8')  # Child must use its archived copy.
+        deadline = time.monotonic() + 180
+        while addon._OFFLINE['process'] is not None and time.monotonic() < deadline:
+            addon._offline_poll()
+            time.sleep(.05)
+        assert settings.offline_status.startswith('Completed;'), settings.offline_status
+        assert '1/47 retained markers' in settings.offline_status
+        snapshot = folder / 'weighting_table.json'
+        assert snapshot.read_bytes() == raw
+        report = json.loads((folder / 'face_report.json').read_text(encoding='utf-8'))
+        assert report['config']['depth_weighting'] == 'sd'
+        assert snapshot.samefile(report['inputs']['tissue_table']['path'])
+        assert report['inputs']['tissue_table']['sha256'] == hashlib.sha256(raw).hexdigest()
+        metadata = report['marker_metadata']
+        assert metadata['tissue_application']['replaced_labels'] == []
+        assert metadata['marker_records'] == baseline_report['marker_metadata']['marker_records']
+        assert metadata['bone_positions_mm'] == baseline_report['marker_metadata']['bone_positions_mm']
+        rows = metadata['depth_weighting']['landmarks']
+        assert 'Vertex_VarfCap' not in rows
+        assert rows['Nasion']['effective_weight'] == rows['Nasion']['base_weight'] / 4
+        assert rows['Rhinion']['effective_weight'] == rows['Rhinion']['base_weight']
+        assert rows['Rhinion']['fallback'] == 'missing table row'
+        assert any(obj.get('gnm_report') == str(folder / 'face_report.json') for obj in scene.objects)
+        print('BLENDER_OFFLINE_TISSUE_WEIGHTING_PASS')
+    finally:
+        addon._stop_offline()
+        settings.offline_depth_weighting = False
+        settings.tissue_table, settings.tissue_table_path = old_selection
 
 
 def run_tissue_undo_checks(addon):
