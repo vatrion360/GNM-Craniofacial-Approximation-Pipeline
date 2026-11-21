@@ -1,4 +1,6 @@
-# Unreleased
+# 5.1.0rc1 / add-on 20.0.0
+
+Release candidate for T-FINAL. See [release scope and acceptance](docs/T_FINAL.md).
 
 - Expose optional tissue SD weighting when launching an offline fit from Blender. Each weighted run archives its reference table. Blender shows how many retained markers have an SD after an ordinary fit.
 

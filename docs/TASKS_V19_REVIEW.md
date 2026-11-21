@@ -151,7 +151,7 @@ de acceptare din task sunt îndeplinite.
 | C1 | Lipsește ca detector | Există raport de asimetrie și câmp de modificare craniană. Acestea nu diagnostichează etiologia sau patologia. |
 | C2 | Lipsește | Controalele post-fit pentru dantură nu compară automat dinții GNM cu dentiția observată. |
 | C3 | Parțial; CT manual | Există holdout de markeri și protocol documentat, nu un harness complet de validare CT. Păstrăm exporturile necesare evaluării manuale. |
-| T-FINAL | De rescris | Packaging, changelog, CI și CSV v3 există. Folosim numerotare ulterioară V19 și o bază nouă fixată prin commit. |
+| T-FINAL | Candidat pregătit pentru verificare | [Livrare 5.1.0rc1 / add-on 20.0.0](T_FINAL.md), pe baza integrată `4217ea4`. Pachet Python, ZIP Blender și verificări de instalare și regresie. |
 
 Module importante reutilizabile: `cranio/quality.py`, `cranio/report.py`,
 `cranio/provenance.py`, `cranio/protocol.py`, `cranio/craniometry.py`,

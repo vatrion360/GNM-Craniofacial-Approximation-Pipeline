@@ -1,5 +1,5 @@
 include addon_v13.py gnm_reconstruct.py build_landmark_map.py make_demographic_prior.py
-include landmark_vertex_map.json requirements-tested-py312.txt CHANGELOG.md NOTICE LICENSE
+include landmark_vertex_map.json requirements-tested-py312.txt CHANGELOG.md CITATION.cff NOTICE LICENSE
 recursive-include docs *.md *.bib *.json
 recursive-include examples *.csv *.json
 recursive-include tools *.py
@@ -7,3 +7,4 @@ recursive-include tests *.py
 recursive-include .github *.yml
 
 recursive-include scripts *.py
+recursive-include baseline *.json
